@@ -37,6 +37,25 @@ inductive WeightedNet.FiresSequence {P T : Type*} (net : WeightedNet P T) :
       (tail : net.FiresSequence i ts tgt) :
       net.FiresSequence src (t :: ts) tgt
 
+/-- Lift a standard firing to a singleton firing sequence. -/
+theorem WeightedNet.FiresSequence.singleton {P T : Type*}
+    {net : WeightedNet P T} {src tgt : Marking P} {t : T}
+    (h : net.Fires src t tgt) : net.FiresSequence src [t] tgt := by
+  exact WeightedNet.FiresSequence.cons h (WeightedNet.FiresSequence.nil tgt)
+
+/-- A firing sequence h_1 ending at a marking `i` can be extended by another firing
+sequence h_2 starting at `i`. The resulting proof uses the fact that the transition list is the concatenation of the two sequences. -/
+theorem WeightedNet.FiresSequence.append {P T : Type*}
+    {net : WeightedNet P T} {src i tgt : Marking P} {ts₁ ts₂ : List T}
+    (h₁ : net.FiresSequence src ts₁ i)
+    (h₂ : net.FiresSequence i ts₂ tgt) :
+    net.FiresSequence src (ts₁ ++ ts₂) tgt := by
+  induction h₁ with
+  | nil => exact h₂
+  | cons head tail ih =>
+  /- h1 is head :: tail and the induction hypothesis holds for tail and h2 -/
+      exact WeightedNet.FiresSequence.cons head (ih h₂)
+
 /-- A marking is reachable from another marking when some transition sequence
 takes the first marking to the second. -/
 def WeightedNet.Reachable {P T : Type*} (net : PetriNet.WeightedNet P T)
