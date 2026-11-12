@@ -6,4 +6,4 @@ Authors: Franck Cassez
 
 module
 
-public import PetriNets.Reachability
+public import PetriNets.Monotonicity
