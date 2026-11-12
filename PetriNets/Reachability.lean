@@ -80,4 +80,22 @@ def WeightedNet.Reachable {P T : Type*} (net : PetriNet.WeightedNet P T)
     (m m' : Marking P) : Prop :=
   ∃ ts : List T, net.FiresSequence m ts m'
 
+/-- Every marking is reachable from itself by the empty firing sequence. -/
+@[refl]
+theorem WeightedNet.Reachable.refl {P T : Type*} (net : WeightedNet P T)
+    (m : Marking P) : net.Reachable m m := by
+  exact ⟨[], WeightedNet.FiresSequence.nil m⟩
+
+/-- Reachability is transitive: consecutive witnessing firing sequences can be
+concatenated. -/
+@[trans]
+theorem WeightedNet.Reachable.trans {P T : Type*} {net : WeightedNet P T}
+    {m₁ m₂ m₃ : Marking P} (h₁ : net.Reachable m₁ m₂)
+    (h₂ : net.Reachable m₂ m₃) : net.Reachable m₁ m₃ := by
+  rcases h₁ with ⟨ts₁, hts₁⟩
+  rcases h₂ with ⟨ts₂, hts₂⟩
+  exact ⟨ts₁ ++ ts₂, WeightedNet.FiresSequence.append hts₁ hts₂⟩
+
+-- TODO: Provide `IsRefl` and `IsTrans` instances if generic relation APIs need them.
+
 end PetriNet
