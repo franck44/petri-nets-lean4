@@ -24,9 +24,15 @@ weight to each arc: membership in `F` corresponds precisely to a positive
 entry in `Pre` or `Post`. The matrix presentation is convenient for defining
 the incidence matrix `Post - Pre`, state equations, and invariants.
 
-The terminology follows the standard weighted P/T-net literature; see, for
-example, T. Murata, "Petri Nets: Properties, Analysis and Applications",
-*Proceedings of the IEEE* 77(4), 1989, pp. 541–580.
+## References
+
+* W. Reisig, *Understanding Petri Nets: Modeling Techniques, Analysis Methods,
+  Case Studies*, Springer, 2013, especially "The Basic Concepts", pp. 13–24.
+  DOI: 10.1007/978-3-642-33278-4.
+* T. Murata, "Petri Nets: Properties, Analysis and Applications",
+  *Proceedings of the IEEE* 77(4), 1989, pp. 541–580, especially Section II
+  for weighted nets, markings, enabling, and firing.
+  DOI: 10.1109/5.24143.
 -/
 
 @[expose] public section
