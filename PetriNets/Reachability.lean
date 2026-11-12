@@ -13,24 +13,24 @@ reachability relation for weighted P/T nets.
 
 namespace PetriNet
 
--- namespace WeightedNet
 
-/-- `net.FiresSequence m transitions m'` means that firing the transitions in
-order takes marking `m` to marking `m'`. -/
+/-- `net.FiresSequence src transitions tgt` builds a proof that firing the sequence of transitions `transitions` starting from marking `src` leads to marking `tgt`.
+In other words, it shows that executing the  transitions in order takes the net state from `src` to `tgt`. -/
 inductive WeightedNet.FiresSequence {P T : Type*} (net : WeightedNet P T) :
     Marking P → List T → Marking P → Prop where
-  | nil (marking) : net.FiresSequence marking [] marking
-  | cons {marking marking' marking'' : Marking P} {transition : T}
-      {transitions : List T} (head : net.Fires marking transition marking')
-      (tail : net.FiresSequence marking' transitions marking'') :
-      net.FiresSequence marking (transition :: transitions) marking''
+    /- `src` is the initial marking, `tgt` is the final marking -/
+    /- the empty sequence is valid if it leaves the marking unchanged -/
+  | nil (m) : net.FiresSequence m [] m
+  /- a non-empty sequence is valid if the first transition fires and the remaining sequence is valid -/
+  | cons {ts: List T} {src i tgt : Marking P} {t : T}
+      (head : net.Fires src t i)
+      (tail : net.FiresSequence i ts tgt) :
+      net.FiresSequence src (t :: ts) tgt
 
 /-- A marking is reachable from another marking when some transition sequence
 takes the first marking to the second. -/
 def WeightedNet.Reachable {P T : Type*} (net : PetriNet.WeightedNet P T)
-    (marking marking' : Marking P) : Prop :=
-  ∃ transitions : List T, net.FiresSequence marking transitions marking'
-
--- end WeightedNet
+    (m m' : Marking P) : Prop :=
+  ∃ ts : List T, net.FiresSequence m ts m'
 
 end PetriNet
