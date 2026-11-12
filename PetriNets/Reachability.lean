@@ -56,6 +56,24 @@ theorem WeightedNet.FiresSequence.append {P T : Type*}
   /- h1 is head :: tail and the induction hypothesis holds for tail and h2 -/
       exact WeightedNet.FiresSequence.cons head (ih h₂)
 
+/-- A transition sequence has a unique target marking when fired from a
+ source marking. -/
+theorem WeightedNet.FiresSequence.deterministic {P T : Type*}
+    {net : WeightedNet P T} {src tgt₁ tgt₂ : Marking P} {ts : List T}
+    (h₁ : net.FiresSequence src ts tgt₁)
+    (h₂ : net.FiresSequence src ts tgt₂) : tgt₁ = tgt₂ := by
+    /- induction on h₁ treating tgt₂ as arbitrary -/
+  induction h₁ generalizing tgt₂ with
+  | nil =>
+      cases h₂
+      rfl
+  | cons head₁ tail₁ ih =>
+      cases h₂ with
+      | cons head₂ tail₂ =>
+          cases WeightedNet.fires_is_deterministic head₁ head₂
+          /- the two target after head₁ and head₂ must be the same -/
+          exact ih tail₂
+
 /-- A marking is reachable from another marking when some transition sequence
 takes the first marking to the second. -/
 def WeightedNet.Reachable {P T : Type*} (net : PetriNet.WeightedNet P T)
