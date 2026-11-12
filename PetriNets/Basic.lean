@@ -59,16 +59,16 @@ abbrev Marking (P : Type*) := P → ℕ
 /-- A transition is enabled when every place contains at least the number of
 tokens required by its input multiplicity. -/
 def WeightedNet.Enabled {P T : Type*} (net : WeightedNet P T)
-    (marking : Marking P) (transition : T) : Prop :=
-  ∀ place, net.pre place transition ≤ marking place
+    (m : Marking P) (t : T) : Prop :=
+  ∀ p, net.pre p t ≤ m p
 
-/-- `net.Fires marking transition marking'` means that `transition` is enabled
-at `marking` and that firing it produces `marking'`. -/
+/-- `net.Fires m t m'` means that `t` is enabled at `m` and that firing it
+produces `m'`. -/
 def WeightedNet.Fires {P T : Type*} (net : WeightedNet P T)
-    (marking : Marking P) (transition : T) (marking' : Marking P) : Prop :=
-  net.Enabled marking transition ∧
-    ∀ place,
-      marking' place = marking place - net.pre place transition + net.post place transition
+    (m : Marking P) (t : T) (m' : Marking P) : Prop :=
+  net.Enabled m t ∧
+    ∀ p,
+      m' p = m p - net.pre p t + net.post p t
 
 /-- Firing a fixed transition from a fixed marking has a unique result i.e. is deterministic. -/
 theorem WeightedNet.fires_is_deterministic {P T : Type*} {net : WeightedNet P T}
