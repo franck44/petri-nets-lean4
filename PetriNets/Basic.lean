@@ -29,6 +29,8 @@ example, T. Murata, "Petri Nets: Properties, Analysis and Applications",
 *Proceedings of the IEEE* 77(4), 1989, pp. 541–580.
 -/
 
+@[expose] public section
+
 namespace PetriNet
 
 /-- A weighted place/transition net represented by its multiplicity matrices.

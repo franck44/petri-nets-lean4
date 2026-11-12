@@ -1,3 +1,3 @@
 module
 
-public import PetriNets.Basic
+public import PetriNets.Reachability
