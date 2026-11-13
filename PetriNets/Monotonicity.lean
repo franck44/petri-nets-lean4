@@ -73,4 +73,29 @@ theorem WeightedNet.Reachable.add {P T : Type*} {net : WeightedNet P T}
   have hts_add := WeightedNet.FiresSequence.add hts d
   use ts
 
+/-- Reachability is monotonic with respect to the pointwise order on markings:
+if `m₁ ≤ m₂` and `m₁'` is reachable from `m₁`, then there is an `m₂'`
+reachable from `m₂` such that `m₁' ≤ m₂'`.
+
+For the proof, let `d = m₂ - m₁`. The assumption `m₁ ≤ m₂` gives
+`m₁ + d = m₂` pointwise. By `WeightedNet.Reachable.add`, `m₁' + d` is
+reachable from `m₁ + d = m₂`. Finally, `m₁' ≤ m₁' + d` pointwise, so take
+`m₂' = m₁' + d`.
+-/
+theorem WeightedNet.Reachable.mono {P T : Type*} {net : WeightedNet P T}
+    {m₁ m₂ m₁' : Marking P} (hreach : net.Reachable m₁ m₁')
+    (hle : m₁ ≤ m₂) :
+    ∃ m₂', net.Reachable m₂ m₂' ∧ m₁' ≤ m₂' := by
+  let d : Marking P := m₂ - m₁
+  have hsrc : m₁ + d = m₂ := by
+    funext p
+    change m₁ p + (m₂ p - m₁ p) = m₂ p
+    exact Nat.add_sub_of_le (hle p)
+  have hreach_add := WeightedNet.Reachable.add hreach d
+  rw [hsrc] at hreach_add
+  have htgt_le : m₁' ≤ m₁' + d := by
+    intro p
+    simp
+  use m₁' + d
+
 end PetriNet
