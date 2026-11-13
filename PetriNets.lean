@@ -6,4 +6,5 @@ Authors: Franck Cassez
 
 module
 
+public import PetriNets.Incidence
 public import PetriNets.Monotonicity

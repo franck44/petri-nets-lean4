@@ -17,7 +17,7 @@ This module uses the matrix-oriented presentation of a weighted P/T net
 `N = (P, T, Pre, Post)`,
 
 where `P` and `T` are the types of places and transitions and
-`Pre, Post : P → T → ℕ` are the input and output multiplicity matrices.
+`Pre, Post : P → T → ℕ` are the pre- and post-incidence matrices.
 
 For a place `p` and transition `t`, a positive value `Pre p t` is the weight of
 the arc from `p` to `t`, and a positive value `Post p t` is the weight of the
@@ -45,7 +45,8 @@ the incidence matrix `Post - Pre`, state equations, and invariants.
 
 namespace PetriNet
 
-/-- A weighted place/transition net represented by its multiplicity matrices.
+/-- A weighted place/transition net represented by its pre- and post-incidence
+matrices.
 
 `pre p t` is the number of tokens consumed from place `p` when transition `t`
 fires. `post p t` is the number of tokens produced in `p`. In either matrix,
@@ -63,7 +64,7 @@ It defines the state of the net, as the distribution of tokens across the places
 abbrev Marking (P : Type*) := P → ℕ
 
 /-- A transition is enabled when every place contains at least the number of
-tokens required by its input multiplicity. -/
+tokens specified by its pre-incidence entry. -/
 def WeightedNet.Enabled {P T : Type*} (net : WeightedNet P T)
     (m : Marking P) (t : T) : Prop :=
   ∀ p, net.pre p t ≤ m p
