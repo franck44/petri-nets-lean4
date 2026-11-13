@@ -79,4 +79,29 @@ def WeightedNet.incidence {P T : Type*} (net : WeightedNet P T) :
     Matrix P T ℤ :=
   fun p t => (net.post p t : ℤ) - (net.pre p t : ℤ)
 
+/-- The natural-number token-balance equation for one firing: at each place,
+the tokens after firing plus the tokens consumed equal the tokens before firing
+plus the tokens produced. -/
+theorem WeightedNet.Fires.balance {P T : Type*} {net : WeightedNet P T}
+    {m m' : Marking P} {t : T} (h : net.Fires m t m') :
+    ∀ p, m' p + net.pre p t = m p + net.post p t := by
+  intro p
+  have hfire := h.right p
+  have henabled := h.left p
+  omega
+
+/-- The integer one-step state equation: firing `t` from `m` to `m'` changes
+the token count at each place by the corresponding signed incidence entry.
+
+The proof unfolds `WeightedNet.Fires` and `WeightedNet.incidence`, then uses
+integer arithmetic with coercions from natural numbers. -/
+theorem WeightedNet.Fires.int_state_equation {P T : Type*}
+    {net : WeightedNet P T}
+    {m m' : Marking P} {t : T} (h : net.Fires m t m') :
+    ∀ p, (m' p : ℤ) = (m p : ℤ) + net.incidence p t := by
+  intro p
+  rw [h.right p]
+  simp only [Nat.cast_add, Nat.cast_sub (h.left p), WeightedNet.incidence]
+  ring
+
 end PetriNet
