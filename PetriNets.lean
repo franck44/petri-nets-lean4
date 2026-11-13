@@ -8,3 +8,4 @@ module
 
 public import PetriNets.Incidence
 public import PetriNets.Monotonicity
+public import PetriNets.StateEquation
