@@ -58,4 +58,35 @@ def WeightedNet.PlaceInvariant.value {P T : Type*} [Fintype P]
     (m : Marking P) : ℤ :=
   ∑ p, inv.coeff p * (m p : ℤ)
 
+/-- The value of a place invariant is preserved after the firing of any
+transition. -/
+theorem WeightedNet.PlaceInvariant.value_eq_of_fires {P T : Type*} [Fintype P]
+    {net : WeightedNet P T} (inv : WeightedNet.PlaceInvariant net)
+    {m m' : Marking P} {t : T} (h : net.Fires m t m') :
+    inv.value m' = inv.value m := by
+  simp only [WeightedNet.PlaceInvariant.value]
+  simp_rw [h.int_state_equation, mul_add]
+  rw [Finset.sum_add_distrib, inv.condition t, add_zero]
+
+/-- The value of a place invariant is preserved after firing any transition
+sequence.
+This generalises the previous theorem to sequences of transitions. -/
+theorem WeightedNet.PlaceInvariant.value_eq_of_firesSequence
+    {P T : Type*} [Fintype P] {net : WeightedNet P T}
+    (inv : WeightedNet.PlaceInvariant net) {src tgt : Marking P} {ts : List T}
+    (h : net.FiresSequence src ts tgt) : inv.value tgt = inv.value src := by
+  induction h with
+  | nil => rfl
+  | cons head tail ih =>
+      exact ih.trans (inv.value_eq_of_fires head)
+
+/-- If `tgt` is reachable from `src`, every place invariant has the same value
+at both markings. -/
+theorem WeightedNet.PlaceInvariant.value_eq_of_reachable
+    {P T : Type*} [Fintype P] {net : WeightedNet P T}
+    (inv : WeightedNet.PlaceInvariant net) {src tgt : Marking P}
+    (h : net.Reachable src tgt) : inv.value tgt = inv.value src := by
+  rcases h with ⟨ts, hts⟩
+  exact inv.value_eq_of_firesSequence hts
+
 end PetriNet
