@@ -60,4 +60,56 @@ theorem firingCount_append {T : Type*} [DecidableEq T]
   funext t
   simp [firingCount]
 
+/-- A weighted sum of firing counts equals the sum of the corresponding values
+along the transition list.
+
+For example, let `t₁` and `t₂` be distinct transitions, let
+`ts = [t₁, t₂, t₁]`, and suppose `f t₁ = 3` and `f t₂ = 5`. The count-weighted
+sum is `2 * 3 + 1 * 5 = 11`, while the sum along the mapped list is
+`3 + 5 + 3 = 11`. -/
+theorem firingCount_weighted_sum {T : Type*} [Fintype T] [DecidableEq T]
+    (ts : List T) (f : T → ℕ) :
+    (∑ t, firingCount ts t * f t) = (ts.map f).sum := by
+  calc
+    _ = ∑ t ∈ ts.toFinset, firingCount ts t * f t := by
+      symm
+      apply Finset.sum_subset (Finset.subset_univ _)
+      intro t ht hnot
+      have hnotmem : t ∉ ts := by simpa using hnot
+      simp [firingCount, List.count_eq_zero.mpr hnotmem]
+    _ = (ts.map f).sum := by
+      simpa [firingCount, nsmul_eq_mul] using
+        (Finset.sum_list_map_count ts f).symm
+
+/-- Prepending `t` adds exactly the `t` contribution to a weighted sum of
+firing counts. -/
+theorem firingCount_weighted_sum_cons {T : Type*} [Fintype T] [DecidableEq T]
+    (t : T) (ts : List T) (f : T → ℕ) :
+    (∑ u, firingCount (t :: ts) u * f u) =
+      f t + ∑ u, firingCount ts u * f u := by
+  simp_rw [firingCount_weighted_sum]
+  simp
+
+/-- The natural-number token-balance equation for a firing sequence.
+
+The transition type `T` is finite so that the total tokens consumed and
+produced at a place can be expressed as finite sums over all transitions.
+Decidable equality is needed to compute the firing-count vector. -/
+theorem WeightedNet.FiresSequence.balance {P T : Type*} [Fintype T]
+    [DecidableEq T] {net : WeightedNet P T} {src tgt : Marking P}
+    {ts : List T} (h : net.FiresSequence src ts tgt) :
+    ∀ p,
+      tgt p + ∑ t, firingCount ts t * net.pre p t =
+      src p + ∑ t, firingCount ts t * net.post p t := by
+  induction h with
+  | nil m =>
+      intro p
+      simp
+  | cons head tail ih =>
+      intro p
+      have hhead := head.balance p
+      have htail := ih p
+      simp_rw [firingCount_weighted_sum_cons]
+      omega
+
 end PetriNet
