@@ -112,4 +112,47 @@ theorem WeightedNet.FiresSequence.balance {P T : Type*} [Fintype T]
       simp_rw [firingCount_weighted_sum_cons]
       omega
 
+/-- The integer state equation for a firing sequence. At every place, the
+target marking equals the source marking plus the incidence contribution of
+the firing-count vector.
+
+The transition type `T` is finite because the incidence contribution is a sum
+over all transitions. -/
+theorem WeightedNet.FiresSequence.int_state_equation {P T : Type*} [Fintype T]
+    [DecidableEq T] {net : WeightedNet P T} {src tgt : Marking P}
+    {ts : List T} (h : net.FiresSequence src ts tgt) :
+    ∀ p,
+      (tgt p : ℤ) = (src p : ℤ) +
+        ∑ t, (firingCount ts t : ℤ) * net.incidence p t := by
+  intro p
+  have hbalance :
+      (tgt p : ℤ) +
+          ∑ t, (firingCount ts t : ℤ) * (net.pre p t : ℤ) =
+        (src p : ℤ) +
+          ∑ t, (firingCount ts t : ℤ) * (net.post p t : ℤ) := by
+    exact_mod_cast h.balance p
+  simp only [WeightedNet.incidence]
+  simp only [mul_sub]
+  simp only [Finset.sum_sub_distrib]
+  omega
+
+/-- A marking `tgt` is reachable from `src` only if there is a nonnegative
+firing-count vector whose incidence contribution transforms `src` into `tgt`.
+
+The converse does not hold in general: a solution of the state equation need
+not correspond to an executable firing sequence.
+
+The proof extracts the firing sequence witnessing reachability, applies its
+integer state equation, and uses its firing-count vector as the witness.
+-/
+theorem WeightedNet.Reachable.int_state_equation {P T : Type*} [Fintype T]
+    [DecidableEq T] {net : WeightedNet P T} {src tgt : Marking P}
+    (h : net.Reachable src tgt) :
+    ∃ x : T → ℕ, ∀ p,
+      (tgt p : ℤ) = (src p : ℤ) +
+        ∑ t, (x t : ℤ) * net.incidence p t := by
+  rcases h with ⟨ts, hts⟩
+  have heq := hts.int_state_equation
+  use firingCount ts
+
 end PetriNet
