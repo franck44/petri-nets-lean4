@@ -58,6 +58,19 @@ def WeightedNet.PlaceInvariant.value {P T : Type*} [Fintype P]
     (m : Marking P) : ℤ :=
   ∑ p, inv.coeff p * (m p : ℤ)
 
+/-- For each transition, a place invariant assigns the same total weight to
+the tokens produced and the tokens consumed. This is the invariant condition
+written in terms of `post` and `pre`, rather than the incidence matrix. -/
+theorem WeightedNet.PlaceInvariant.post_eq_pre
+    {P T : Type*} [Fintype P] {net : WeightedNet P T}
+    (inv : WeightedNet.PlaceInvariant net) (t : T) :
+    ∑ p, inv.coeff p * (net.post p t : ℤ) =
+      ∑ p, inv.coeff p * (net.pre p t : ℤ) := by
+  have h := inv.condition t
+  simp_rw [WeightedNet.incidence, mul_sub] at h
+  rw [Finset.sum_sub_distrib] at h
+  exact sub_eq_zero.mp h
+
 /-- The value of a place invariant is preserved after the firing of any
 transition. -/
 theorem WeightedNet.PlaceInvariant.value_eq_of_fires {P T : Type*} [Fintype P]
