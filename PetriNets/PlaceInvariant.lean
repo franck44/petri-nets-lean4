@@ -89,4 +89,16 @@ theorem WeightedNet.PlaceInvariant.value_eq_of_reachable
   rcases h with ⟨ts, hts⟩
   exact inv.value_eq_of_firesSequence hts
 
+/-- The contrapositive of `value_eq_of_reachable`: if a place invariant has
+different values at `src` and `tgt`, then `tgt` is not reachable from `src`.
+This is the standard use of place invariants as a necessary reachability
+condition. -/
+theorem WeightedNet.PlaceInvariant.not_reachable_of_value_ne
+    {P T : Type*} [Fintype P] {net : WeightedNet P T}
+    (inv : WeightedNet.PlaceInvariant net) {src tgt : Marking P}
+    (h : inv.value tgt ≠ inv.value src) : ¬net.Reachable src tgt := by
+  intro hreach
+  apply h
+  exact inv.value_eq_of_reachable hreach
+
 end PetriNet
