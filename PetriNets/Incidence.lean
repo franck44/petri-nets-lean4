@@ -31,6 +31,15 @@ A positive entry records net token production, while a negative entry records
 net token consumption. No finiteness assumptions are needed to define the
 matrix; they will be introduced later for finite sums and matrix products.
 
+## Orientation relative to Murata
+
+Murata uses a transition-by-place incidence matrix `A` and writes the one-step
+state equation as `M' = M + Aᵀ u`, where `u` selects the transition that fires.
+Our incidence matrix `C` is place-by-transition, so it corresponds to Murata's
+`Aᵀ`. With our orientation, the equation is `M' = M + C u`; for a single
+transition `t`, its component at place `p` is
+`M' p = M p + C p t`.
+
 ## Example
 
 Consider places `p₁, p₂` and transitions `t₁, t₂`, with
