@@ -1,0 +1,61 @@
+/-
+Copyright (c) 2026 Franck Cassez. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Franck Cassez
+-/
+
+module
+
+public import PetriNets.Incidence
+public import PetriNets.Reachability
+
+/-!
+# Place invariants of weighted P/T nets
+
+A place invariant of a net bundles a coefficient function `y : P → ℤ` with a
+proof that every transition has zero weighted incidence contribution. With our
+place-by-transition incidence matrix `C`, this is the equation `yᵀ C = 0`,
+stated componentwise for each transition.
+
+Being a place invariant is a structural property of a particular net: the
+bundled proof depends on the net's incidence matrix, but not on an initial
+marking. The invariant's value is defined at every marking and is preserved by
+firing, hence equal on markings related by reachability. The converse does not
+hold in general: having the same invariant value does not imply that one
+marking is reachable from the other.
+
+The place type `P` is finite because both the invariant condition and the
+value of an invariant at a marking sum over all places. No finiteness
+assumption on transitions is needed: the invariant condition is checked one
+transition at a time.
+
+## References
+
+* W. Reisig, *Understanding Petri Nets: Modeling Techniques, Analysis Methods,
+  Case Studies*, Springer, 2013, especially the chapters on place invariants,
+  pp. 103–129. DOI: 10.1007/978-3-642-33278-4.
+* T. Murata, "Petri Nets: Properties, Analysis and Applications",
+  *Proceedings of the IEEE* 77(4), 1989, Section V-A.
+  DOI: 10.1109/5.24143.
+-/
+
+@[expose] public section
+
+namespace PetriNet
+
+/-- A place invariant of `net` consists of a function on places together with
+a proof that every transition has zero weighted incidence contribution. This
+is a structural property of `net` and does not depend on an initial marking. -/
+structure WeightedNet.PlaceInvariant {P T : Type*} [Fintype P]
+    (net : WeightedNet P T) where
+  coeff : P → ℤ
+  condition : ∀ t, ∑ p, coeff p * net.incidence p t = 0
+
+/-- The weighted value of a place invariant at a marking. This is defined for
+every marking, whether reachable or not. -/
+def WeightedNet.PlaceInvariant.value {P T : Type*} [Fintype P]
+    {net : WeightedNet P T} (inv : WeightedNet.PlaceInvariant net)
+    (m : Marking P) : ℤ :=
+  ∑ p, inv.coeff p * (m p : ℤ)
+
+end PetriNet
