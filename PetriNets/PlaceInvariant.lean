@@ -43,9 +43,14 @@ transition at a time.
 
 namespace PetriNet
 
-/-- A place invariant of `net` consists of a function on places together with
-a proof that every transition has zero weighted incidence contribution. This
-is a structural property of `net` and does not depend on an initial marking. -/
+/-- A place invariant of `net` consists of a coefficient function on places
+together with a proof that every transition has zero weighted incidence
+contribution. Thus, constructing a value of type `PlaceInvariant net` requires
+both the function `coeff` and a proof of `condition`; the type guarantees that
+every bundled coefficient function satisfies the invariant condition.
+
+This is a structural property of `net` and does not depend on an initial
+marking. -/
 structure WeightedNet.PlaceInvariant {P T : Type*} [Fintype P]
     (net : WeightedNet P T) where
   coeff : P → ℤ
