@@ -56,6 +56,18 @@ structure WeightedNet.PlaceInvariant {P T : Type*} [Fintype P]
   coeff : P → ℤ
   condition : ∀ t, ∑ p, coeff p * net.incidence p t = 0
 
+/-- For a place invariant `inv`, let `y = inv.coeff`. Viewing `y` as a row
+vector and `net.incidence` as the incidence matrix `C`, we have `y · C = 0`.
+
+This theorem packages the componentwise condition stored in `inv`; it does not
+require the transition type to be finite. -/
+theorem WeightedNet.PlaceInvariant.coeff_vecMul_incidence_eq_zero
+    {P T : Type*} [Fintype P] {net : WeightedNet P T}
+    (inv : WeightedNet.PlaceInvariant net) :
+    Matrix.vecMul inv.coeff net.incidence = 0 := by
+  funext t
+  exact inv.condition t
+
 /-- The weighted value of a place invariant at a marking. This is defined for
 every marking, whether reachable or not. -/
 def WeightedNet.PlaceInvariant.value {P T : Type*} [Fintype P]
