@@ -32,8 +32,8 @@ transition at a time.
 ## References
 
 * W. Reisig, *Understanding Petri Nets: Modeling Techniques, Analysis Methods,
-  Case Studies*, Springer, 2013, especially the chapters on place invariants,
-  pp. 103–129. DOI: 10.1007/978-3-642-33278-4.
+  Case Studies*, Springer, 2013, especially Chapter 11,
+  pp. 123–129. DOI: 10.1007/978-3-642-33278-4.
 * T. Murata, "Petri Nets: Properties, Analysis and Applications",
   *Proceedings of the IEEE* 77(4), 1989, Section V-A.
   DOI: 10.1109/5.24143.
