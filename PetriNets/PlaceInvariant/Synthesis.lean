@@ -101,6 +101,12 @@ theorem WeightedNet.placeInvariantMap_apply {P T : Type*} [Fintype P]
 `placeInvariantMap`. This identifies the type of place invariants precisely
 with the set of coefficient functions `y` satisfying `y · C = 0`.
 
+As a linear equivalence, `placeInvariantEquivKer` provides two mutually
+inverse linear maps. The forward map `placeInvariantEquivKer net inv` sends a
+place invariant to its coefficient function in the kernel. The reverse map
+`(placeInvariantEquivKer net).symm y` constructs a place invariant from a
+kernel element. Both maps preserve addition and integer scalar multiplication.
+
 The equivalence is constructed as follows:
 
 * The forward map sends an invariant `inv` to `inv.coeff`. Kernel membership
@@ -140,5 +146,21 @@ def WeightedNet.placeInvariantEquivKer
   map_smul' k inv := by
     apply Subtype.ext
     exact WeightedNet.PlaceInvariant.coeff_smul k inv
+
+/-- The forward direction of `placeInvariantEquivKer` sends a place invariant
+to its coefficient function. -/
+@[simp]
+theorem WeightedNet.placeInvariantEquivKer_apply
+    {P T : Type*} [Fintype P] (net : WeightedNet P T)
+    (inv : WeightedNet.PlaceInvariant net) :
+    (net.placeInvariantEquivKer inv).1 = inv.coeff := rfl
+
+/-- The inverse direction of `placeInvariantEquivKer` constructs a place
+invariant with the coefficient function carried by the kernel element. -/
+@[simp]
+theorem WeightedNet.placeInvariantEquivKer_symm_apply_coeff
+    {P T : Type*} [Fintype P] (net : WeightedNet P T)
+    (y : LinearMap.ker net.placeInvariantMap) :
+    ((net.placeInvariantEquivKer).symm y).coeff = y.1 := rfl
 
 end PetriNet
