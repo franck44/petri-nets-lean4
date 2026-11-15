@@ -21,6 +21,12 @@ inference.
 
 Together, these closure properties are the first step towards viewing the
 place invariants as the integer kernel of the net's incidence matrix.
+
+## References
+
+* W. Reisig, *Understanding Petri Nets: Modeling Techniques, Analysis Methods,
+  Case Studies*, Springer, 2013, Chapter 12.
+  DOI: 10.1007/978-3-642-33278-4.
 -/
 
 @[expose] public section
