@@ -12,13 +12,13 @@ public import PetriNets.Reachability
 /-!
 # Place invariants of weighted P/T nets
 
-A place invariant of a net bundles a coefficient function `y : P → ℤ` with a
-proof that every transition has zero weighted incidence contribution. With our
+A place invariant of a net consists of a coefficient function `y : P → ℤ` and
+a proof that every transition has zero weighted incidence contribution. With our
 place-by-transition incidence matrix `C`, this is the equation `yᵀ C = 0`,
 stated componentwise for each transition.
 
 Being a place invariant is a structural property of a particular net: the
-bundled proof depends on the net's incidence matrix, but not on an initial
+proof depends on the net's incidence matrix, but not on an initial
 marking. The invariant's value is defined at every marking and is preserved by
 firing, hence equal on markings related by reachability. The converse does not
 hold in general: having the same invariant value does not imply that one
@@ -47,7 +47,7 @@ namespace PetriNet
 together with a proof that every transition has zero weighted incidence
 contribution. Thus, constructing a value of type `PlaceInvariant net` requires
 both the function `coeff` and a proof of `condition`; the type guarantees that
-every bundled coefficient function satisfies the invariant condition.
+every place invariant satisfies the invariant condition.
 
 This is a structural property of `net` and does not depend on an initial
 marking. -/

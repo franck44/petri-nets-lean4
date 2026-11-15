@@ -10,4 +10,5 @@ public import PetriNets.Incidence
 public import PetriNets.Monotonicity
 public import PetriNets.PlaceInvariant
 public import PetriNets.PlaceInvariant.Algebra
+public import PetriNets.PlaceInvariant.Synthesis
 public import PetriNets.StateEquation

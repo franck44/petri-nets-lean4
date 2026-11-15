@@ -40,7 +40,7 @@ theorem WeightedNet.PlaceInvariant.ext {P T : Type*} [Fintype P]
 
 /-- Taking the coefficient function is injective on place invariants. This is
 used to transport the additive commutative group structure of functions
-`P → ℤ` to bundled place invariants in `instAddCommGroup`. -/
+`P → ℤ` to place invariants in `instAddCommGroup`. -/
 theorem WeightedNet.PlaceInvariant.coeff_injective
     {P T : Type*} [Fintype P] {net : WeightedNet P T} :
     Function.Injective
