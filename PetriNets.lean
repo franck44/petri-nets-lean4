@@ -8,6 +8,7 @@ module
 
 public import PetriNets.Incidence
 public import PetriNets.MarkingGraph
+public import PetriNets.MarkingGraph.Boundedness
 public import PetriNets.MarkingGraph.Properties
 public import PetriNets.Monotonicity
 public import PetriNets.PlaceInvariant

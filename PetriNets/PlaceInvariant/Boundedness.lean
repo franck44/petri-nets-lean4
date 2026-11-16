@@ -18,7 +18,8 @@ upper bound on the number of tokens at `p`.
 
 Boundedness is relative to an initial marking: a place is bounded from `m₀`
 when one natural-number bound applies to all markings reachable from `m₀`. A
-net is bounded from `m₀` when every place is bounded from `m₀`.
+net is bounded from `m₀` when one bound applies to every place in every
+marking reachable from `m₀`.
 
 If an invariant is positive for a place, that place is bounded for every
 choice of initial marking. The bound itself may depend on the initial marking,
@@ -51,11 +52,12 @@ def WeightedNet.PlaceBoundedFrom {P T : Type*} (net : WeightedNet P T)
     (m₀ : Marking P) (p : P) : Prop :=
   ∃ B : ℕ, ∀ m, net.Reachable m₀ m → m p ≤ B
 
-/-- A net is bounded from initial marking `m₀` when every place is bounded
-from `m₀`. -/
+/-- A net is bounded from initial marking `m₀` when there is one natural
+number `B` such that every place contains at most `B` tokens in every marking
+reachable from `m₀`. -/
 def WeightedNet.BoundedFrom {P T : Type*} (net : WeightedNet P T)
     (m₀ : Marking P) : Prop :=
-  ∀ p, net.PlaceBoundedFrom m₀ p
+  ∃ B : ℕ, ∀ m, net.Reachable m₀ m → ∀ p, m p ≤ B
 
 /-- An invariant with nonnegative coefficients has a nonnegative value at
 every marking. -/
@@ -132,8 +134,13 @@ theorem WeightedNet.boundedFrom_of_positiveAt_each
     {P T : Type*} [Fintype P] (net : WeightedNet P T)
     (hpos : ∀ p, ∃ inv : WeightedNet.PlaceInvariant net, inv.PositiveAt p)
     (m₀ : Marking P) : net.BoundedFrom m₀ := by
-  intro p
-  obtain ⟨inv, hinv⟩ := hpos p
-  exact inv.placeBoundedFrom_of_positiveAt hinv m₀
+  classical
+  choose inv hinv using hpos
+  let bound := fun p => ((inv p).value m₀).toNat / ((inv p).coeff p).toNat
+  obtain ⟨B, hB⟩ := Finite.bddAbove_range bound
+  use B
+  intro m hreach p
+  exact ((inv p).tokens_le_value_div_of_positiveAt (hinv p) hreach).trans
+    (hB ⟨p, rfl⟩)
 
 end PetriNet
