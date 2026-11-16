@@ -15,7 +15,7 @@ public import Mathlib.LinearAlgebra.Matrix.ToLin
 A place coefficient function `y : P → ℤ` is a place invariant exactly when
 its product with the incidence matrix is zero. This module expresses that
 condition as the kernel of an integer-linear map, providing the algebraic
-foundation for synthesizing place invariants.
+foundation for synthesising place invariants.
 
 The purpose of this map is to test arbitrary candidate coefficient functions,
 not only coefficient functions already known to define place invariants. Given
@@ -25,7 +25,7 @@ a table of how much the quantity measured by `y` changes when each transition
 fires. A nonzero value identifies a transition for which `y` is not preserved.
 If every value is zero, `y` satisfies the place-invariant condition.
 
-We call this map `placeInvariantMap`. Synthesizing place invariants
+We call this map `placeInvariantMap`. Synthesising place invariants
 then amounts to finding its zero inputs, that is, computing its kernel using
 integer linear algebra.
 

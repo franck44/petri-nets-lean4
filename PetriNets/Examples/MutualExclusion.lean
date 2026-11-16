@@ -11,7 +11,7 @@ public import PetriNets.PlaceInvariant
 /-!
 # Example: mutual exclusion
 
-This module formalizes the mutual-exclusion example from Reisig's symbolic
+This module formalises the mutual-exclusion example from Reisig's symbolic
 net in Fig. 3.8. Its places are labelled `A` through `G`, and its transitions
 are labelled `a` through `f`:
 

@@ -10,9 +10,9 @@ public import PetriNets.PlaceInvariant.Synthesis
 public import Mathlib.Data.Fin.VecNotation
 
 /-!
-# Example: synthesizing a place invariant
+# Example: synthesising a place invariant
 
-This module uses `placeInvariantEquivKer` to synthesize a place invariant for
+This module uses `placeInvariantEquivKer` to synthesise a place invariant for
 a three-place, two-transition net:
 
 ```text
@@ -75,7 +75,7 @@ theorem tokenCountCoeffs_mem_ker :
 def tokenCountKernelElement : LinearMap.ker net.placeInvariantMap :=
   ⟨tokenCountCoeffs, tokenCountCoeffs_mem_ker⟩
 
-/-- The token-count place invariant synthesized from the kernel element. -/
+/-- The token-count place invariant synthesised from the kernel element. -/
 def tokenCountInvariant : WeightedNet.PlaceInvariant net :=
   (net.placeInvariantEquivKer).symm tokenCountKernelElement
 
