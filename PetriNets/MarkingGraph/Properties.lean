@@ -43,6 +43,9 @@ only the static net structure. It does not include an initial marking.
 * `WeightedNet.liveFrom_iff_markingGraph_path_to_label`: a net is live exactly
   when, from every state, there is a path to an edge carrying any chosen
   transition label.
+* `WeightedNet.weaklyLiveFrom_iff_markingGraph_has_label`: a net is weakly
+  live exactly when every transition labels an edge of the marking graph.
+* `WeightedNet.LiveFrom.weaklyLiveFrom`: liveness implies weak liveness.
 
 Termination and boundedness are treated separately: their marking-graph
 characterisations require finiteness assumptions on the place or transition
@@ -82,6 +85,14 @@ again from every marking reachable from it. -/
 def WeightedNet.ReversibleFrom {P T : Type*} (net : WeightedNet P T)
     (m₀ : Marking P) : Prop :=
   ∀ m, net.Reachable m₀ m → net.Reachable m m₀
+
+/-- Every net that is live from `m₀` is weakly live from `m₀`. Apply
+liveness at `m₀`, which is reachable from itself by the empty firing
+sequence. -/
+theorem WeightedNet.LiveFrom.weaklyLiveFrom {P T : Type*}
+    {net : WeightedNet P T} {m₀ : Marking P}
+    (hlive : net.LiveFrom m₀) : net.WeaklyLiveFrom m₀ := by
+  exact hlive m₀ (WeightedNet.Reachable.refl net m₀)
 
 /-- A net is deadlock-free from `m₀` if and only if every state of its
 marking graph has an outgoing edge. This is Reisig's marking-graph
@@ -147,5 +158,24 @@ theorem WeightedNet.liveFrom_iff_markingGraph_path_to_label
     obtain ⟨ts, mid, tgt, hmtr, htr⟩ := hpath src t
     exact ⟨mid.1, ⟨ts, (net.markingGraph_mTr_iff src mid).mp hmtr⟩,
       (net.markingGraph_enabled_iff_exists_tr mid t).mpr ⟨tgt, htr⟩⟩
+
+/-- A net is weakly live from `m₀` if and only if every transition labels at
+least one edge of its marking graph. This is Reisig's marking-graph
+characterisation of weak liveness. -/
+theorem WeightedNet.weaklyLiveFrom_iff_markingGraph_has_label
+    {P T : Type*} (net : WeightedNet P T) (m₀ : Marking P) :
+    net.WeaklyLiveFrom m₀ ↔
+      ∀ t, ∃ src tgt, (net.markingGraph m₀).Tr src t tgt := by
+  constructor
+  · intro hweaklyLive t
+    obtain ⟨m, hmReachable, henabled⟩ := hweaklyLive t
+    let src : {m : Marking P // net.markingLTS.CanReach m₀ m} :=
+      ⟨m, net.markingLTS_canReach_iff.mpr hmReachable⟩
+    obtain ⟨tgt, htr⟩ := (net.markingGraph_enabled_iff_exists_tr src t).mp henabled
+    exact ⟨src, tgt, htr⟩
+  · intro hlabel t
+    obtain ⟨src, tgt, htr⟩ := hlabel t
+    exact ⟨src.1, WeightedNet.markingGraph_state_reachable src,
+      (net.markingGraph_enabled_iff_exists_tr src t).mpr ⟨tgt, htr⟩⟩
 
 end PetriNet
