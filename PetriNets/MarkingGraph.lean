@@ -109,6 +109,14 @@ def WeightedNet.markingGraph {P T : Type*} (net : WeightedNet P T)
     (m₀ : Marking P) :=
   net.markingLTS.generatedBy m₀
 
+/-- The state of the marking graph representing its initial marking. The
+stored reachability proof is the empty multistep transition from `m₀` to
+itself. -/
+def WeightedNet.markingGraphInitial {P T : Type*} (net : WeightedNet P T)
+    (m₀ : Marking P) :
+    {m : Marking P // net.markingLTS.CanReach m₀ m} :=
+  ⟨m₀, Cslib.LTS.CanReach.refl net.markingLTS m₀⟩
+
 /-- The underlying marking of every marking-graph state is reachable from the
 initial marking. -/
 theorem WeightedNet.markingGraph_state_reachable {P T : Type*}
@@ -190,6 +198,19 @@ theorem WeightedNet.markingGraph_mTr_iff {P T : Type*}
             ⟨ha, hi, head⟩
           exact Cslib.LTS.MTr.stepL hedge (ih hi hb)
     exact lift h src.2 tgt.2
+
+/-- Reachability between two states of the marking graph is exactly Petri-net
+reachability between their underlying markings. -/
+theorem WeightedNet.markingGraph_canReach_iff {P T : Type*}
+    {net : WeightedNet P T} {m₀ : Marking P}
+    (src tgt : {m : Marking P // net.markingLTS.CanReach m₀ m}) :
+    (net.markingGraph m₀).CanReach src tgt ↔
+      net.Reachable src.1 tgt.1 := by
+  constructor
+  · rintro ⟨ts, hmtr⟩
+    exact ⟨ts, (net.markingGraph_mTr_iff src tgt).mp hmtr⟩
+  · rintro ⟨ts, hseq⟩
+    exact ⟨ts, (net.markingGraph_mTr_iff src tgt).mpr hseq⟩
 
 /-- A state of the marking graph is terminal exactly when its underlying
 marking is terminal in the Petri net. -/

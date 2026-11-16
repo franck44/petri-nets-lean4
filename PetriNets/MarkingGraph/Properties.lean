@@ -46,6 +46,11 @@ only the static net structure. It does not include an initial marking.
 * `WeightedNet.weaklyLiveFrom_iff_markingGraph_has_label`: a net is weakly
   live exactly when every transition labels an edge of the marking graph.
 * `WeightedNet.LiveFrom.weaklyLiveFrom`: liveness implies weak liveness.
+* `WeightedNet.reversibleFrom_iff_markingGraph_reaches_initial`: a net is
+  reversible exactly when every marking-graph state can reach the initial
+  state.
+* `WeightedNet.reversibleFrom_iff_markingGraph_stronglyConnected`: a net is
+  reversible exactly when its marking graph is strongly connected.
 
 Termination and boundedness are treated separately: their marking-graph
 characterisations require finiteness assumptions on the place or transition
@@ -177,5 +182,40 @@ theorem WeightedNet.weaklyLiveFrom_iff_markingGraph_has_label
     obtain ⟨src, tgt, htr⟩ := hlabel t
     exact ⟨src.1, WeightedNet.markingGraph_state_reachable src,
       (net.markingGraph_enabled_iff_exists_tr src t).mpr ⟨tgt, htr⟩⟩
+
+/-- A net is reversible from `m₀` if and only if every state of its marking
+graph can reach `net.markingGraphInitial m₀`, the state representing `m₀`. -/
+theorem WeightedNet.reversibleFrom_iff_markingGraph_reaches_initial
+    {P T : Type*} (net : WeightedNet P T) (m₀ : Marking P) :
+    net.ReversibleFrom m₀ ↔
+      ∀ src,
+        (net.markingGraph m₀).CanReach src
+          (net.markingGraphInitial m₀) := by
+  constructor
+  · intro hreversible src
+    apply (net.markingGraph_canReach_iff src (net.markingGraphInitial m₀)).mpr
+    exact hreversible src.1 (WeightedNet.markingGraph_state_reachable src)
+  · intro hreturn m hmReachable
+    let src : {m : Marking P // net.markingLTS.CanReach m₀ m} :=
+      ⟨m, net.markingLTS_canReach_iff.mpr hmReachable⟩
+    exact (net.markingGraph_canReach_iff src (net.markingGraphInitial m₀)).mp
+      (hreturn src)
+
+/-- A net is reversible from `m₀` if and only if its marking graph is
+strongly connected: every state can reach every other state. Equivalently,
+the entire marking graph forms a single strongly connected component. -/
+theorem WeightedNet.reversibleFrom_iff_markingGraph_stronglyConnected
+    {P T : Type*} (net : WeightedNet P T) (m₀ : Marking P) :
+    net.ReversibleFrom m₀ ↔
+      ∀ src tgt, (net.markingGraph m₀).CanReach src tgt := by
+  constructor
+  · intro hreversible src tgt
+    apply (net.markingGraph_canReach_iff src tgt).mpr
+    exact (hreversible src.1 (WeightedNet.markingGraph_state_reachable src)).trans
+      (WeightedNet.markingGraph_state_reachable tgt)
+  · intro hconnected
+    rw [net.reversibleFrom_iff_markingGraph_reaches_initial m₀]
+    intro src
+    exact hconnected src (net.markingGraphInitial m₀)
 
 end PetriNet
