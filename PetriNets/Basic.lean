@@ -69,6 +69,12 @@ def WeightedNet.Enabled {P T : Type*} (net : WeightedNet P T)
     (m : Marking P) (t : T) : Prop :=
   ∀ p, net.pre p t ≤ m p
 
+/-- A marking is terminal when it enables no transition. This is a local
+property of a marking, distinct from termination of all runs of a net. -/
+def WeightedNet.IsTerminal {P T : Type*} (net : WeightedNet P T)
+    (m : Marking P) : Prop :=
+  ∀ t, ¬net.Enabled m t
+
 /-- `net.Fires m t m'` means that `t` is enabled at `m` and that firing it
 produces `m'`. -/
 def WeightedNet.Fires {P T : Type*} (net : WeightedNet P T)
@@ -76,6 +82,18 @@ def WeightedNet.Fires {P T : Type*} (net : WeightedNet P T)
   net.Enabled m t ∧
     ∀ p,
       m' p = m p - net.pre p t + net.post p t
+
+/-- A transition is enabled at a marking exactly when it can fire to some
+target marking. -/
+theorem WeightedNet.enabled_iff_exists_fires {P T : Type*}
+    (net : WeightedNet P T) (m : Marking P) (t : T) :
+    net.Enabled m t ↔ ∃ m', net.Fires m t m' := by
+  constructor
+  · intro henabled
+    use fun p => m p - net.pre p t + net.post p t
+    exact ⟨henabled, fun _ => rfl⟩
+  · rintro ⟨_, hfires⟩
+    exact hfires.1
 
 /-- Firing a fixed transition from a fixed marking has a unique result i.e. is deterministic. -/
 theorem WeightedNet.fires_is_deterministic {P T : Type*} {net : WeightedNet P T}
