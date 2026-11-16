@@ -59,6 +59,13 @@ theorem WeightedNet.markingLTS_tr_iff {P T : Type*} (net : WeightedNet P T)
     net.markingLTS.Tr src t tgt ↔ net.Fires src t tgt :=
   Iff.rfl
 
+/-- A transition is enabled at a marking exactly when the marking LTS has an
+outgoing edge carrying that transition as its label. -/
+theorem WeightedNet.markingLTS_enabled_iff_exists_tr {P T : Type*}
+    (net : WeightedNet P T) (m : Marking P) (t : T) :
+    net.Enabled m t ↔ ∃ m', net.markingLTS.Tr m t m' :=
+  net.enabled_iff_exists_fires m t
+
 /-- A multistep transition of the marking LTS is exactly a Petri-net firing
 sequence with the same source, transition list, and target. -/
 theorem WeightedNet.markingLTS_mTr_iff {P T : Type*} (net : WeightedNet P T)
@@ -102,6 +109,88 @@ def WeightedNet.markingGraph {P T : Type*} (net : WeightedNet P T)
     (m₀ : Marking P) :=
   net.markingLTS.generatedBy m₀
 
+/-- The underlying marking of every marking-graph state is reachable from the
+initial marking. -/
+theorem WeightedNet.markingGraph_state_reachable {P T : Type*}
+    {net : WeightedNet P T} {m₀ : Marking P}
+    (m : {m : Marking P // net.markingLTS.CanReach m₀ m}) :
+    net.Reachable m₀ m.1 :=
+  net.markingLTS_canReach_iff.mp m.2
+
+/-- An edge between two marking-graph states is exactly a firing between their
+underlying markings. The reachability conditions added by `LTS.generatedBy`
+are already carried by the two states. -/
+theorem WeightedNet.markingGraph_tr_iff_fires {P T : Type*}
+    {net : WeightedNet P T} {m₀ : Marking P}
+    (src tgt : {m : Marking P // net.markingLTS.CanReach m₀ m}) (t : T) :
+    (net.markingGraph m₀).Tr src t tgt ↔ net.Fires src.1 t tgt.1 := by
+  constructor
+  · unfold WeightedNet.markingGraph
+    intro ⟨srcCanReach, tgtCanReach, htr⟩
+    exact htr
+  · intro hfires
+    exact ⟨src.2, tgt.2, hfires⟩
+
+/-- A transition is enabled at a marking-graph state exactly when that state
+has an outgoing edge carrying the transition as its label. -/
+theorem WeightedNet.markingGraph_enabled_iff_exists_tr {P T : Type*}
+    {net : WeightedNet P T} {m₀ : Marking P}
+    (src : {m : Marking P // net.markingLTS.CanReach m₀ m}) (t : T) :
+    net.Enabled src.1 t ↔
+      ∃ tgt, (net.markingGraph m₀).Tr src t tgt := by
+  constructor
+  · intro henabled
+    /- We need to construct a target state in the marking graph that corresponds
+       to the marking reached by firing `t` from `src.1`. -/
+    obtain ⟨m', htr⟩ := (net.markingLTS_enabled_iff_exists_tr src.1 t).mp henabled
+    obtain ⟨ts, hpath⟩ := src.2
+    have hm'CanReach : net.markingLTS.CanReach m₀ m' :=
+      ⟨ts ++ [t], hpath.stepR net.markingLTS htr⟩
+    let tgt : {m : Marking P // net.markingLTS.CanReach m₀ m} :=
+      ⟨m', hm'CanReach⟩
+    exact ⟨tgt, (net.markingGraph_tr_iff_fires src tgt t).mpr htr⟩
+  · rintro ⟨tgt, htr⟩
+    exact ((net.markingGraph_tr_iff_fires src tgt t).mp htr).1
+
+/-- A multistep transition in the marking graph is exactly a Petri-net firing
+sequence between the underlying markings. -/
+theorem WeightedNet.markingGraph_mTr_iff {P T : Type*}
+    {net : WeightedNet P T} {m₀ : Marking P}
+    (src tgt : {m : Marking P // net.markingLTS.CanReach m₀ m})
+    {ts : List T} :
+    (net.markingGraph m₀).MTr src ts tgt ↔
+      net.FiresSequence src.1 ts tgt.1 := by
+  constructor
+  · intro h
+    induction h with
+    | refl => exact WeightedNet.FiresSequence.nil _
+    | stepL htr _ ih => exact WeightedNet.FiresSequence.cons htr.2.2 ih
+  · intro h
+    have lift {a b : Marking P} {labels : List T}
+        (hseq : net.FiresSequence a labels b) :
+        ∀ (ha : net.markingLTS.CanReach m₀ a)
+          (hb : net.markingLTS.CanReach m₀ b),
+          (net.markingGraph m₀).MTr ⟨a, ha⟩ labels ⟨b, hb⟩ := by
+      induction hseq with
+      | nil m =>
+          intro ha hb
+          have heq : (⟨m, ha⟩ : {m : Marking P // net.markingLTS.CanReach m₀ m}) =
+              ⟨m, hb⟩ := Subtype.ext (by rfl)
+          rw [heq]
+          exact Cslib.LTS.MTr.refl
+      | @cons labels a i b t head tail ih =>
+          intro ha hb
+          have haReachable : net.Reachable m₀ a :=
+            net.markingLTS_canReach_iff.mp ha
+          have hiReachable : net.Reachable m₀ i :=
+            haReachable.trans ⟨[t], WeightedNet.FiresSequence.singleton head⟩
+          have hi : net.markingLTS.CanReach m₀ i :=
+            net.markingLTS_canReach_iff.mpr hiReachable
+          have hedge : (net.markingGraph m₀).Tr ⟨a, ha⟩ t ⟨i, hi⟩ :=
+            ⟨ha, hi, head⟩
+          exact Cslib.LTS.MTr.stepL hedge (ih hi hb)
+    exact lift h src.2 tgt.2
+
 /-- A state of the marking graph is terminal exactly when its underlying
 marking is terminal in the Petri net. -/
 theorem WeightedNet.isTerminal_iff_markingGraph_isTerminal {P T : Type*}
@@ -110,15 +199,9 @@ theorem WeightedNet.isTerminal_iff_markingGraph_isTerminal {P T : Type*}
     net.IsTerminal m.1 ↔ (net.markingGraph m₀).IsTerminal m := by
   constructor
   · intro hterminal t m' htr
-    exact hterminal t htr.2.2.1
+    exact hterminal t ((net.markingGraph_enabled_iff_exists_tr m t).mpr ⟨m', htr⟩)
   · intro hterminal t henabled
-    obtain ⟨m', hfires⟩ := (net.enabled_iff_exists_fires m.1 t).mp henabled
-    have hmReachable : net.Reachable m₀ m.1 :=
-      net.markingLTS_canReach_iff.mp m.2
-    have hm'Reachable : net.Reachable m₀ m' :=
-      hmReachable.trans ⟨[t], WeightedNet.FiresSequence.singleton hfires⟩
-    let m'state : {m : Marking P // net.markingLTS.CanReach m₀ m} :=
-      ⟨m', net.markingLTS_canReach_iff.mpr hm'Reachable⟩
-    exact hterminal t m'state ⟨m.2, m'state.2, hfires⟩
+    obtain ⟨m', htr⟩ := (net.markingGraph_enabled_iff_exists_tr m t).mp henabled
+    exact hterminal t m' htr
 
 end PetriNet

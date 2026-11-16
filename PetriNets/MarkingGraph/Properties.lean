@@ -40,6 +40,9 @@ only the static net structure. It does not include an initial marking.
   marking graph has an outgoing edge.
 * `WeightedNet.deadlockFreeFrom_iff_markingGraph_no_terminal`: equivalently,
   the marking graph has no terminal state.
+* `WeightedNet.liveFrom_iff_markingGraph_path_to_label`: a net is live exactly
+  when, from every state, there is a path to an edge carrying any chosen
+  transition label.
 
 Termination and boundedness are treated separately: their marking-graph
 characterisations require finiteness assumptions on the place or transition
@@ -89,20 +92,15 @@ theorem WeightedNet.deadlockFreeFrom_iff_markingGraph_has_outgoing
       ∀ src, ∃ t tgt, (net.markingGraph m₀).Tr src t tgt := by
   constructor
   · intro hdeadlockFree src
-    have hsrcReachable : net.Reachable m₀ src.1 :=
-      net.markingLTS_canReach_iff.mp src.2
-    obtain ⟨t, henabled⟩ := hdeadlockFree src.1 hsrcReachable
-    obtain ⟨m', hfires⟩ := (net.enabled_iff_exists_fires src.1 t).mp henabled
-    have hm'Reachable : net.Reachable m₀ m' :=
-      hsrcReachable.trans ⟨[t], WeightedNet.FiresSequence.singleton hfires⟩
-    let tgt : {m : Marking P // net.markingLTS.CanReach m₀ m} :=
-      ⟨m', net.markingLTS_canReach_iff.mpr hm'Reachable⟩
-    exact ⟨t, tgt, src.2, tgt.2, hfires⟩
+    obtain ⟨t, henabled⟩ :=
+      hdeadlockFree src.1 (WeightedNet.markingGraph_state_reachable src)
+    obtain ⟨tgt, htr⟩ := (net.markingGraph_enabled_iff_exists_tr src t).mp henabled
+    exact ⟨t, tgt, htr⟩
   · intro houtgoing m hmReachable
     let src : {m : Marking P // net.markingLTS.CanReach m₀ m} :=
       ⟨m, net.markingLTS_canReach_iff.mpr hmReachable⟩
-    obtain ⟨t, _, htr⟩ := houtgoing src
-    exact ⟨t, htr.2.2.1⟩
+    obtain ⟨t, tgt, htr⟩ := houtgoing src
+    exact ⟨t, (net.markingGraph_enabled_iff_exists_tr src t).mpr ⟨tgt, htr⟩⟩
 
 /-- A net is deadlock-free from `m₀` if and only if its marking graph has no
 terminal state. The equivalent outgoing-edge formulation is given by
@@ -120,5 +118,34 @@ theorem WeightedNet.deadlockFreeFrom_iff_markingGraph_no_terminal
     by_contra hnoOutgoing
     push Not at hnoOutgoing
     exact hnoTerminal m hnoOutgoing
+
+/-- A net is live from `m₀` if and only if, from every state of its marking
+graph and for every transition `t`, there is a finite path to a state with an
+outgoing edge labelled by `t`. This is Reisig's marking-graph characterisation
+of liveness. -/
+theorem WeightedNet.liveFrom_iff_markingGraph_path_to_label
+    {P T : Type*} (net : WeightedNet P T) (m₀ : Marking P) :
+    net.LiveFrom m₀ ↔
+      ∀ src t, ∃ ts mid tgt,
+        (net.markingGraph m₀).MTr src ts mid ∧
+          (net.markingGraph m₀).Tr mid t tgt := by
+  constructor
+  · intro hlive src t
+    obtain ⟨m, hmReachable, henabled⟩ :=
+      hlive src.1 (WeightedNet.markingGraph_state_reachable src) t
+    obtain ⟨ts, hseq⟩ := hmReachable
+    have hm₀m : net.Reachable m₀ m :=
+      (WeightedNet.markingGraph_state_reachable src).trans ⟨ts, hseq⟩
+    let mid : {m : Marking P // net.markingLTS.CanReach m₀ m} :=
+      ⟨m, net.markingLTS_canReach_iff.mpr hm₀m⟩
+    obtain ⟨tgt, htr⟩ := (net.markingGraph_enabled_iff_exists_tr mid t).mp henabled
+    exact ⟨ts, mid, tgt, (net.markingGraph_mTr_iff src mid).mpr hseq,
+      htr⟩
+  · intro hpath m hmReachable t
+    let src : {m : Marking P // net.markingLTS.CanReach m₀ m} :=
+      ⟨m, net.markingLTS_canReach_iff.mpr hmReachable⟩
+    obtain ⟨ts, mid, tgt, hmtr, htr⟩ := hpath src t
+    exact ⟨mid.1, ⟨ts, (net.markingGraph_mTr_iff src mid).mp hmtr⟩,
+      (net.markingGraph_enabled_iff_exists_tr mid t).mpr ⟨tgt, htr⟩⟩
 
 end PetriNet
