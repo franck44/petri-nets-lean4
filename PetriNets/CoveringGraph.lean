@@ -9,6 +9,7 @@ module
 public import PetriNets.Coverability
 public import PetriNets.MarkingGraph
 public import Cslib.Foundations.Semantics.LTS.OmegaExecution
+public import Mathlib.Order.WellQuasiOrder
 
 /-!
 # Covering graphs
@@ -77,6 +78,13 @@ graph selects the appropriate candidate.
 namespace PetriNet
 
 namespace OmegaMarking
+
+/-- **Dickson's lemma for ω-markings.** If the type of places is finite, every
+infinite sequence of ω-markings m₀, m₁, m₂, … contains two markings mᵢ and mⱼ with i < j such that mᵢ ≤ mⱼ. -/
+theorem exists_le_pair {P : Type*} [Finite P]
+    (markings : ℕ → OmegaMarking P) :
+    ∃ i j, i < j ∧ markings i ≤ markings j := by
+  exact wellQuasiOrdered_le markings
 
 /-- `accelerate A m` is the ω-marking obtained from `m` by replacing the
 values at the chosen set `A` of places by `ω`. At every place outside `A`, it
