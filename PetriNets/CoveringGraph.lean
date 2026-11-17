@@ -259,4 +259,60 @@ theorem WeightedNet.lift_fires_to_coveringGraph
     _ ≤ OmegaMarking.accelerate A i := OmegaMarking.le_accelerate A i
     _ = tgtω := htgtω.symm
 
+/-- Lift a finite firing sequence to a path of the covering graph. If the
+reachable graph state `srcω` covers the ordinary source marking `src`, then
+the graph can follow the same transition sequence to a state covering the
+ordinary target marking `tgt`.
+
+This lifts the single-step commuting square to firing sequences:
+
+```text
+             FiresSequence ts
+src  ------------------------------> tgt
+ |                                      |
+ | toOmega ≤                            | toOmega ≤
+ v                                      v
+srcω -------------------------------> tgtω
+                 graph.MTr ts
+```
+
+The upper and lower paths carry the same transition list `ts`, and the square
+commutes in the covering order.
+
+This generalised statement supplies the induction hypothesis needed for the
+finite-run form of the Covering Theorem. -/
+theorem WeightedNet.lift_firesSequence_to_coveringGraph
+    {P T : Type*} {net : WeightedNet P T} {m₀ src tgt : Marking P}
+    {graph : Cslib.LTS (OmegaMarking P) T} {srcω : OmegaMarking P}
+    {ts : List T} (hgraph : net.IsCoveringGraphFrom m₀ graph)
+    (hreach : graph.CanReach m₀.toOmega srcω)
+    (hcover : src.toOmega ≤ srcω)
+    (hseq : net.FiresSequence src ts tgt) :
+    ∃ tgtω, graph.MTr srcω ts tgtω ∧ tgt.toOmega ≤ tgtω := by
+  induction hseq generalizing srcω with
+  | nil =>
+      exact ⟨srcω, Cslib.LTS.MTr.refl, hcover⟩
+  | cons head tail ih =>
+      obtain ⟨iω, htr, hcover_i⟩ :=
+        net.lift_fires_to_coveringGraph hgraph hreach hcover head
+      have hreach_i : graph.CanReach m₀.toOmega iω := by
+        obtain ⟨labels, hmtr⟩ := hreach
+        exact ⟨labels ++ [_], Cslib.LTS.MTr.stepR graph hmtr htr⟩
+      obtain ⟨tgtω, htail, hcover_tgt⟩ := ih hreach_i hcover_i
+      exact ⟨tgtω, Cslib.LTS.MTr.stepL htr htail, hcover_tgt⟩
+
+/-- **Covering Theorem (Reisig, Theorem 17), finite-run form.**
+
+Every finite firing sequence of the net is matched by a path in the covering
+graph carrying the same transition sequence. The final graph state covers the
+ordinary final marking. -/
+theorem WeightedNet.covering_of_firesSequence
+    {P T : Type*} {net : WeightedNet P T} {m₀ tgt : Marking P}
+    {graph : Cslib.LTS (OmegaMarking P) T} {ts : List T}
+    (hgraph : net.IsCoveringGraphFrom m₀ graph)
+    (hseq : net.FiresSequence m₀ ts tgt) :
+    ∃ tgtω, graph.MTr m₀.toOmega ts tgtω ∧ tgt.toOmega ≤ tgtω := by
+  exact net.lift_firesSequence_to_coveringGraph hgraph
+    (Cslib.LTS.CanReach.refl graph m₀.toOmega) le_rfl hseq
+
 end PetriNet
