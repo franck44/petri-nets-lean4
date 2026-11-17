@@ -7,7 +7,6 @@ Authors: Franck Cassez
 module
 
 public import PetriNets.Coverability
-public import Cslib.Foundations.Semantics.LTS.Execution
 
 /-!
 # Covering graphs
@@ -104,16 +103,23 @@ theorem accelerate_apply_of_not_mem {P : Type*} {A : Set P}
   classical
   simp [accelerate, hp]
 
-/-- The set `A` of places is justified for accelerating the raw marking `m`
-along a path with state list `ancestors` when a place belongs to `A` exactly
-if `m` strictly increases there over an earlier marking which it covers.
+/-- `AccelerationJustifiedFrom graph root m A` states that `A` is exactly the
+set of places justified for acceleration at the current marking `m`.
 
-The list is intended to contain every state preceding the accelerated target,
-including the source of the current edge. -/
-def AccelerationJustifiedBy {P : Type*} (ancestors : List (OmegaMarking P))
-    (m : OmegaMarking P) (A : Set P) : Prop :=
+Following Reisig, a place `p` belongs to `A` precisely when some path from
+`root` to `m` contains a marking `a` such that `a ≤ m` and `a p < m p`. The
+two reachability conditions below express that a path from `root` to `m` can
+be formed through `a`.
+
+This condition determines which places will be set to `ω` in the successor of
+`m`. It compares `a` with `m`, not with the result of the transition
+subsequently fired from `m`. -/
+def AccelerationJustifiedFrom {P T : Type*}
+    (graph : Cslib.LTS (OmegaMarking P) T) (root m : OmegaMarking P)
+    (A : Set P) : Prop :=
   ∀ p, p ∈ A ↔
-    ∃ a ∈ ancestors, a ≤ m ∧ a p < m p
+    ∃ a, graph.CanReach root a ∧ graph.CanReach a m ∧
+      a ≤ m ∧ a p < m p
 
 end OmegaMarking
 
@@ -160,32 +166,47 @@ theorem WeightedNet.coverStepLTS_enabled_iff_exists_tr {P T : Type*}
   · rintro ⟨_, _, _, hfires, _⟩
     exact hfires.1
 
-/-- A candidate edge is a valid cover step along `ancestors` when it first
-performs an ω-firing and then accelerates exactly the places justified by the
-earlier markings in `ancestors`. -/
-def WeightedNet.CoverStepAlong {P T : Type*} (net : WeightedNet P T)
-    (ancestors : List (OmegaMarking P)) (src : OmegaMarking P) (t : T)
-    (tgt : OmegaMarking P) : Prop :=
+/-- `ValidCoverStep graph root src t tgt` means that `t` fires from `src`, and
+the firing result is accelerated exactly at the places justified by a path
+from `root` to `src`, producing `tgt`. -/
+def WeightedNet.ValidCoverStep {P T : Type*} (net : WeightedNet P T)
+    (graph : Cslib.LTS (OmegaMarking P) T) (root src : OmegaMarking P)
+    (t : T) (tgt : OmegaMarking P) : Prop :=
   ∃ i A, net.OmegaFires src t i ∧
-    OmegaMarking.AccelerationJustifiedBy ancestors i A ∧
+    OmegaMarking.AccelerationJustifiedFrom graph root src A ∧
     tgt = OmegaMarking.accelerate A i
 
-/-- `graph` is a covering graph of `net` from `m₀` when all of its paths from
-`m₀.toOmega` use correctly accelerated cover steps, and every transition
-enabled at the end of such a path labels an outgoing graph edge.
+/-- Every edge reachable from `m₀` obeys the covering-graph step rule.
+For an edge `src --t--> tgt`, first fire `t` to obtain `i`. A place `p` is
+accelerated to `ω` exactly when the path to `src` contains a marking `a` with
+`a ≤ src` and `a p < src p`; every other place retains its value in `i`. -/
+def WeightedNet.CoverStepRuleFrom {P T : Type*} (net : WeightedNet P T)
+    (m₀ : OmegaMarking P) (graph : Cslib.LTS (OmegaMarking P) T) : Prop :=
+  ∀ {src}, graph.CanReach m₀ src →
+    ∀ {t tgt}, graph.Tr src t tgt →
+      net.ValidCoverStep graph m₀ src t tgt
 
-Only the part reachable from `m₀.toOmega` is constrained. Consequently the
-initial state is fixed to `m₀.toOmega`, every relevant graph state is reached
-by construction, and loops are permitted. -/
+/-- At every state reachable from `m₀`, each enabled Petri-net
+transition labels at least one outgoing edge of `graph`. -/
+def WeightedNet.TransitionCompleteFrom {P T : Type*} (net : WeightedNet P T)
+    (m₀ : OmegaMarking P) (graph : Cslib.LTS (OmegaMarking P) T) : Prop :=
+  ∀ {src}, graph.CanReach m₀ src →
+    ∀ t, net.OmegaEnabled src t →
+      ∃ tgt, graph.Tr src t tgt
+
+/-- `IsCoveringGraphFrom net m₀ graph` characterises a covering graph by three
+separate conditions: the cover-step rule, transition completeness, and
+uniqueness of the outgoing edge carrying each transition label.
+
+Only states reachable from the initial state `m₀.toOmega` are constrained.
+Reisig's condition (c) is expressed by requiring the LTS generated from that
+initial state to be deterministic.
+Loops are permitted; a covering tree can later be obtained by unfolding the
+graph from this initial state. -/
 def WeightedNet.IsCoveringGraphFrom {P T : Type*} (net : WeightedNet P T)
     (m₀ : Marking P) (graph : Cslib.LTS (OmegaMarking P) T) : Prop :=
-  (∀ {src ts states},
-      graph.Execution m₀.toOmega ts src states →
-      ∀ {t tgt}, graph.Tr src t tgt →
-        net.CoverStepAlong states src t tgt) ∧
-  (∀ {src ts states},
-      graph.Execution m₀.toOmega ts src states →
-      ∀ t, net.OmegaEnabled src t →
-        ∃ tgt, graph.Tr src t tgt)
+  net.CoverStepRuleFrom m₀.toOmega graph ∧
+    net.TransitionCompleteFrom m₀.toOmega graph ∧
+    (graph.generatedBy m₀.toOmega).Deterministic
 
 end PetriNet
