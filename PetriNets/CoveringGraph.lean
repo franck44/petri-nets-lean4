@@ -9,6 +9,7 @@ module
 public import PetriNets.Coverability
 public import PetriNets.MarkingGraph
 public import Cslib.Foundations.Semantics.LTS.OmegaExecution
+public import Mathlib.Data.List.Duplicate
 public import Mathlib.Order.WellQuasiOrder
 
 /-!
@@ -76,6 +77,137 @@ graph selects the appropriate candidate.
 @[expose] public section
 
 namespace Cslib.LTS
+
+/-- A state `tgt` is *simply reachable* from `src` when there is a finite
+execution from `src` to `tgt` whose list of visited states contains no
+duplicates.
+
+The transition-label list and complete state list are retained through
+`Execution`; the `Nodup` condition makes the execution a simple path.
+
+TODO: this is a generic LTS definition and should eventually be contributed
+to CSLib and moved to the `Cslib.LTS` library itself. -/
+def CanReachSimple {State Label : Type*} (lts : LTS State Label)
+    (src tgt : State) : Prop :=
+  ∃ labels states,
+    lts.Execution src labels tgt states ∧ states.Nodup
+
+end Cslib.LTS
+
+namespace List
+
+/-- A duplicated list element occurs at two ordered bounded indices in the list. -/
+theorem Duplicate.exists_get_eq {α : Type*} {x : α} {l : List α}
+    (h : Duplicate x l) :
+    ∃ i j : Fin l.length,
+      i < j ∧ l.get i = x ∧ l.get j = x := by
+  induction h with
+  | @cons_mem l hx =>
+      obtain ⟨i, hi⟩ := List.get_of_mem hx
+      refine ⟨⟨0, by simp⟩, ⟨i + 1, by simp⟩, ?_, by simp, ?_⟩
+      · change (0 : ℕ) < i.val + 1
+        omega
+      · simpa using hi
+  | @cons_duplicate y l _ ih =>
+      obtain ⟨i, j, hij, hi, hj⟩ := ih
+      refine ⟨⟨i + 1, by simp⟩, ⟨j + 1, by simp⟩, ?_, ?_, ?_⟩
+      · simpa using hij
+      · simpa using hi
+      · simpa using hj
+
+end List
+
+namespace Cslib.LTS
+
+/-- Remove a cycle from a finite execution containing a repeated state.
+
+If the state list is not `Nodup`, some state occurs at two different
+positions. The part of the execution between these two occurrences forms a
+cycle and can be deleted. The resulting execution has the same source and
+target, but a strictly shorter state list.
+
+For example, consider the execution
+
+```text
+a → b → c → b → d
+```
+
+in which `b` occurs twice. Removing the segment from the first occurrence of
+`b` up to the second gives
+
+```text
+a → b → d
+```
+
+This remains a valid path because the outgoing transition `b → d` following
+the second occurrence can also follow the equal first occurrence. The proof
+splits the original execution at the two equal occurrences, discards the
+cycle between them, and composes the retained prefix and suffix. -/
+theorem Execution.shorten_of_dup {State Label : Type*}
+    {lts : LTS State Label} {src tgt : State}
+    {labels : List Label} {states : List State}
+    (hexec : lts.Execution src labels tgt states)
+    (hdup : ∃ s, List.Duplicate s states) :
+    ∃ labels' states',
+      lts.Execution src labels' tgt states' ∧
+      states'.length < states.length := by
+  /- get a witness duplicated state. -/
+  obtain ⟨state, hstate⟩ := hdup
+  /- get two indices i < j where the duplicated state occurs. -/
+  obtain ⟨i, j, hij, hi, hj⟩ := hstate.exists_get_eq
+  /- the two occurrences of the duplicated state are equal. -/
+  have heq : states.get i = states.get j := hi.trans hj.symm
+  /- take the prefix up to the first occurrence and the suffix from the second occurrence. -/
+  have hprefix := hexec.take i i.isLt
+  have hsuffix := hexec.drop j j.isLt
+ /- rewwrite to use state.get i and get j. -/
+  change lts.Execution src (labels.take i) (states.get i)
+    (states.take (i + 1)) at hprefix
+  change lts.Execution (states.get j) (labels.drop j) tgt
+    (states.drop j) at hsuffix
+  /- show that sufix starts with the duplicated state. -/
+  rw [← heq] at hsuffix
+  refine ⟨labels.take i ++ labels.drop j,
+    states.take (i + 1) ++ (states.drop j).tail,
+    hprefix.comp hsuffix, ?_⟩
+  simp
+  omega
+
+/-- Every finite execution can be shortened, without changing its endpoints,
+to an execution whose state list contains no duplicates. -/
+theorem Execution.exists_nodup {State Label : Type*}
+    {lts : LTS State Label} {src tgt : State}
+    {labels : List Label} {states : List State}
+    (hexec : lts.Execution src labels tgt states) :
+    ∃ labels' states',
+      lts.Execution src labels' tgt states' ∧ states'.Nodup := by
+  induction hlength : states.length using Nat.strong_induction_on
+      generalizing labels states with
+  | ind n ih =>
+      by_cases hnodup : states.Nodup
+      · exact ⟨labels, states, hexec, hnodup⟩
+      · obtain ⟨labels', states', hexec', hshorter⟩ :=
+          hexec.shorten_of_dup
+            (List.exists_duplicate_iff_not_nodup.mpr hnodup)
+        exact ih states'.length (hlength ▸ hshorter) hexec' rfl
+
+/-- Reachability is equivalent to reachability by a simple path.
+
+For the forward direction, convert a multistep transition into an execution
+and repeatedly remove cycles until its state list is `Nodup`. The reverse
+direction simply forgets the intermediate state list and its `Nodup` proof.
+
+TODO: this generic result should eventually be contributed to CSLib. -/
+theorem canReach_iff_canReachSimple {State Label : Type*}
+    {lts : LTS State Label} {src tgt : State} :
+    lts.CanReach src tgt ↔ lts.CanReachSimple src tgt := by
+  constructor
+  · rintro ⟨labels, hmtr⟩
+    obtain ⟨states, hexec⟩ := Execution.of_mTr hmtr
+    obtain ⟨labels', states', hexec', hnodup⟩ := hexec.exists_nodup
+    exact ⟨labels', states', hexec', hnodup⟩
+  · rintro ⟨labels, _, hexec, _⟩
+    exact ⟨labels, hexec.to_mTr⟩
 
 /-- **Kőnig's infinity lemma for deterministic LTS.** Suppose the type of
 labels is finite and the LTS is deterministic. If infinitely many states are
