@@ -77,6 +77,24 @@ def WeightedNet.OmegaFires {P T : Type*} (net : WeightedNet P T)
     ∀ p,
       m' p = m p - net.pre p t + net.post p t
 
+/-- Suppose `src₁ ≤ src₂` and transition `t` fires from `src₁` to `tgt₁`.
+Then `t` also fires from `src₂` to some `tgt₂`, and `tgt₁ ≤ tgt₂`. Thus,
+starting with at least as many tokens at every place preserves the pointwise
+order after firing the same transition. -/
+theorem WeightedNet.OmegaFires.mono {P T : Type*}
+    {net : WeightedNet P T} {src₁ src₂ tgt₁ : OmegaMarking P} {t : T}
+    (h₁ : net.OmegaFires src₁ t tgt₁)
+    (hleq : src₁ ≤ src₂) :
+    ∃ tgt₂, net.OmegaFires src₂ t tgt₂ ∧ tgt₁ ≤ tgt₂ := by
+  let tgt₂ : OmegaMarking P :=
+    fun p => src₂ p - net.pre p t + net.post p t
+  have h₂ : net.OmegaFires src₂ t tgt₂ :=
+    ⟨h₁.1.mono hleq, fun _ => rfl⟩
+  refine ⟨tgt₂, h₂, ?_⟩
+  intro p
+  rw [h₁.2 p, h₂.2 p]
+  exact add_le_add (tsub_le_tsub_right (hleq p) _) le_rfl
+
 /-- A transition is enabled at an ω-marking exactly when it can fire to some
 ω-marking. -/
 theorem WeightedNet.omegaEnabled_iff_exists_omegaFires {P T : Type*}
