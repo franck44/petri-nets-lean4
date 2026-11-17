@@ -283,16 +283,33 @@ def WeightedNet.TransitionCompleteFrom {P T : Type*} (net : WeightedNet P T)
 separate conditions: the cover-step rule, transition completeness, and
 uniqueness of the outgoing edge carrying each transition label.
 
-Only states reachable from the initial state `m₀.toOmega` are constrained.
-Reisig's condition (c) is expressed by requiring the LTS generated from that
-initial state to be deterministic.
+The cover-step and transition-completeness conditions concern states reachable
+from `m₀.toOmega`. Reisig's condition (c) is expressed by requiring the entire
+covering-graph LTS to be deterministic.
 Loops are permitted; a covering tree can later be obtained by unfolding the
 graph from this initial state. -/
 def WeightedNet.IsCoveringGraphFrom {P T : Type*} (net : WeightedNet P T)
     (m₀ : Marking P) (graph : Cslib.LTS (OmegaMarking P) T) : Prop :=
   net.CoverStepRuleFrom m₀.toOmega graph ∧
     net.TransitionCompleteFrom m₀.toOmega graph ∧
-    (graph.generatedBy m₀.toOmega).Deterministic
+    graph.Deterministic
+
+/-- If a covering graph with finitely many transition labels has infinitely
+many states reachable from its initial marking, then it has an infinite
+execution starting at that marking.
+
+This is a direct application of the generic LTS form of Kőnig's lemma: the
+covering graph is deterministic by definition, and `T` is finite. -/
+theorem WeightedNet.coveringGraph_omegaExecution_of_infinite
+    {P T : Type*} [Finite T] {net : WeightedNet P T} {m₀ : Marking P}
+    {graph : Cslib.LTS (OmegaMarking P) T}
+    (hgraph : net.IsCoveringGraphFrom m₀ graph)
+    (hinfinite : {m | graph.CanReach m₀.toOmega m}.Infinite) :
+    ∃ markings labels,
+      graph.OmegaExecution markings labels ∧ markings 0 = m₀.toOmega := by
+  let _ : graph.Deterministic := hgraph.2.2
+  exact Cslib.LTS.exists_omegaExecution_of_infinite_reachable
+    graph m₀.toOmega hinfinite
 
 /-- Suppose the reachable covering-graph state `srcω` covers the ordinary
 marking `src`, and `t` fires from `src` to `tgt`. Then the covering graph has
