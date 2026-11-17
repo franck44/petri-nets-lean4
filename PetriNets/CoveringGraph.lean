@@ -75,6 +75,72 @@ graph selects the appropriate candidate.
 
 @[expose] public section
 
+namespace Cslib.LTS
+
+/-- **Kőnig's infinity lemma for deterministic LTS.** Suppose the type of
+labels is finite and the LTS is deterministic. If infinitely many states are
+reachable from `root`, there is an infinite execution starting at `root`.
+
+TODO: this is a generic LTS result and should eventually be contributed to
+CSLib and moved to the `Cslib.LTS` library itself.
+
+Finite transition labels and determinism imply finite branching. The proof
+maintains a state from which infinitely many states remain reachable. Such a
+state must have a successor with the same property: otherwise its finitely
+many successors would each have only finitely many descendants, making its
+own set of descendants finite. Repeatedly choosing such a successor produces
+the required infinite execution. -/
+theorem exists_omegaExecution_of_infinite_reachable
+    {State Label : Type*} [Finite Label]
+    (lts : LTS State Label) [lts.Deterministic]
+    (root : State) (hinfinite : {s | lts.CanReach root s}.Infinite) :
+    ∃ states labels,
+      lts.OmegaExecution states labels ∧ states 0 = root := by
+  classical
+  let descendants (s : State) := {s' | lts.CanReach s s'}
+  have next_infinite {s : State} (hs : (descendants s).Infinite) :
+      ∃ label s', lts.Tr s label s' ∧ (descendants s').Infinite := by
+    by_contra! h
+    let successors : Set State := {s' | ∃ label, lts.Tr s label s'}
+    have hsuccessors : successors.Finite := by
+      have hall : (⋃ label, lts.image s label).Finite :=
+        Set.finite_iUnion fun label => Set.toFinite (lts.image s label)
+      apply hall.subset
+      rintro s' ⟨label, htr⟩
+      exact Set.mem_iUnion.mpr ⟨label, htr⟩
+    have hdesc : ∀ s' ∈ successors, (descendants s').Finite := by
+      rintro s' ⟨label, htr⟩
+      exact Set.finite_coe_iff.mp (h label s' htr)
+    have hunion : (⋃ s' ∈ successors, descendants s').Finite :=
+      hsuccessors.biUnion hdesc
+    apply hs
+    apply ((Set.finite_singleton s).union hunion).subset
+    intro tgt htgt
+    obtain ⟨ts, hts⟩ := htgt
+    cases ts with
+    | nil =>
+        left
+        have : s = tgt := by simpa using hts
+        exact this.symm
+    | cons label labels =>
+        right
+        obtain ⟨s', htr, htail⟩ := (MTr.cons_iff).mp hts
+        exact Set.mem_iUnion₂.mpr ⟨s', ⟨label, htr⟩, ⟨labels, htail⟩⟩
+  let good := {s : State // (descendants s).Infinite}
+  let next (s : good) : good :=
+    ⟨(next_infinite s.2).choose_spec.choose,
+      (next_infinite s.2).choose_spec.choose_spec.2⟩
+  let label (s : good) : Label := (next_infinite s.2).choose
+  have next_tr (s : good) : lts.Tr s (label s) (next s) :=
+    (next_infinite s.2).choose_spec.choose_spec.1
+  let branch : ℕ → good := fun n => next^[n] ⟨root, hinfinite⟩
+  refine ⟨fun n => (branch n).1, fun n => label (branch n), ?_, ?_⟩
+  · intro n
+    simpa [branch, Function.iterate_succ_apply'] using next_tr (branch n)
+  · rfl
+
+end Cslib.LTS
+
 namespace PetriNet
 
 namespace OmegaMarking
