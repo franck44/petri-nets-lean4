@@ -59,6 +59,15 @@ def WeightedNet.OmegaEnabled {P T : Type*} (net : WeightedNet P T)
     (m : OmegaMarking P) (t : T) : Prop :=
   ∀ p, (net.pre p t : ℕ∞) ≤ m p
 
+/-- Increasing an ω-marking preserves transition enabledness.
+If `t` is enabled at `m` and `m ≤ m'`, then `t` is also enabled at `m'`. -/
+theorem WeightedNet.OmegaEnabled.mono {P T : Type*}
+    {net : WeightedNet P T} {m m' : OmegaMarking P} {t : T}
+    (h : net.OmegaEnabled m t) (hleq : m ≤ m') :
+    net.OmegaEnabled m' t := by
+  intro p
+  exact (h p).trans (hleq p)
+
 /-- `net.OmegaFires m t m'` means that `t` is enabled at the ω-marking `m`
 and firing it produces `m'`. Subtraction and addition are those of `ℕ∞`, so a
 component equal to `ω` remains equal to `ω`. -/

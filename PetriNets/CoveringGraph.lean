@@ -103,6 +103,15 @@ theorem accelerate_apply_of_not_mem {P : Type*} {A : Set P}
   classical
   simp [accelerate, hp]
 
+/-- Acceleration never decreases an ω-marking. -/
+theorem le_accelerate {P : Type*} (A : Set P) (m : OmegaMarking P) :
+    m ≤ accelerate A m := by
+  intro p
+  by_cases hp : p ∈ A
+  · rw [accelerate_apply_of_mem hp]
+    exact le_top
+  · rw [accelerate_apply_of_not_mem hp]
+
 /-- `AccelerationJustifiedFrom graph root m A` states that `A` is exactly the
 set of places justified for acceleration at the current marking `m`.
 
