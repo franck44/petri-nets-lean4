@@ -209,6 +209,68 @@ theorem canReach_iff_canReachSimple {State Label : Type*}
   · rintro ⟨labels, _, hexec, _⟩
     exact ⟨labels, hexec.to_mTr⟩
 
+/-- A finite simple path represented by its nonempty list of pairwise
+distinct states. -/
+structure SimplePath (State : Type*) where
+  states : List State
+  nodup : states.Nodup
+  nonempty : states ≠ []
+
+namespace SimplePath
+
+/-- The final state of a simple path. -/
+def last {State : Type*} (path : SimplePath State) : State :=
+  path.states.getLast path.nonempty
+
+/-- The zero-step simple path rooted at `root`. -/
+def root {State : Type*} (root : State) : SimplePath State where
+  states := [root]
+  nodup := by simp
+  nonempty := by simp
+
+@[simp]
+theorem last_root {State : Type*} (root : State) :
+    (SimplePath.root root).last = root :=
+  rfl
+
+/-- Simple paths are equal when their state lists are equal; their remaining
+fields are proofs. -/
+@[ext]
+theorem ext {State : Type*} {path path' : SimplePath State}
+    (hstates : path.states = path'.states) : path = path' := by
+  cases path
+  cases path'
+  simp_all
+
+end SimplePath
+
+/-- The LTS whose states store finite simple paths of `lts`.
+
+A state is a `SimplePath` of original LTS states. An edge
+
+```text
+path --label→ path'
+```
+
+exists when the original LTS has a transition from the final state of `path`
+to a fresh state `next`, and `path'` is obtained by appending `next`:
+
+```text
+path.last --label→ next       path' = path ++ [next].
+```
+
+The transition relation mirrors the transition relation of `lts`: it carries
+the same label and appends the target of the original transition to the
+stored path. Thus every edge extends a path by exactly one previously
+unvisited state. -/
+def simplePathLTS {State Label : Type*} (lts : LTS State Label) :
+    LTS (SimplePath State) Label where
+  Tr path label path' :=
+    ∃ next,
+      lts.Tr path.last label next ∧
+      next ∉ path.states ∧
+      path'.states = path.states ++ [next]
+
 /-- **Kőnig's infinity lemma for deterministic LTS.** Suppose the type of
 labels is finite and the LTS is deterministic. If infinitely many states are
 reachable from `root`, there is an infinite execution starting at `root`.
