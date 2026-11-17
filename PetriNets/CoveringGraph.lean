@@ -222,6 +222,22 @@ def WeightedNet.IsCoveringGraphFrom {P T : Type*} (net : WeightedNet P T)
 marking `src`, and `t` fires from `src` to `tgt`. Then the covering graph has
 a `t`-labelled edge from `srcω` to a state `tgtω` which covers `tgt`.
 
+The result completes the following order-enriched commuting square:
+
+```text
+       Fires t
+src  ----------> tgt
+ |                |
+ | toOmega ≤      | toOmega ≤
+ v                v
+srcω ----------> tgtω
+       graph.Tr t
+```
+
+The square commutes in the sense of the covering order rather than by
+equality: `src.toOmega ≤ srcω` implies that the upper firing can be matched by
+the lower graph edge with `tgt.toOmega ≤ tgtω`, for some `tgtω`.
+
 This is the single-step lifting result used as the induction step in the
 Covering Theorem. -/
 theorem WeightedNet.lift_fires_to_coveringGraph
