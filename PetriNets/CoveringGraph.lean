@@ -7,6 +7,8 @@ Authors: Franck Cassez
 module
 
 public import PetriNets.Coverability
+public import PetriNets.MarkingGraph
+public import Cslib.Foundations.Semantics.LTS.OmegaExecution
 
 /-!
 # Covering graphs
@@ -314,5 +316,79 @@ theorem WeightedNet.covering_of_firesSequence
     ∃ tgtω, graph.MTr m₀.toOmega ts tgtω ∧ tgt.toOmega ≤ tgtω := by
   exact net.lift_firesSequence_to_coveringGraph hgraph
     (Cslib.LTS.CanReach.refl graph m₀.toOmega) le_rfl hseq
+
+/-- **Covering Theorem (Reisig, Theorem 17), infinite-run form.**
+
+Let `markings` and `labels` describe an infinite sequential run of the net
+starting at `m₀`:
+
+```text
+markings 0 --labels 0--> markings 1 --labels 1--> markings 2 --> ...
+```
+
+The theorem constructs an infinite sequence `graphMarkings` forming an
+execution of the covering graph with exactly the same transition labels:
+
+```text
+markings 0  --labels 0--> markings 1  --labels 1--> markings 2  --> ...
+     |                            |                            |
+     | toOmega ≤                  | toOmega ≤                  | toOmega ≤
+     v                            v                            v
+graphMarkings 0 --labels 0--> graphMarkings 1 --labels 1--> graphMarkings 2 --> ...
+```
+
+The lower execution starts at `m₀.toOmega`, and at every position `n` its
+state covers the embedded ordinary marking:
+`(markings n).toOmega ≤ graphMarkings n`. Thus every step of the ordinary run
+is matched by a covering-graph edge with the same label. As noted by Reisig,
+the converse is not true in general: a covering-graph execution need not
+represent an ordinary sequential run. -/
+theorem WeightedNet.covering_of_omegaExecution
+    {P T : Type*} {net : WeightedNet P T} {m₀ : Marking P}
+    {graph : Cslib.LTS (OmegaMarking P) T}
+    {markings : Cslib.ωSequence (Marking P)} {labels : Cslib.ωSequence T}
+    (hgraph : net.IsCoveringGraphFrom m₀ graph)
+    (hrun : net.markingLTS.OmegaExecution markings labels)
+    (hinitial : markings 0 = m₀) :
+    ∃ graphMarkings : Cslib.ωSequence (OmegaMarking P),
+      graph.OmegaExecution graphMarkings labels ∧
+      graphMarkings 0 = m₀.toOmega ∧
+      ∀ n, (markings n).toOmega ≤ graphMarkings n := by
+  classical
+  let StateAt (n : ℕ) :=
+    {m : OmegaMarking P //
+      graph.CanReach m₀.toOmega m ∧ (markings n).toOmega ≤ m}
+  let initial : StateAt 0 :=
+    ⟨m₀.toOmega, Cslib.LTS.CanReach.refl graph m₀.toOmega, by
+      rw [hinitial]⟩
+  have stepExists (n : ℕ) (m : StateAt n) :
+      ∃ m', graph.Tr m.1 (labels n) m' ∧
+        graph.CanReach m₀.toOmega m' ∧ (markings (n + 1)).toOmega ≤ m' := by
+    obtain ⟨m', htr, hcover⟩ :=
+      net.lift_fires_to_coveringGraph hgraph m.2.1 m.2.2 (hrun n)
+    refine ⟨m', htr, ?_, hcover⟩
+    obtain ⟨ts, hmtr⟩ := m.2.1
+    exact ⟨ts ++ [labels n], Cslib.LTS.MTr.stepR graph hmtr htr⟩
+  let next (n : ℕ) (m : StateAt n) : StateAt (n + 1) :=
+    ⟨Classical.choose (stepExists n m),
+      (Classical.choose_spec (stepExists n m)).2.1,
+      (Classical.choose_spec (stepExists n m)).2.2⟩
+  have next_tr (n : ℕ) (m : StateAt n) :
+      graph.Tr m.1 (labels n) (next n m).1 := by
+    exact (Classical.choose_spec (stepExists n m)).1
+  let lifted : (n : ℕ) → StateAt n :=
+    fun n => Nat.rec initial (fun n m => next n m) n
+  have lifted_succ (n : ℕ) : lifted (n + 1) = next n (lifted n) := by
+    rfl
+  let graphMarkings : Cslib.ωSequence (OmegaMarking P) :=
+    ⟨fun n => (lifted n).1⟩
+  refine ⟨graphMarkings, ?_, ?_, ?_⟩
+  · intro n
+    change graph.Tr (lifted n).1 (labels n) (lifted (n + 1)).1
+    rw [lifted_succ]
+    exact next_tr n (lifted n)
+  · rfl
+  · intro n
+    exact (lifted n).2.2
 
 end PetriNet
