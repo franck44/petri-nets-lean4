@@ -218,4 +218,29 @@ def WeightedNet.IsCoveringGraphFrom {P T : Type*} (net : WeightedNet P T)
     net.TransitionCompleteFrom m₀.toOmega graph ∧
     (graph.generatedBy m₀.toOmega).Deterministic
 
+/-- Suppose the reachable covering-graph state `srcω` covers the ordinary
+marking `src`, and `t` fires from `src` to `tgt`. Then the covering graph has
+a `t`-labelled edge from `srcω` to a state `tgtω` which covers `tgt`.
+
+This is the single-step lifting result used as the induction step in the
+Covering Theorem. -/
+theorem WeightedNet.lift_fires_to_coveringGraph
+    {P T : Type*} {net : WeightedNet P T} {m₀ src tgt : Marking P}
+    {graph : Cslib.LTS (OmegaMarking P) T} {srcω : OmegaMarking P} {t : T}
+    (hgraph : net.IsCoveringGraphFrom m₀ graph)
+    (hreach : graph.CanReach m₀.toOmega srcω)
+    (hcover : src.toOmega ≤ srcω) (hfires : net.Fires src t tgt) :
+    ∃ tgtω, graph.Tr srcω t tgtω ∧ tgt.toOmega ≤ tgtω := by
+  have hω : net.OmegaFires src.toOmega t tgt.toOmega :=
+    (net.fires_iff_omegaFires_toOmega src tgt t).mp hfires
+  obtain ⟨i, hi, htgt_i⟩ := hω.mono hcover
+  obtain ⟨tgtω, hedge⟩ := hgraph.2.1 hreach t hi.1
+  obtain ⟨i', A, hi', _, htgtω⟩ := hgraph.1 hreach hedge
+  cases net.omegaFires_is_deterministic hi hi'
+  refine ⟨tgtω, hedge, ?_⟩
+  calc
+    tgt.toOmega ≤ i := htgt_i
+    _ ≤ OmegaMarking.accelerate A i := OmegaMarking.le_accelerate A i
+    _ = tgtω := htgtω.symm
+
 end PetriNet
