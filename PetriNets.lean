@@ -6,6 +6,7 @@ Authors: Franck Cassez
 
 module
 
+public import PetriNets.Coverability
 public import PetriNets.Incidence
 public import PetriNets.MarkingGraph
 public import PetriNets.MarkingGraph.Boundedness
