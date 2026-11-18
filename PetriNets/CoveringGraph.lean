@@ -306,6 +306,33 @@ theorem WeightedNet.coveringGraph_omegaExecution_of_infinite
   exact Cslib.LTS.exists_injective_omegaExecution_of_infinite_reachable
     graph m₀.toOmega hinfinite
 
+/-- Along an infinite covering-graph execution, the set of `ω`-places at an
+earlier position is contained in the set at every later position. -/
+theorem WeightedNet.omegaPlaces_mono_of_omegaExecution
+    {P T : Type*} [Fintype P] {net : WeightedNet P T} {m₀ : Marking P}
+    {graph : Cslib.LTS (OmegaMarking P) T}
+    {markings : Cslib.ωSequence (OmegaMarking P)}
+    {labels : Cslib.ωSequence T}
+    (hgraph : net.IsCoveringGraphFrom m₀ graph)
+    (hexec : graph.OmegaExecution markings labels)
+    (hinitial : markings 0 = m₀.toOmega)
+    {i j : ℕ} (hij : i ≤ j) :
+    OmegaMarking.omegaPlaces (markings i) ⊆
+      OmegaMarking.omegaPlaces (markings j) := by
+  have hreach (n : ℕ) : graph.CanReach m₀.toOmega (markings n) := by
+    rw [← hinitial]
+    exact ⟨labels.extract 0 n, hexec.extract_mTr (Nat.zero_le n)⟩
+  induction j with
+  | zero =>
+      have : i = 0 := by omega
+      subst i
+      exact Finset.Subset.rfl
+  | succ j ih =>
+      rcases Nat.eq_or_lt_of_le hij with (rfl | hij')
+      · exact Finset.Subset.rfl
+      · exact (ih (Nat.le_of_lt_succ hij')).trans
+          (net.omegaPlaces_mono_of_tr hgraph (hreach j) (hexec j))
+
 /-- Suppose the reachable covering-graph state `srcω` covers the ordinary
 marking `src`, and `t` fires from `src` to `tgt`. Then the covering graph has
 a `t`-labelled edge from `srcω` to a state `tgtω` which covers `tgt`.
