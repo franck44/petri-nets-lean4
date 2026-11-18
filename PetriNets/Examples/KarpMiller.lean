@@ -62,7 +62,7 @@ def initial : Marking P := fun _ => 0
 
 /-- Execute the terminating DFS and convert its result to Graphviz DOT. -/
 def dot : String :=
-  (KarpMiller.dfs net (KarpMiller.Branch.initial initial)).toDot
+  (KarpMiller.karpMillerDFS net (KarpMiller.Branch.initial initial)).toDot
 
 #eval IO.println dot
 

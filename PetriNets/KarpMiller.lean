@@ -26,8 +26,8 @@ When the current marking already occurs among the ancestors, the branch is
 not fresh and becomes a leaf. The completed finite DFS tree retains these
 closed leaves.
 
-Termination of `dfs` is justified by the well-founded recursive-call relation
-`DfsCall`.
+Termination of `karpMillerDFS` is justified by the well-founded recursive-call
+relation `DfsCall`.
 
 ## References
 
@@ -95,20 +95,68 @@ The recursive calls are exactly the branches returned by `dfsSuccessors`.
 Their termination is justified by `dfsCall_wellFounded`; its accessibility
 proof is used only by Lean's termination checker and is erased from the
 compiled algorithm. -/
-def dfs (net : WeightedNet P T) (src : Branch P) :
+def karpMillerDFS (net : WeightedNet P T) (src : Branch P) :
     KarpMillerTree P T :=
   .node src <| (dfsSuccessors net src).attach.map fun candidate =>
-    (candidate.1.1, dfs net candidate.1.2)
+    (candidate.1.1, karpMillerDFS net candidate.1.2)
 termination_by (dfsCall_wellFounded (net := net) (T := T)).wrap src
 decreasing_by
   exact ⟨candidate.1.1, candidate.2⟩
 
-/-- The tree constructed by `dfs` has the source branch as its root. -/
+/-- The tree constructed by `karpMillerDFS` has the source branch as its
+root. -/
 @[simp]
-theorem dfs_rootValue (net : WeightedNet P T) (src : Branch P) :
-    (dfs net src).rootValue = src := by
-  rw [dfs]
+theorem karpMillerDFS_rootValue (net : WeightedNet P T) (src : Branch P) :
+    (karpMillerDFS net src).rootValue = src := by
+  rw [karpMillerDFS]
   rfl
+
+/-- The immediate children constructed by `karpMillerDFS` are exactly the
+branches in `dfsSuccessors`. More precisely, a child labelled by `t` is the
+recursively constructed tree rooted at a computed successor `tgt`. -/
+theorem mem_karpMillerDFS_children_iff
+    (net : WeightedNet P T) (src : Branch P)
+    (t : T) (child : KarpMillerTree P T) :
+    (t, child) ∈ (karpMillerDFS net src).children ↔
+      ∃ tgt, (t, tgt) ∈ dfsSuccessors net src ∧
+        child = karpMillerDFS net tgt := by
+  rw [karpMillerDFS]
+  simp only [KarpMillerTree.children, List.mem_map]
+  constructor
+  · rintro ⟨candidate, hcandidate, hpair⟩
+    rcases candidate with ⟨⟨u, tgt⟩, hsuccessor⟩
+    simp only at hpair
+    obtain ⟨rfl, rfl⟩ := hpair
+    exact ⟨tgt, hsuccessor, rfl⟩
+  · rintro ⟨tgt, hsuccessor, rfl⟩
+    refine ⟨⟨(t, tgt), hsuccessor⟩, ?_, rfl⟩
+    simp
+
+/-- The tree constructed by `karpMillerDFS` is valid: every parent–child edge
+is a computed DFS transition, and every child subtree has the same property. -/
+theorem karpMillerDFS_isValid (net : WeightedNet P T) (src : Branch P) :
+    (karpMillerDFS net src).IsValid net := by
+  rw [karpMillerDFS]
+  apply KarpMillerTree.IsValid.node
+  · intro t child hmem
+    simp only [List.mem_map] at hmem
+    obtain ⟨candidate, hcandidate, hpair⟩ := hmem
+    rcases candidate with ⟨⟨u, tgt⟩, hsuccessor⟩
+    simp only at hpair
+    obtain ⟨rfl, rfl⟩ := hpair
+    rw [karpMillerDFS_rootValue]
+    exact hsuccessor
+  · intro t child hmem
+    simp only [List.mem_map] at hmem
+    obtain ⟨candidate, hcandidate, hpair⟩ := hmem
+    rcases candidate with ⟨⟨u, tgt⟩, hsuccessor⟩
+    simp only at hpair
+    obtain ⟨rfl, rfl⟩ := hpair
+    exact karpMillerDFS_isValid net tgt
+termination_by (dfsCall_wellFounded (net := net) (T := T)).wrap src
+decreasing_by
+  refine ⟨t, ?_⟩
+  exact hsuccessor
 
 end FinitePlaces
 
