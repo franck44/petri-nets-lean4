@@ -60,14 +60,9 @@ def net : WeightedNet P T where
 /-- The empty initial marking. -/
 def initial : Marking P := fun _ => 0
 
-/-- Execute the fuelled DFS and convert its result to Graphviz DOT.
-
-Three units of fuel suffice for this example: the root, the accelerated
-`ω`-node, and its duplicate leaf. -/
+/-- Execute the terminating DFS and convert its result to Graphviz DOT. -/
 def dot : String :=
-  match KarpMiller.dfsFuel net 3 (KarpMiller.Branch.initial initial) with
-  | some tree => tree.toDot
-  | none => "// Insufficient DFS fuel"
+  (KarpMiller.dfs net (KarpMiller.Branch.initial initial)).toDot
 
 #eval IO.println dot
 

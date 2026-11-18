@@ -197,6 +197,28 @@ theorem marking_mem_history_of_mTr {src tgt : Branch P} {labels : List T}
       exact Or.inl (ancestors_mono_of_mTr htail
         (marking_mem_ancestors_of_tr htr))
 
+/-- A Karp–Miller DFS edge preserves the invariant that the ancestor list has
+no duplicates. -/
+theorem ancestors_nodup_of_tr {src tgt : Branch P} {t : T}
+    (htr : (dfsLTS net).Tr src t tgt) (hsrc : src.ancestors.Nodup) :
+    tgt.ancestors.Nodup := by
+  obtain ⟨hfresh, _, rfl⟩ := mem_dfsSuccessors_iff.mp htr
+  simpa [succBranch] using src.history_nodup hsrc hfresh
+
+/-- Every node reachable from the initial Karp–Miller node has a
+duplicate-free list of ancestors. -/
+theorem reachable_ancestors_nodup {m₀ : Marking P} {node : Branch P}
+    (hreach : (dfsLTS net).CanReach (Branch.initial m₀) node) :
+    node.ancestors.Nodup := by
+  obtain ⟨labels, hmtr⟩ := hreach
+  have preserve {src tgt : Branch P} {labels : List T}
+      (h : (dfsLTS net).MTr src labels tgt) (hsrc : src.ancestors.Nodup) :
+      tgt.ancestors.Nodup := by
+    induction h with
+    | refl => exact hsrc
+    | stepL htr _ ih => exact ih (ancestors_nodup_of_tr htr hsrc)
+  exact preserve hmtr (by simp [Branch.initial, Branch.root])
+
 /-- If the initial marking of a finite execution is below a prospective raw
 successor marking `m`, and is strictly smaller at place `p`, then `p` is
 selected for acceleration.
