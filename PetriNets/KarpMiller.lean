@@ -204,6 +204,45 @@ theorem omegaPlaces_mono_of_step {P T : Type*}
   rw [OmegaMarking.mem_omegaPlaces] at hp ⊢
   exact hstep.preserves_top hp
 
+/-- If a Karp–Miller step does not introduce a new `ω`-place, acceleration
+does not change its raw firing result.
+
+A place selected for acceleration has value `ω` in the target. Equality of
+the source and target ω-place sets implies that it was already `ω` in the
+source, and firing preserves that value. Every unselected place retains its
+raw firing value by definition. -/
+theorem Step.marking_eq_firingResult_of_omegaPlaces_eq
+    {P T : Type*} [FinEnum P] [FinEnum T]
+    {net : WeightedNet P T} {src tgt : KarpMillerNode P} {t : T}
+    (hstep : Step net src t tgt)
+    (homega : OmegaMarking.omegaPlaces src.marking =
+      OmegaMarking.omegaPlaces tgt.marking) :
+    tgt.marking = firingResult net src.marking t := by
+  have htgt : uncheckedSuccessor net src t = tgt := by
+    unfold Step successor? at hstep
+    split at hstep
+    · contradiction
+    · split at hstep
+      · exact Option.some.inj hstep
+      · contradiction
+  rw [← htgt] at homega ⊢
+  funext p
+  by_cases hp : p ∈ Node.acceleratedPlaces
+      (firingResult net src.marking t) src
+  · have htgtTop :
+        (uncheckedSuccessor net src t).marking p = ⊤ := by
+      simp [uncheckedSuccessor, Node.append,
+        OmegaMarking.accelerateFinset, hp]
+    have hpTgt : p ∈ OmegaMarking.omegaPlaces
+        (uncheckedSuccessor net src t).marking := by
+      rw [OmegaMarking.mem_omegaPlaces]
+      exact htgtTop
+    rw [← homega, OmegaMarking.mem_omegaPlaces] at hpTgt
+    simp [uncheckedSuccessor, Node.append,
+      OmegaMarking.accelerateFinset, firingResult, hp, hpTgt]
+  · simp [uncheckedSuccessor, Node.append,
+      OmegaMarking.accelerateFinset, hp]
+
 /-- A Karp–Miller node has no outgoing step exactly when it is a duplicate or
 its ω-marking enables no transition. -/
 theorem no_step_iff_duplicate_or_terminal {P T : Type*}
@@ -330,6 +369,25 @@ theorem exists_omegaPlaces_stable_from {P T : Type*}
     · omega
   exact (Finset.eq_of_subset_of_card_le hsub hcard).symm
 
+/-- On a suffix where the set of ω-places is stable, every Karp–Miller target
+marking is exactly the raw result of firing the corresponding transition. -/
+theorem marking_eq_firingResult_of_omegaPlaces_stable
+    {P T : Type*} [FinEnum P] [FinEnum T]
+    {net : WeightedNet P T}
+    {nodes : Cslib.ωSequence (KarpMillerNode P)}
+    {labels : Cslib.ωSequence T}
+    (hexec : (lts net).OmegaExecution nodes labels)
+    {n₀ n : ℕ}
+    (hstable : ∀ k, n₀ ≤ k →
+      OmegaMarking.omegaPlaces (nodes k).marking =
+        OmegaMarking.omegaPlaces (nodes n₀).marking)
+    (hn : n₀ ≤ n) :
+    (nodes (n + 1)).marking =
+      firingResult net (nodes n).marking (labels n) := by
+  apply (hexec n).marking_eq_firingResult_of_omegaPlaces_eq
+  exact (hstable n hn).trans
+    (hstable (n + 1) (hn.trans (Nat.le_succ n))).symm
+
 /-- If a node's ancestors contain no duplicates and the node is open,
 then the node is not a duplicate and its complete history contains no duplicates. -/
 theorem Node.history_nodup {P : Type*} {node : KarpMillerNode P}
@@ -356,6 +414,28 @@ theorem Step.ancestors_eq_history {P T : Type*}
     · obtain rfl := Option.some.inj hstep.symm
       rfl
     · contradiction
+
+/-- Every marking occurring earlier on an infinite Karp–Miller execution is
+stored in the ancestor list of every later node.
+
+For consecutive nodes this follows because a step places the source marking
+at the head of the target history. For a more distant node, the existing
+ancestor membership is carried forward by each subsequent step. -/
+theorem marking_mem_ancestors_of_omegaExecution {P T : Type*}
+    [FinEnum P] [FinEnum T]
+    {net : WeightedNet P T}
+    {nodes : Cslib.ωSequence (KarpMillerNode P)}
+    {labels : Cslib.ωSequence T}
+    (hexec : (lts net).OmegaExecution nodes labels)
+    {i j : ℕ} (hij : i < j) :
+    (nodes i).marking ∈ (nodes j).ancestors := by
+  induction j with
+  | zero => omega
+  | succ j ih =>
+      rw [(hexec j).ancestors_eq_history]
+      rcases Nat.eq_or_lt_of_le (Nat.le_of_lt_succ hij) with (rfl | hij')
+      · simp [Node.history]
+      · simp [Node.history, ih hij']
 
 /-- A Karp–Miller step `src t tgt` results in `tgt.ancestors` having no duplicates provided
 that `src.ancestors` has no duplicates. In other words, the no-duplicates property in ancestors is an invariant preserved by Karp–Miller steps (proved in the `reachable_ancestors_nodup` theorem). -/
