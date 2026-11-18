@@ -287,6 +287,19 @@ def KarpMillerTree.children {P T : Type*} :
     KarpMillerTree P T → List (T × KarpMillerTree P T)
   | .node _ children => children
 
+/-- A Karp–Miller tree is valid when each labelled parent–child edge is a
+Karp–Miller step and every child subtree is itself valid. -/
+inductive KarpMillerTree.IsValid {P T : Type*}
+    [FinEnum P] [FinEnum T]
+    (net : WeightedNet P T) : KarpMillerTree P T → Prop where
+  | node {rootValue : KarpMillerNode P}
+      {children : List (T × KarpMillerTree P T)}
+      (validSteps : ∀ t child, (t, child) ∈ children →
+        Step net rootValue t child.rootValue)
+      (validSubtrees : ∀ t child, (t, child) ∈ children →
+        child.IsValid net) :
+      IsValid net (.node rootValue children)
+
 /-- A printable view of a Karp–Miller tree.
 
 Markings are functions and therefore cannot be printed directly. This view
@@ -429,6 +442,79 @@ theorem dfsFuel_rootValue {P T : Type*}
           simp [hchildren] at h
           subst tree
           rfl
+
+/-- If a list of candidate steps is recursively explored successfully, the
+resulting child trees are valid and remain connected to their parent by those
+steps. This is the list-processing part of `dfsFuel_isValid`. -/
+theorem validChildren_of_mapM_dfsFuel {P T : Type*}
+    [FinEnum P] [FinEnum T]
+    {net : WeightedNet P T} {n : ℕ} {src : KarpMillerNode P}
+    {candidates : List (T × KarpMillerNode P)}
+    {children : List (T × KarpMillerTree P T)}
+    (hsteps : ∀ t tgt, (t, tgt) ∈ candidates → Step net src t tgt)
+    (hvalid : ∀ {tgt tree}, dfsFuel net n tgt = some tree → tree.IsValid net)
+    (hmap : candidates.mapM (fun x =>
+        (dfsFuel net n x.2).bind fun tree => some (x.1, tree)) =
+      some children) :
+    children.Forall fun (t, child) =>
+      Step net src t child.rootValue ∧ child.IsValid net := by
+  induction candidates generalizing children with
+  | nil =>
+      simp at hmap
+      subst children
+      simp
+  | cons candidate candidates ih =>
+      rcases candidate with ⟨t, tgt⟩
+      rw [List.mapM_cons] at hmap
+      cases htree : dfsFuel net n tgt with
+      | none => simp [htree] at hmap
+      | some tree =>
+          cases hchildren : candidates.mapM (fun x =>
+              (dfsFuel net n x.2).bind fun subtree =>
+                some (x.1, subtree)) with
+          | none => simp [htree, hchildren] at hmap
+          | some rest =>
+              simp [htree, hchildren] at hmap
+              subst children
+              simp only [List.forall_cons]
+              constructor
+              · constructor
+                · rw [dfsFuel_rootValue htree]
+                  exact hsteps t tgt (by simp)
+                · exact hvalid htree
+              · apply ih
+                · intro u node hmem
+                  exact hsteps u node (by simp [hmem])
+                · exact hchildren
+
+/-- Every tree successfully constructed by `dfsFuel` is valid: each of its
+labelled edges is a Karp–Miller step, recursively throughout the tree. -/
+theorem dfsFuel_isValid {P T : Type*}
+    [FinEnum P] [FinEnum T]
+    {net : WeightedNet P T} {fuel : ℕ}
+    {src : KarpMillerNode P} {tree : KarpMillerTree P T}
+    (h : dfsFuel net fuel src = some tree) :
+    tree.IsValid net := by
+  induction fuel generalizing src tree with
+  | zero => simp [dfsFuel] at h
+  | succ n ih =>
+      unfold dfsFuel at h
+      cases hchildren : (successors net src).mapM (fun x =>
+          (dfsFuel net n x.2).bind fun subtree => some (x.1, subtree)) with
+      | none => simp [hchildren] at h
+      | some children =>
+          simp [hchildren] at h
+          subst tree
+          have hvalidChildren := validChildren_of_mapM_dfsFuel
+            (fun _ _ hmem => step_of_mem_successors hmem)
+            (fun hsubtree => ih hsubtree) hchildren
+          apply KarpMillerTree.IsValid.node
+          · intro t child hmem
+            exact ((List.forall_iff_forall_mem.mp hvalidChildren)
+              (t, child) hmem).1
+          · intro t child hmem
+            exact ((List.forall_iff_forall_mem.mp hvalidChildren)
+              (t, child) hmem).2
 
 end KarpMiller
 
