@@ -48,10 +48,24 @@ def initial (m₀ : Marking P) : Branch P :=
   root m₀.toOmega
 
 /-- Extend a branch with a new current marking. -/
-def append (m : OmegaMarking P)
-    (branch : Branch P) : Branch P where
+def append (branch : Branch P)
+    (m : OmegaMarking P) : Branch P where
   marking := m
   ancestors := branch.history
+
+/-- `branch ++ m` extends `branch` with the successor marking `m`. -/
+instance : HAppend (Branch P) (OmegaMarking P) (Branch P) where
+  hAppend := append
+
+@[simp]
+theorem append_marking (branch : Branch P) (m : OmegaMarking P) :
+    (branch ++ m).marking = m :=
+  rfl
+
+@[simp]
+theorem append_ancestors (branch : Branch P) (m : OmegaMarking P) :
+    (branch ++ m).ancestors = branch.history :=
+  rfl
 
 /-- A branch is open when its current marking does not duplicate an ancestor. -/
 def IsOpen (branch : Branch P) : Prop :=
