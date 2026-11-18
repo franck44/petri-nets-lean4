@@ -51,8 +51,8 @@ no duplicates. -/
 theorem ancestors_nodup_of_tr {src tgt : Branch P} {t : T}
     (htr : (dfsLTS net).Tr src t tgt) (hsrc : src.ancestors.Nodup) :
     tgt.ancestors.Nodup := by
-  rw [ancestors_eq_history_of_tr htr]
-  exact src.history_nodup hsrc (mem_dfsSuccessors_iff.mp htr).1
+  obtain ⟨hopen, _, rfl⟩ := mem_dfsSuccessors_iff.mp htr
+  simpa [succBranch] using src.history_nodup hsrc hopen
 
 /-- Every node reachable from the initial Karp–Miller node has a
 duplicate-free list of ancestors. -/

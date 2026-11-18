@@ -39,42 +39,6 @@ section FinitePlaces
 
 variable [FinEnum P] [FinEnum T]
 
-/-- Along an infinite Karp–Miller execution, the set of `ω`-places at an
-earlier position is contained in the set at every later position. -/
-theorem omegaPlaces_mono_of_omegaExecution {nodes : Cslib.ωSequence (Branch P)}
-    {labels : Cslib.ωSequence T}
-    (hexec : (dfsLTS net).OmegaExecution nodes labels)
-    {i j : ℕ} (hij : i ≤ j) :
-    OmegaMarking.omegaPlaces (nodes i).marking ⊆
-      OmegaMarking.omegaPlaces (nodes j).marking := by
-  induction j with
-  | zero =>
-      have : i = 0 := by omega
-      subst i
-      exact Finset.Subset.rfl
-  | succ j ih =>
-      rcases Nat.eq_or_lt_of_le hij with (rfl | hij')
-      · exact Finset.Subset.rfl
-      · exact (ih (Nat.le_of_lt_succ hij')).trans
-          (omegaPlaces_mono_of_tr (hexec j))
-
-end FinitePlaces
-
-section FinitePlaces
-
-variable [FinEnum P] [FinEnum T]
-
-
-/-- The ancestors of the target of a Karp–Miller DFS edge `src t tgt`
-are exactly the complete history of `src`. -/
-theorem ancestors_eq_history_of_tr {src tgt : Branch P} {t : T}
-    (htr : (dfsLTS net).Tr src t tgt) :
-    tgt.ancestors = src.history := by
-  change (t, tgt) ∈ dfsSuccessors net src at htr
-  rw [mem_dfsSuccessors_iff] at htr
-  rw [← htr.2.2]
-  rfl
-
 /-- Every marking occurring earlier on an infinite Karp–Miller execution is
 stored in the ancestor list of every later node.
 
@@ -89,7 +53,9 @@ theorem marking_mem_ancestors_of_omegaExecution {nodes : Cslib.ωSequence (Branc
   induction j with
   | zero => omega
   | succ j ih =>
-      rw [ancestors_eq_history_of_tr (hexec j)]
+      have htgt := (mem_dfsSuccessors_iff.mp (hexec j)).2.2
+      rw [← htgt]
+      simp only [succBranch, Branch.append_ancestors]
       rcases Nat.eq_or_lt_of_le (Nat.le_of_lt_succ hij) with (rfl | hij')
       · simp [Branch.history]
       · simp [Branch.history, ih hij']

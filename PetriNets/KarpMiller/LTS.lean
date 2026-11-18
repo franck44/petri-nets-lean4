@@ -91,6 +91,29 @@ theorem omegaPlaces_mono_of_tr {src tgt : Branch P} {t : T}
   rw [← htr.2.2]
   exact omegaPlaces_mono_of_succBranch src t
 
+/-- Along a finite Karp–Miller execution, the set of places equal to `ω` can
+only grow. This extends `omegaPlaces_mono_of_tr` from one transition to a
+sequence of transitions. -/
+theorem omegaPlaces_mono_of_mTr {src tgt : Branch P} {labels : List T}
+    (hexec : (dfsLTS net).MTr src labels tgt) :
+    OmegaMarking.omegaPlaces src.marking ⊆
+      OmegaMarking.omegaPlaces tgt.marking := by
+  induction hexec with
+  | refl => exact Finset.Subset.rfl
+  | stepL htr _ ih =>
+      exact (omegaPlaces_mono_of_tr htr).trans ih
+
+/-- Along an infinite Karp–Miller execution, the set of places equal to `ω`
+can only grow. This extends `omegaPlaces_mono_of_mTr` from finite executions
+to finite prefixes of an infinite execution. -/
+theorem omegaPlaces_mono_of_omegaExecution {nodes : Cslib.ωSequence (Branch P)}
+    {labels : Cslib.ωSequence T}
+    (hexec : (dfsLTS net).OmegaExecution nodes labels)
+    {i j : ℕ} (hij : i ≤ j) :
+    OmegaMarking.omegaPlaces (nodes i).marking ⊆
+      OmegaMarking.omegaPlaces (nodes j).marking := by
+  exact omegaPlaces_mono_of_mTr (hexec.extract_mTr hij)
+
 /-- The Karp–Miller DFS LTS is deterministic. Registering this fact as an
 instance allows CSLib results for deterministic LTSs to apply directly. -/
 instance (net : WeightedNet P T) :
