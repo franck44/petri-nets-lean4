@@ -11,10 +11,11 @@ public import PetriNets.MarkingGraph
 /-!
 # Behavioural properties represented by marking graphs
 
-This module defines four standard behavioural properties of a weighted P/T
-net relative to an initial marking: deadlock freedom, liveness, weak liveness,
-and reversibility. It then relates these Petri-net properties to properties of
-the marking graph, following Reisig's characterisations.
+This module defines standard behavioural properties of a weighted P/T net
+relative to an initial marking: deadlock freedom, liveness, weak liveness,
+dead transitions, and reversibility. It then relates these Petri-net
+properties to properties of the marking graph, following Reisig's
+characterisations.
 
 The initial marking is an explicit parameter because `WeightedNet` describes
 only the static net structure. It does not include an initial marking.
@@ -28,6 +29,8 @@ only the static net structure. It does not include an initial marking.
   every reachable marking.
 * `WeightedNet.WeaklyLiveFrom`: every transition is enabled at some reachable
   marking.
+* `WeightedNet.TransitionDeadFrom`: a given transition is enabled at no
+  reachable marking.
 * `WeightedNet.ReversibleFrom`: the initial marking is reachable from every
   reachable marking.
 
@@ -85,6 +88,12 @@ def WeightedNet.WeaklyLiveFrom {P T : Type*} (net : WeightedNet P T)
     (m₀ : Marking P) : Prop :=
   ∀ t, ∃ m, net.Reachable m₀ m ∧ net.Enabled m t
 
+/-- A transition `t` is dead from `m₀` when it is not enabled at any
+marking reachable from `m₀`. -/
+def WeightedNet.TransitionDeadFrom {P T : Type*} (net : WeightedNet P T)
+    (m₀ : Marking P) (t : T) : Prop :=
+  ∀ m, net.Reachable m₀ m → ¬ net.Enabled m t
+
 /-- A net is reversible from `m₀` when the initial marking can be reached
 again from every marking reachable from it. -/
 def WeightedNet.ReversibleFrom {P T : Type*} (net : WeightedNet P T)
@@ -98,6 +107,21 @@ theorem WeightedNet.LiveFrom.weaklyLiveFrom {P T : Type*}
     {net : WeightedNet P T} {m₀ : Marking P}
     (hlive : net.LiveFrom m₀) : net.WeaklyLiveFrom m₀ := by
   exact hlive m₀ (WeightedNet.Reachable.refl net m₀)
+
+/-- A transition is dead precisely when there is no reachable marking at
+which it is enabled. -/
+theorem WeightedNet.transitionDeadFrom_iff_not_exists_enabled
+    {P T : Type*} (net : WeightedNet P T) (m₀ : Marking P) (t : T) :
+    net.TransitionDeadFrom m₀ t ↔
+      ¬ ∃ m, net.Reachable m₀ m ∧ net.Enabled m t := by
+  simp [WeightedNet.TransitionDeadFrom]
+
+/-- A net is weakly live exactly when none of its transitions is dead. -/
+theorem WeightedNet.weaklyLiveFrom_iff_no_dead_transition
+    {P T : Type*} (net : WeightedNet P T) (m₀ : Marking P) :
+    net.WeaklyLiveFrom m₀ ↔ ∀ t, ¬ net.TransitionDeadFrom m₀ t := by
+  classical
+  simp [WeightedNet.WeaklyLiveFrom, WeightedNet.TransitionDeadFrom]
 
 /-- A net is deadlock-free from `m₀` if and only if every state of its
 marking graph has an outgoing edge. This is Reisig's marking-graph
