@@ -114,6 +114,69 @@ theorem omegaPlaces_mono_of_omegaExecution {nodes : Cslib.ωSequence (Branch P)}
       OmegaMarking.omegaPlaces (nodes j).marking := by
   exact omegaPlaces_mono_of_mTr (hexec.extract_mTr hij)
 
+/-- A Karp–Miller DFS step preserves every existing ancestor of the source
+branch in the target branch. -/
+theorem ancestors_mono_of_tr {src tgt : Branch P} {t : T}
+    (htr : (dfsLTS net).Tr src t tgt) :
+    src.ancestors ⊆ tgt.ancestors := by
+  obtain ⟨_, _, rfl⟩ := mem_dfsSuccessors_iff.mp htr
+  simp [succBranch, Branch.history]
+
+/-- Along a finite Karp–Miller execution, every ancestor of the initial branch
+remains an ancestor of the final branch. This extends `ancestors_mono_of_tr`
+from one transition to a sequence of transitions. -/
+theorem ancestors_mono_of_mTr {src tgt : Branch P} {labels : List T}
+    (hexec : (dfsLTS net).MTr src labels tgt) :
+    src.ancestors ⊆ tgt.ancestors := by
+  induction hexec with
+  | refl => exact List.Subset.refl _
+  | stepL htr _ ih =>
+      exact List.Subset.trans (ancestors_mono_of_tr htr) ih
+
+/-- Along an infinite Karp–Miller execution, every ancestor at an earlier
+position remains an ancestor at every later position. This extends
+`ancestors_mono_of_mTr` from finite executions to finite prefixes of an
+infinite execution. -/
+theorem ancestors_mono_of_omegaExecution
+    {nodes : Cslib.ωSequence (Branch P)}
+    {labels : Cslib.ωSequence T}
+    (hexec : (dfsLTS net).OmegaExecution nodes labels)
+    {i j : ℕ} (hij : i ≤ j) :
+    (nodes i).ancestors ⊆ (nodes j).ancestors := by
+  exact ancestors_mono_of_mTr (hexec.extract_mTr hij)
+
+/-- Every marking occurring earlier on an infinite Karp–Miller execution is
+stored in the ancestor list of every later node.
+
+For consecutive nodes this follows because a step places the source marking
+at the head of the target history. For a more distant node, the existing
+ancestor membership is carried forward by each subsequent step. -/
+theorem marking_mem_ancestors_of_omegaExecution
+    {nodes : Cslib.ωSequence (Branch P)}
+    {labels : Cslib.ωSequence T}
+    (hexec : (dfsLTS net).OmegaExecution nodes labels)
+    {i j : ℕ} (hij : i < j) :
+    (nodes i).marking ∈ (nodes j).ancestors := by
+  have hnext : (nodes i).marking ∈ (nodes (i + 1)).ancestors := by
+    obtain ⟨_, _, htgt⟩ := mem_dfsSuccessors_iff.mp (hexec i)
+    rw [← htgt]
+    simp [succBranch, Branch.history]
+  exact ancestors_mono_of_omegaExecution hexec hij hnext
+
+/-- Every marking is contained in the complete history of every node at the
+same or a later position of an infinite Karp–Miller execution. -/
+theorem marking_mem_history_of_omegaExecution
+    {nodes : Cslib.ωSequence (Branch P)}
+    {labels : Cslib.ωSequence T}
+    (hexec : (dfsLTS net).OmegaExecution nodes labels)
+    {i j : ℕ} (hij : i ≤ j) :
+    (nodes i).marking ∈ (nodes j).history := by
+  rcases Nat.eq_or_lt_of_le hij with (rfl | hij')
+  · simp [Branch.history]
+  · rw [Branch.history, List.mem_append]
+    exact Or.inl
+      (marking_mem_ancestors_of_omegaExecution hexec hij')
+
 /-- The Karp–Miller DFS LTS is deterministic. Registering this fact as an
 instance allows CSLib results for deterministic LTSs to apply directly. -/
 instance (net : WeightedNet P T) :

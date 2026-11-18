@@ -39,40 +39,6 @@ section FinitePlaces
 
 variable [FinEnum P] [FinEnum T]
 
-/-- Every marking occurring earlier on an infinite Karp–Miller execution is
-stored in the ancestor list of every later node.
-
-For consecutive nodes this follows because a step places the source marking
-at the head of the target history. For a more distant node, the existing
-ancestor membership is carried forward by each subsequent step. -/
-theorem marking_mem_ancestors_of_omegaExecution {nodes : Cslib.ωSequence (Branch P)}
-    {labels : Cslib.ωSequence T}
-    (hexec : (dfsLTS net).OmegaExecution nodes labels)
-    {i j : ℕ} (hij : i < j) :
-    (nodes i).marking ∈ (nodes j).ancestors := by
-  induction j with
-  | zero => omega
-  | succ j ih =>
-      have htgt := (mem_dfsSuccessors_iff.mp (hexec j)).2.2
-      rw [← htgt]
-      simp only [succBranch, Branch.append_ancestors]
-      rcases Nat.eq_or_lt_of_le (Nat.le_of_lt_succ hij) with (rfl | hij')
-      · simp [Branch.history]
-      · simp [Branch.history, ih hij']
-
-/-- Every marking is contained in the complete history of every node at the
-same or a later position of an infinite Karp–Miller execution. -/
-theorem marking_mem_history_of_omegaExecution
-    {nodes : Cslib.ωSequence (Branch P)}
-    {labels : Cslib.ωSequence T}
-    (hexec : (dfsLTS net).OmegaExecution nodes labels)
-    {i j : ℕ} (hij : i ≤ j) :
-    (nodes i).marking ∈ (nodes j).history := by
-  rcases Nat.eq_or_lt_of_le hij with (rfl | hij')
-  · simp [Branch.history]
-  · simp [Branch.history,
-      marking_mem_ancestors_of_omegaExecution hexec hij']
-
 /-- On an infinite Karp–Miller execution, two distinct comparable markings
 with the same ω-places would force a new ω-place in the later marking.
 
@@ -201,4 +167,3 @@ end FinitePlaces
 end KarpMiller
 
 end PetriNet
-
