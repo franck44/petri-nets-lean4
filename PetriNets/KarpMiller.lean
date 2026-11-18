@@ -209,10 +209,10 @@ theorem mapM_dfsFuel_mono
 Karp–Miller subtree below any node. -/
 theorem exists_dfsFuel (src : Branch P) :
     ∃ fuel tree, dfsFuel net fuel src = some tree := by
-  apply (child_wellFounded (net := net) (T := T)).induction src
+  apply (dfsCall_wellFounded (net := net) (T := T)).induction src
   intro src smaller
   have buildChildren : ∀ candidates : List (T × Branch P),
-      (∀ candidate ∈ candidates, Child net candidate.2 src) →
+      (∀ candidate ∈ candidates, DfsCall net candidate.2 src) →
       ∃ fuel trees,
         candidates.mapM (fun x =>
           (dfsFuel net fuel x.2).bind fun tree => some (x.1, tree)) =

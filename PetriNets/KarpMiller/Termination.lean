@@ -232,19 +232,23 @@ theorem not_omegaExecution
   step of the infinite execution. -/
   exact hnotfresh (mem_dfsSuccessors_iff.mp (hexec j)).1
 
-/-- `Child net tgt src` means that `tgt` is an immediate Karp–Miller
-successor of `src`, for some transition label. The argument order is chosen
-for well-founded recursion: children are smaller than their parents. -/
-def Child (net : WeightedNet P T)
-    (tgt src : Branch P) : Prop :=
-  ∃ t, (dfsLTS net).Tr src t tgt
+/-- `DfsCall net next current` means that computing the Karp–Miller DFS at
+`current` makes an immediate recursive call at `next`.
 
-/-- The Karp–Miller child relation is well-founded.
+Such a call occurs exactly when `dfsLTS net` has a transition from `current`
+to `next`, with some label. The recursive argument is placed first so that
+`DfsCall net` has the orientation expected of a well-founded relation:
+`next` is smaller than `current`. -/
+def DfsCall (net : WeightedNet P T)
+    (next current : Branch P) : Prop :=
+  ∃ t, (dfsLTS net).Tr current t next
 
-An infinite descending chain for `Child net` would select a transition label
-at every position and therefore form an infinite execution of `dfsLTS net`,
-contradicting `not_omegaExecution`. -/
-theorem child_wellFounded : WellFounded (Child net) := by
+/-- The recursive-call relation of the Karp–Miller DFS is well-founded.
+
+An infinite descending chain for `DfsCall net` would select a transition
+label at every position and therefore form an infinite execution of
+`dfsLTS net`, contradicting `not_omegaExecution`. -/
+theorem dfsCall_wellFounded : WellFounded (DfsCall net) := by
   rw [wellFounded_iff_isEmpty_descending_chain]
   constructor
   rintro ⟨nodes, hchildren⟩
