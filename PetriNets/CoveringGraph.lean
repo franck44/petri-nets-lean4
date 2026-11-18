@@ -129,6 +129,18 @@ noncomputable def accelerate {P : Type*} (A : Set P)
   classical
   exact fun p => if p ∈ A then ⊤ else m p
 
+/-- Executable acceleration for a finite set of places. -/
+def accelerateFinset {P : Type*} [DecidableEq P] (A : Finset P)
+    (m : OmegaMarking P) : OmegaMarking P :=
+  fun p => if p ∈ A then ⊤ else m p
+
+/-- Finite-set acceleration agrees with set-based acceleration. -/
+theorem accelerateFinset_eq_accelerate {P : Type*} [DecidableEq P]
+    (A : Finset P) (m : OmegaMarking P) :
+    accelerateFinset A m = accelerate (A : Set P) m := by
+  funext p
+  by_cases hp : p ∈ A <;> simp [accelerateFinset, accelerate, hp]
+
 /-- A place selected for acceleration has value `ω`. -/
 @[simp]
 theorem accelerate_apply_of_mem {P : Type*} {A : Set P}
