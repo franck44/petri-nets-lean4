@@ -103,6 +103,7 @@ by filtering the finite set of all places. -/
 noncomputable def omegaPlaces {P : Type*} [Fintype P]
     (m : OmegaMarking P) : Finset P := by
   classical
+  /- collect the elements that satisfy `m p = ⊤`.-/
   exact Finset.univ.filter fun p => m p = ⊤
 
 /-- A place belongs to `omegaPlaces m` exactly when its value in `m` is `ω`.
