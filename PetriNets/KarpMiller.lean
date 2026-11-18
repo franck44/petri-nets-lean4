@@ -274,13 +274,13 @@ theorem reachable_ancestors_nodup {P T : Type*}
 /-- A finite Karp–Miller tree. Each child is paired with the transition used
 to generate it from the marking stored at the parent node. -/
 inductive KarpMillerTree (P T : Type*) where
-  | node (root : KarpMillerNode P)
+  | node (rootValue : KarpMillerNode P)
       (children : List (T × KarpMillerTree P T))
 
-/-- The Karp–Miller node stored at the root of a tree. -/
-def KarpMillerTree.root {P T : Type*} :
+/-- The Karp–Miller node value stored at a tree vertex. -/
+def KarpMillerTree.rootValue {P T : Type*} :
     KarpMillerTree P T → KarpMillerNode P
-  | .node root _ => root
+  | .node rootValue _ => rootValue
 
 /-- The labelled immediate subtrees of a Karp–Miller tree. -/
 def KarpMillerTree.children {P T : Type*} :
@@ -305,10 +305,10 @@ mutual
   /-- Convert a Karp–Miller tree to its printable view. -/
   def KarpMillerTree.toView {P T : Type*} [FinEnum P] :
       KarpMillerTree P T → KarpMillerTree.View P T
-    | .node root children =>
+    | .node rootValue children =>
         .node
           ((FinEnum.toList P).map fun p =>
-            (p, omegaValueToString (root.marking p)))
+            (p, omegaValueToString (rootValue.marking p)))
           (KarpMillerTree.childrenToViews children)
 
   /-- Convert a list of labelled child trees to printable views. -/
@@ -334,9 +334,9 @@ mutual
       [FinEnum P] [ToString P] [ToString T]
       (tree : KarpMillerTree P T) (id : ℕ) : ℕ × List String :=
     match tree with
-    | .node root children =>
+    | .node rootValue children =>
         let nodeLine :=
-          s!"  n{id} [label=\"{KarpMillerTree.markingDotLabel root}\"];"
+          s!"  n{id} [label=\"{KarpMillerTree.markingDotLabel rootValue}\"];"
         let result := KarpMillerTree.childrenToDotLines children id (id + 1)
         (result.1, nodeLine :: result.2)
 
@@ -412,12 +412,12 @@ def dfsFuel {P T : Type*}
 
 /-- A tree returned by `dfsFuel` has the source node supplied to the search
 as its root. -/
-theorem dfsFuel_root {P T : Type*}
+theorem dfsFuel_rootValue {P T : Type*}
     [FinEnum P] [FinEnum T]
     {net : WeightedNet P T} {fuel : ℕ}
     {src : KarpMillerNode P} {tree : KarpMillerTree P T}
     (h : dfsFuel net fuel src = some tree) :
-    tree.root = src := by
+    tree.rootValue = src := by
   cases fuel with
   | zero => simp [dfsFuel] at h
   | succ n =>
