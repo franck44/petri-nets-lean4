@@ -86,6 +86,37 @@ theorem exists_le_pair {P : Type*} [Finite P]
     ∃ i j, i < j ∧ markings i ≤ markings j := by
   exact wellQuasiOrdered_le markings
 
+/-- The finite set of places at which a given ω-marking has value `ω`.
+
+For example, if a three-place marking has values
+
+```text
+m = (3, ω, ω),
+```
+
+then `omegaPlaces m` is the set containing the second and third places. The
+function does not construct or enumerate ω-markings: it takes one marking and
+records precisely which of its components are `ω`.
+
+The result is a `Finset P` because the place type `P` is finite. It is obtained
+by filtering the finite set of all places. -/
+noncomputable def omegaPlaces {P : Type*} [Fintype P]
+    (m : OmegaMarking P) : Finset P := by
+  classical
+  exact Finset.univ.filter fun p => m p = ⊤
+
+/-- A place belongs to `omegaPlaces m` exactly when its value in `m` is `ω`.
+
+This theorem is the membership interface for `omegaPlaces`: it allows proofs
+to move between the finite-set statement `p ∈ omegaPlaces m` and the marking
+equation `m p = ⊤`. -/
+@[simp]
+theorem mem_omegaPlaces {P : Type*} [Fintype P]
+    {m : OmegaMarking P} {p : P} :
+    p ∈ omegaPlaces m ↔ m p = ⊤ := by
+  classical
+  simp [omegaPlaces]
+
 /-- `accelerate A m` is the ω-marking obtained from `m` by replacing the
 values at the chosen set `A` of places by `ω`. At every place outside `A`, it
 retains the value of `m`.
