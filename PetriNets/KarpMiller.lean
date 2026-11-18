@@ -176,6 +176,34 @@ def Step {P T : Type*}
     (src : KarpMillerNode P) (t : T) (tgt : KarpMillerNode P) : Prop :=
   successor? net src t = some tgt
 
+/-- A Karp–Miller step preserves every place already equal to `ω`. -/
+theorem Step.preserves_top {P T : Type*}
+    [FinEnum P] [FinEnum T]
+    {net : WeightedNet P T} {src tgt : KarpMillerNode P} {t : T}
+    (hstep : Step net src t tgt) {p : P}
+    (hp : src.marking p = ⊤) :
+    tgt.marking p = ⊤ := by
+  unfold Step successor? at hstep
+  split at hstep
+  · contradiction
+  · split at hstep
+    · simp only [Option.some.injEq] at hstep
+      subst tgt
+      simp [uncheckedSuccessor, Node.append,
+        OmegaMarking.accelerateFinset, firingResult, hp]
+    · contradiction
+
+/-- Along a Karp–Miller step, the set of places equal to `ω` can only grow. -/
+theorem omegaPlaces_mono_of_step {P T : Type*}
+    [FinEnum P] [FinEnum T]
+    {net : WeightedNet P T} {src tgt : KarpMillerNode P} {t : T}
+    (hstep : Step net src t tgt) :
+    OmegaMarking.omegaPlaces src.marking ⊆
+      OmegaMarking.omegaPlaces tgt.marking := by
+  intro p hp
+  rw [OmegaMarking.mem_omegaPlaces] at hp ⊢
+  exact hstep.preserves_top hp
+
 /-- A Karp–Miller node has no outgoing step exactly when it is a duplicate or
 its ω-marking enables no transition. -/
 theorem no_step_iff_duplicate_or_terminal {P T : Type*}
@@ -248,6 +276,59 @@ theorem lts_deterministic {P T : Type*}
   change successor? net src t = some tgt₁ at h₁
   change successor? net src t = some tgt₂ at h₂
   exact Option.some.inj (h₁.symm.trans h₂)
+
+/-- Along an infinite Karp–Miller execution, the set of `ω`-places at an
+earlier position is contained in the set at every later position. -/
+theorem omegaPlaces_mono_of_omegaExecution {P T : Type*}
+    [FinEnum P] [FinEnum T]
+    {net : WeightedNet P T}
+    {nodes : Cslib.ωSequence (KarpMillerNode P)}
+    {labels : Cslib.ωSequence T}
+    (hexec : (lts net).OmegaExecution nodes labels)
+    {i j : ℕ} (hij : i ≤ j) :
+    OmegaMarking.omegaPlaces (nodes i).marking ⊆
+      OmegaMarking.omegaPlaces (nodes j).marking := by
+  induction j with
+  | zero =>
+      have : i = 0 := by omega
+      subst i
+      exact Finset.Subset.rfl
+  | succ j ih =>
+      rcases Nat.eq_or_lt_of_le hij with (rfl | hij')
+      · exact Finset.Subset.rfl
+      · exact (ih (Nat.le_of_lt_succ hij')).trans
+          (omegaPlaces_mono_of_step (hexec j))
+
+/-- On every infinite Karp–Miller execution, the set of places equal to `ω`
+is constant from some position onwards.
+
+The sets grow monotonically and are all subsets of the finite place type.
+Choose a position at which their cardinality is maximal; every later set has
+the same cardinality and therefore equals it. -/
+theorem exists_omegaPlaces_stable_from {P T : Type*}
+    [FinEnum P] [FinEnum T]
+    {net : WeightedNet P T}
+    {nodes : Cslib.ωSequence (KarpMillerNode P)}
+    {labels : Cslib.ωSequence T}
+    (hexec : (lts net).OmegaExecution nodes labels) :
+    ∃ n₀, ∀ n, n₀ ≤ n →
+      OmegaMarking.omegaPlaces (nodes n).marking =
+        OmegaMarking.omegaPlaces (nodes n₀).marking := by
+  let cardAt (n : ℕ) :=
+    (OmegaMarking.omegaPlaces (nodes n).marking).card
+  have himage : (cardAt '' (Set.univ : Set ℕ)).Finite := by
+    apply (Set.finite_Iic (Finset.univ : Finset P).card).subset
+    rintro k ⟨n, _, rfl⟩
+    exact Finset.card_le_univ _
+  obtain ⟨n₀, _, hmax⟩ :=
+    Set.Finite.exists_maximalFor' cardAt Set.univ himage Set.univ_nonempty
+  refine ⟨n₀, fun n hn => ?_⟩
+  have hsub := omegaPlaces_mono_of_omegaExecution hexec hn
+  have hcard : cardAt n ≤ cardAt n₀ := by
+    by_cases hle : cardAt n₀ ≤ cardAt n
+    · exact hmax (Set.mem_univ n) hle
+    · omega
+  exact (Finset.eq_of_subset_of_card_le hsub hcard).symm
 
 /-- If a node's ancestors contain no duplicates and the node is open,
 then the node is not a duplicate and its complete history contains no duplicates. -/
