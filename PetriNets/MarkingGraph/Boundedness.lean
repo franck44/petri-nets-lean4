@@ -12,10 +12,11 @@ public import PetriNets.PlaceInvariant.Boundedness
 /-!
 # Boundedness and finite marking graphs
 
-This module proves Reisig's marking-graph characterisation of boundedness.
-The marking graph is finite-state when its generated state type has a `Finite`
-instance, following CSLib's convention for finite-state labelled transition
-systems.
+This module defines unboundedness of an individual place and simultaneous
+unboundedness of a set of places. It also proves Reisig's marking-graph
+characterisation of boundedness. The marking graph is finite-state when its
+generated state type has a `Finite` instance, following CSLib's convention
+for finite-state labelled transition systems.
 
 For a finite place type, a finite marking graph implies boundedness: the
 finitely many graph states and places provide only finitely many token counts.
@@ -32,6 +33,39 @@ many possible token counts, so there are only finitely many possible markings.
 @[expose] public section
 
 namespace PetriNet
+
+/-- Place `p` is unbounded from `m₀` when, for every proposed bound `B`,
+there is a marking reachable from `m₀` that contains more than `B` tokens
+in `p`. -/
+def WeightedNet.PlaceUnboundedFrom {P T : Type*} (net : WeightedNet P T)
+    (m₀ : Marking P) (p : P) : Prop :=
+  ∀ B : ℕ, ∃ m, net.Reachable m₀ m ∧ B < m p
+
+/-- The places in `places` are simultaneously unbounded from `m₀` when,
+for every proposed common bound `B`, one reachable marking contains more
+than `B` tokens at every place in `places` simultaneously.
+
+This is stronger than requiring each place in `places` to be individually
+unbounded: the same reachable marking must witness growth at all of them. -/
+def WeightedNet.SimultaneouslyUnboundedFrom {P T : Type*}
+    (net : WeightedNet P T) (m₀ : Marking P) (places : Set P) : Prop :=
+  ∀ B : ℕ, ∃ m, net.Reachable m₀ m ∧ ∀ p ∈ places, B < m p
+
+/-- A place is unbounded exactly when it is not bounded. -/
+theorem WeightedNet.placeUnboundedFrom_iff_not_placeBoundedFrom
+    {P T : Type*} (net : WeightedNet P T) (m₀ : Marking P) (p : P) :
+    net.PlaceUnboundedFrom m₀ p ↔ ¬ net.PlaceBoundedFrom m₀ p := by
+  classical
+  simp [WeightedNet.PlaceUnboundedFrom, WeightedNet.PlaceBoundedFrom]
+
+/-- Simultaneous unboundedness of a singleton is precisely unboundedness of
+its only place. -/
+theorem WeightedNet.simultaneouslyUnboundedFrom_singleton
+    {P T : Type*} (net : WeightedNet P T) (m₀ : Marking P) (p : P) :
+    net.SimultaneouslyUnboundedFrom m₀ {p} ↔
+      net.PlaceUnboundedFrom m₀ p := by
+  simp [WeightedNet.SimultaneouslyUnboundedFrom,
+    WeightedNet.PlaceUnboundedFrom]
 
 /-- If the place type and the state type of the marking graph from `m₀` are
 finite, then the net is bounded from `m₀`. -/
