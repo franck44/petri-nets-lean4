@@ -67,19 +67,19 @@ theorem append_ancestors (branch : Branch P) (m : OmegaMarking P) :
     (branch ++ m).ancestors = branch.history :=
   rfl
 
-/-- A branch is open when its current marking does not duplicate an ancestor. -/
-def IsOpen (branch : Branch P) : Prop :=
+/-- A branch is fresh when its current marking does not duplicate an ancestor. -/
+def IsFresh (branch : Branch P) : Prop :=
   branch.marking ∉ branch.ancestors
 
-/-- If a branch has no duplicate ancestors and is open, then its complete
+/-- If a branch has no duplicate ancestors and is fresh, then its complete
 history has no duplicates. -/
 theorem history_nodup {branch : Branch P}
-    (hancestors : branch.ancestors.Nodup) (hopen : branch.IsOpen) :
+    (hancestors : branch.ancestors.Nodup) (hfresh : branch.IsFresh) :
     branch.history.Nodup := by
-  change branch.marking ∉ branch.ancestors at hopen
+  change branch.marking ∉ branch.ancestors at hfresh
   simp [history, List.nodup_append, hancestors]
   intro m hm heq
-  apply hopen
+  apply hfresh
   exact heq ▸ hm
 
 section FinitePlaces

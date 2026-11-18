@@ -19,11 +19,11 @@ depth-first search (DFS).
 A DFS branch stores its current ω-marking and its ancestor markings because
 acceleration depends on the history of the branch. The executable successor
 functions enumerate enabled transitions, accelerate their successor
-markings, and extend an open branch. These computed successors define the DFS
+markings, and extend a fresh branch. These computed successors define the DFS
 labelled transition system.
 
 When the current marking already occurs among the ancestors, the branch is
-not open and becomes a leaf. The completed finite DFS tree retains these
+not fresh and becomes a leaf. The completed finite DFS tree retains these
 closed leaves.
 
 ## References
@@ -51,8 +51,8 @@ no duplicates. -/
 theorem ancestors_nodup_of_tr {src tgt : Branch P} {t : T}
     (htr : (dfsLTS net).Tr src t tgt) (hsrc : src.ancestors.Nodup) :
     tgt.ancestors.Nodup := by
-  obtain ⟨hopen, _, rfl⟩ := mem_dfsSuccessors_iff.mp htr
-  simpa [succBranch] using src.history_nodup hsrc hopen
+  obtain ⟨hfresh, _, rfl⟩ := mem_dfsSuccessors_iff.mp htr
+  simpa [succBranch] using src.history_nodup hsrc hfresh
 
 /-- Every node reachable from the initial Karp–Miller node has a
 duplicate-free list of ancestors. -/
@@ -111,8 +111,8 @@ theorem KarpMillerTree.IsValid.tr_of_mem_children
 depth.
 
 At zero fuel the computation returns `none`. With successor fuel,
-`dfsSuccessors` checks whether the branch is open and returns no successors
-when it is not. Every successor of an open branch is recursively explored
+`dfsSuccessors` checks whether the branch is fresh and returns no successors
+when it is not. Every successor of a fresh branch is recursively explored
 with one less unit of fuel. The result is `none` if any child needs more fuel,
 and `some tree` when the complete subtree fits within the supplied bound. -/
 def dfsFuel (net : WeightedNet P T) : ℕ → Branch P →
@@ -413,14 +413,14 @@ theorem dfsFuel_isLeaf_iff_no_tr {fuel : ℕ}
     exact hnone t child.rootValue htr
 
 /-- A successfully constructed DFS tree is a leaf exactly when its root
-branch is not open or its ω-marking enables no transition. -/
-theorem dfsFuel_isLeaf_iff_not_open_or_terminal {fuel : ℕ}
+branch is not fresh or its ω-marking enables no transition. -/
+theorem dfsFuel_isLeaf_iff_not_fresh_or_terminal {fuel : ℕ}
     {src : Branch P} {tree : KarpMillerTree P T}
     (hdfs : dfsFuel net fuel src = some tree) :
     tree.IsLeaf ↔
-      ¬ src.IsOpen ∨ ∀ t, ¬ net.OmegaEnabled src.marking t :=
+      ¬ src.IsFresh ∨ ∀ t, ¬ net.OmegaEnabled src.marking t :=
   (dfsFuel_isLeaf_iff_no_tr hdfs).trans
-    no_tr_iff_not_open_or_terminal
+    no_tr_iff_not_fresh_or_terminal
 
 end FinitePlaces
 

@@ -15,7 +15,7 @@ The Karp–Miller algorithm expands a branch by choosing a transition enabled
 at its current marking. Firing the transition produces a successor
 marking. This marking is accelerated with respect to the history of the
 branch, and the accelerated marking is appended to form the successor branch.
-A branch that is not open is not expanded.
+A branch that is not fresh is not expanded.
 
 This idea is represented by the following definitions:
 
@@ -48,7 +48,7 @@ variable [FinEnum P]
 
 This function performs the firing arithmetic, accelerates the resulting
 marking with respect to the history of `src`, and appends it to the branch.
-The caller is responsible for ensuring that `src` is open and `t` is
+The caller is responsible for ensuring that `src` is fresh and `t` is
 enabled. -/
 def succBranch (net : WeightedNet P T) (src : Branch P) (t : T) : Branch P :=
   let m := succMarking net src.marking t

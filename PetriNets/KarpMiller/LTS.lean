@@ -13,7 +13,7 @@ public import PetriNets.KarpMiller.Successor
 
 This module defines the executable successor list explored by the
 Karp–Miller DFS and exposes that list as a labelled transition system. A DFS
-edge is exactly membership in the computed successor list, so openness and
+edge is exactly membership in the computed successor list, so freshness and
 enabledness have a single executable source of truth.
 -/
 
@@ -32,10 +32,10 @@ variable [FinEnum P] [FinEnum T]
 
 /-- Compute the labelled successor branches explored by the Karp–Miller DFS.
 
-The openness check belongs to the DFS algorithm. For an open branch,
+The freshness check belongs to the DFS algorithm. For a fresh branch,
 `succMarkings` enumerates the enabled transitions and their successor
 markings; `succBranch` then accelerates each marking with respect to the branch
-history and extends the branch. A branch that is not open has no DFS
+history and extends the branch. A branch that is not fresh has no DFS
 successors. -/
 def dfsSuccessors (net : WeightedNet P T) (src : Branch P) :
     List (T × Branch P) :=
@@ -44,18 +44,18 @@ def dfsSuccessors (net : WeightedNet P T) (src : Branch P) :
     (succMarkings net src.marking).map fun candidate =>
       (candidate.1, succBranch net src candidate.1)
 
-/-- Membership in `dfsSuccessors` is characterised by openness, enabledness,
+/-- Membership in `dfsSuccessors` is characterised by freshness, enabledness,
 and construction of the target branch. -/
 theorem mem_dfsSuccessors_iff {src tgt : Branch P} {t : T} :
     (t, tgt) ∈ dfsSuccessors net src ↔
-      src.IsOpen ∧ net.OmegaEnabled src.marking t ∧
+      src.IsFresh ∧ net.OmegaEnabled src.marking t ∧
         succBranch net src t = tgt := by
   constructor
   · intro h
     unfold dfsSuccessors at h
     split at h
     · simp at h
-    · rename_i hopen
+    · rename_i hfresh
       simp only [List.mem_map] at h
       obtain ⟨candidate, hcandidate, hpair⟩ := h
       rcases candidate with ⟨u, m⟩
@@ -63,9 +63,9 @@ theorem mem_dfsSuccessors_iff {src tgt : Branch P} {t : T} :
       obtain ⟨rfl, rfl⟩ := hpair
       have henabled :=
         (enabled_and_eq_of_mem_succMarkings hcandidate).1
-      exact ⟨by simpa [Branch.IsOpen], henabled, rfl⟩
-  · rintro ⟨hopen, henabled, rfl⟩
-    have hnotmem : src.marking ∉ src.ancestors := hopen
+      exact ⟨by simpa [Branch.IsFresh], henabled, rfl⟩
+  · rintro ⟨hfresh, henabled, rfl⟩
+    have hnotmem : src.marking ∉ src.ancestors := hfresh
     unfold dfsSuccessors
     simp only [hnotmem, ↓reduceIte, List.mem_map]
     refine ⟨(t, succMarking net src.marking t),
@@ -254,14 +254,14 @@ instance (net : WeightedNet P T) :
   rw [mem_dfsSuccessors_iff] at h₁ h₂
   exact h₁.2.2.symm.trans h₂.2.2
 
-/-- A branch has no DFS successor exactly when it is not open or its current
+/-- A branch has no DFS successor exactly when it is not fresh or its current
 marking enables no transition. -/
-theorem no_tr_iff_not_open_or_terminal {src : Branch P} :
+theorem no_tr_iff_not_fresh_or_terminal {src : Branch P} :
     (∀ t tgt, ¬ (dfsLTS net).Tr src t tgt) ↔
-      ¬ src.IsOpen ∨ ∀ t, ¬ net.OmegaEnabled src.marking t := by
+      ¬ src.IsFresh ∨ ∀ t, ¬ net.OmegaEnabled src.marking t := by
   classical
-  by_cases hopen : src.IsOpen <;>
-    simp [dfsLTS, mem_dfsSuccessors_iff, hopen]
+  by_cases hfresh : src.IsFresh <;>
+    simp [dfsLTS, mem_dfsSuccessors_iff, hfresh]
 
 end FinitePlaces
 

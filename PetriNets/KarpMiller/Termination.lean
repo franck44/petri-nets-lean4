@@ -189,29 +189,48 @@ theorem exists_new_omegaPlace_of_lt_omegaExecution
 
 /-- The Karp–Miller LTS has no infinite execution.
 
-The generic ω-marking sequence lemma supplies two equal markings on any
-hypothetical infinite execution. The earlier marking is stored among the
-ancestors of the later node, so that node is a duplicate. But every step has
-an open source, contradicting the next step of the infinite execution. -/
+Assume that an infinite execution exists. Along this execution, the set of
+`ω`-places grows monotonically. Moreover, whenever an earlier marking is
+strictly below a later one, `exists_new_omegaPlace_of_lt_omegaExecution`
+shows that the later marking has acquired a new `ω`-place. The generic
+Dickson argument `OmegaMarking.exists_eq_pair_of_omegaPlaces_mono` therefore
+provides positions `i < j` carrying equal markings.
+
+The marking at position `i` is stored among the ancestors of the branch at
+position `j`. Since the two current markings are equal, the current marking
+at `j` also occurs among its own ancestors. Thus the branch at `j` is not
+fresh and the DFS gives it no successor. This contradicts the transition from
+position `j` to position `j + 1` supplied by the assumed infinite
+execution. -/
 theorem not_omegaExecution
     {nodes : Cslib.ωSequence (Branch P)}
     {labels : Cslib.ωSequence T} :
     ¬ (dfsLTS net).OmegaExecution nodes labels := by
   intro hexec
+  /- prove that if we have an infinite execution we can conclude False. -/
   obtain ⟨i, j, hij, heq⟩ :=
+    /- Apply the Dickson argument to find two positions with equal markings. -/
     OmegaMarking.exists_eq_pair_of_omegaPlaces_mono
       (fun n => (nodes n).marking)
       (fun hij => omegaPlaces_mono_of_omegaExecution hexec hij)
       (fun hij hle homega hne =>
         exists_new_omegaPlace_of_lt_omegaExecution
           hexec hij (lt_of_le_of_ne hle hne))
+  /- At this point, we have found two positions `i < j` with equal markings. -/
+
+  /- The marking at position `i` is among the ancestors of the branch at
+  position `j`. -/
   have hancestor :=
     marking_mem_ancestors_of_omegaExecution hexec hij
-  have hnotopen : ¬ (nodes j).IsOpen := by
-    simp only [Branch.IsOpen, not_not]
+  /- This implies that the branch at position j is not fresh,
+  since it has a duplicate marking among its ancestors. -/
+  have hnotfresh : ¬ (nodes j).IsFresh := by
+    simp only [Branch.IsFresh, not_not]
     rw [← heq]
     exact hancestor
-  exact hnotopen (mem_dfsSuccessors_iff.mp (hexec j)).1
+  /- Finally, a non-fresh branch has no DFS successor, contradicting the next
+  step of the infinite execution. -/
+  exact hnotfresh (mem_dfsSuccessors_iff.mp (hexec j)).1
 
 /-- `Child net tgt src` means that `tgt` is an immediate Karp–Miller
 successor of `src`, for some transition label. The argument order is chosen
