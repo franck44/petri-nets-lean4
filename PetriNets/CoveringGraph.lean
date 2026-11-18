@@ -333,6 +333,39 @@ theorem WeightedNet.omegaPlaces_mono_of_omegaExecution
       · exact (ih (Nat.le_of_lt_succ hij')).trans
           (net.omegaPlaces_mono_of_tr hgraph (hreach j) (hexec j))
 
+/-- On every infinite covering-graph execution over finitely many places,
+the set of places equal to `ω` is constant from some position onwards.
+
+The sets grow monotonically and are all subsets of the finite set of places.
+Choose a position at which their cardinality is maximal. Every later set
+contains that set but cannot have larger cardinality, so it is equal to it. -/
+theorem WeightedNet.exists_omegaPlaces_stable_from
+    {P T : Type*} [Fintype P] {net : WeightedNet P T} {m₀ : Marking P}
+    {graph : Cslib.LTS (OmegaMarking P) T}
+    {markings : Cslib.ωSequence (OmegaMarking P)}
+    {labels : Cslib.ωSequence T}
+    (hgraph : net.IsCoveringGraphFrom m₀ graph)
+    (hexec : graph.OmegaExecution markings labels)
+    (hinitial : markings 0 = m₀.toOmega) :
+    ∃ n₀, ∀ n, n₀ ≤ n →
+      OmegaMarking.omegaPlaces (markings n) =
+        OmegaMarking.omegaPlaces (markings n₀) := by
+  let cardAt (n : ℕ) := (OmegaMarking.omegaPlaces (markings n)).card
+  have himage : (cardAt '' (Set.univ : Set ℕ)).Finite := by
+    apply (Set.finite_Iic (Finset.univ : Finset P).card).subset
+    rintro k ⟨n, _, rfl⟩
+    exact Finset.card_le_univ _
+  obtain ⟨n₀, _, hmax⟩ :=
+    Set.Finite.exists_maximalFor' cardAt Set.univ himage Set.univ_nonempty
+  refine ⟨n₀, fun n hn ↦ ?_⟩
+  have hsub := net.omegaPlaces_mono_of_omegaExecution
+    hgraph hexec hinitial hn
+  have hcard : cardAt n ≤ cardAt n₀ := by
+    by_cases hle : cardAt n₀ ≤ cardAt n
+    · exact hmax (Set.mem_univ n) hle
+    · omega
+  exact (Finset.eq_of_subset_of_card_le hsub hcard).symm
+
 /-- Suppose the reachable covering-graph state `srcω` covers the ordinary
 marking `src`, and `t` fires from `src` to `tgt`. Then the covering graph has
 a `t`-labelled edge from `srcω` to a state `tgtω` which covers `tgt`.
