@@ -16,9 +16,9 @@ graph of a weighted P/T net.
 
 The construction is first defined declaratively, independently of a DFS, BFS,
 or worklist implementation. A construction node stores its current ω-marking
-and the list of its proper ancestors. Retaining these ancestors is necessary
-because acceleration at the current marking depends on earlier markings on
-the same branch.
+and the markings of the previous nodes on its branch. Retaining these
+ancestors is necessary because acceleration at the current marking depends on
+earlier markings on the same branch.
 
 Different construction nodes may carry the same current ω-marking. When the
 current marking duplicates an ancestor on its branch, the node is retained as
@@ -39,8 +39,8 @@ namespace PetriNet
 
 namespace KarpMiller
 
-/-- A node stores its current value and the list of proper ancestors on its
-branch, ordered from the root towards its parent.
+/-- A node stores its current value and the values of the previous nodes on
+its branch, ordered from the root towards its parent.
 
 The ancestor list is not required to be duplicate-free: a newly generated
 node whose value duplicates an ancestor is retained as a closed leaf. The
@@ -54,8 +54,8 @@ abbrev KarpMillerNode (P : Type*) := Node (OmegaMarking P)
 
 namespace Node
 
-/-- The complete history of a node: all its proper ancestors followed by its
-current marking. This list is nonempty by construction. -/
+/-- The complete history of a node: its ancestors followed by its current
+marking. This list is nonempty by construction. -/
 def history {P : Type*} (node : KarpMillerNode P) :
     List (OmegaMarking P) :=
   node.ancestors ++ [node.marking]
@@ -83,7 +83,7 @@ then `append m node` represents
 m₀ → ⋯ → mₙ → m.
 ```
 
-The complete history of `node` becomes the proper-ancestor list of the new
+The complete history of `node` becomes the ancestor list of the new
 node. No freshness condition is imposed: `m` may equal an ancestor, in which
 case the result is a duplicate leaf. -/
 def append {P : Type*} (m : OmegaMarking P)
@@ -92,7 +92,7 @@ def append {P : Type*} (m : OmegaMarking P)
   ancestors := node.history
 
 /-- A node is a duplicate leaf when its current marking already occurs among
-its proper ancestors. Such a node is retained in the construction but is not
+its ancestors. Such a node is retained in the construction but is not
 expanded. -/
 def IsDuplicate {P : Type*} (node : KarpMillerNode P) : Prop :=
   node.marking ∈ node.ancestors
@@ -176,6 +176,50 @@ theorem lts_deterministic {P T : Type*} (net : WeightedNet P T) :
   obtain ⟨_, m₂, hfires₂, htgt₂⟩ := h₂
   have hm : m₁ = m₂ := net.omegaFires_is_deterministic hfires₁ hfires₂
   rw [htgt₁, htgt₂, hm]
+
+/-- If a node's ancestors contain no duplicates and the node is open,
+then the node is not a duplicate and its complete history contains no duplicates. -/
+theorem Node.history_nodup {P : Type*} {node : KarpMillerNode P}
+    (hancestors : node.ancestors.Nodup) (hopen : node.IsOpen) :
+    node.history.Nodup := by
+  change node.marking ∉ node.ancestors at hopen
+  simp [Node.history, List.nodup_append, hancestors]
+  intro a ha heq
+  apply hopen
+  exact heq ▸ ha
+
+/-- The ancestors of the target of a Karp–Miller step `src t tgt`
+are exactly the complete history of `src`. -/
+theorem Step.ancestors_eq_history {P T : Type*} {net : WeightedNet P T}
+    {src tgt : KarpMillerNode P} {t : T}
+    (hstep : Step net src t tgt) :
+    tgt.ancestors = src.history := by
+  obtain ⟨_, m, _, rfl⟩ := hstep
+  rfl
+
+/-- A Karp–Miller step `src t tgt` results in `tgt.ancestors` having no duplicates provided
+that `src.ancestors` has no duplicates. In other words, the no-duplicates property in ancestors is an invariant preserved by Karp–Miller steps (proved in the `reachable_ancestors_nodup` theorem). -/
+theorem Step.ancestors_nodup {P T : Type*} {net : WeightedNet P T}
+    {src tgt : KarpMillerNode P} {t : T}
+    (hstep : Step net src t tgt) (hsrc : src.ancestors.Nodup) :
+    tgt.ancestors.Nodup := by
+  rw [hstep.ancestors_eq_history]
+  exact src.history_nodup hsrc hstep.isOpen
+
+/-- Every node reachable from the initial Karp–Miller node has a
+duplicate-free list of ancestors. -/
+theorem reachable_ancestors_nodup {P T : Type*} {net : WeightedNet P T}
+    {m₀ : Marking P} {node : KarpMillerNode P}
+    (hreach : (lts net).CanReach (Node.initial m₀) node) :
+    node.ancestors.Nodup := by
+  obtain ⟨labels, hmtr⟩ := hreach
+  have preserve {src tgt : KarpMillerNode P} {labels : List T}
+      (h : (lts net).MTr src labels tgt) (hsrc : src.ancestors.Nodup) :
+      tgt.ancestors.Nodup := by
+    induction h with
+    | refl => exact hsrc
+    | stepL hstep _ ih => exact ih (hstep.ancestors_nodup hsrc)
+  exact preserve hmtr (by simp [Node.initial, Node.root])
 
 end KarpMiller
 
