@@ -6,7 +6,7 @@ Authors: Franck Cassez
 
 module
 
-public import PetriNets.CoveringGraph
+public import PetriNets.OmegaMarking.Sequence
 public import Mathlib.Data.FinEnum
 
 /-!
@@ -197,6 +197,24 @@ theorem Step.preserves_top {src tgt : KarpMillerNode P} {t : T}
         OmegaMarking.accelerateFinset, firingResult, hp]
     · contradiction
 
+/-- A place selected by the acceleration rule has value `ω` in the target
+node of the Karp–Miller step. -/
+theorem Step.eq_top_of_mem_acceleratedPlaces
+    {src tgt : KarpMillerNode P} {t : T} (hstep : Step net src t tgt)
+    {p : P}
+    (hp : p ∈ Node.acceleratedPlaces
+      (firingResult net src.marking t) src) :
+    tgt.marking p = ⊤ := by
+  unfold Step successor? at hstep
+  split at hstep
+  · contradiction
+  · split at hstep
+    · simp only [Option.some.injEq] at hstep
+      subst tgt
+      simp [uncheckedSuccessor, Node.append,
+        OmegaMarking.accelerateFinset, hp]
+    · contradiction
+
 /-- Along a Karp–Miller step, the set of places equal to `ω` can only grow. -/
 theorem omegaPlaces_mono_of_step {src tgt : KarpMillerNode P} {t : T}
     (hstep : Step net src t tgt) :
@@ -324,51 +342,6 @@ theorem omegaPlaces_mono_of_omegaExecution {nodes : Cslib.ωSequence (KarpMiller
       · exact (ih (Nat.le_of_lt_succ hij')).trans
           (omegaPlaces_mono_of_step (hexec j))
 
-/-- On every infinite Karp–Miller execution, the set of places equal to `ω`
-is constant from some position onwards.
-
-The sets grow monotonically and are all subsets of the finite place type.
-Choose a position at which their cardinality is maximal; every later set has
-the same cardinality and therefore equals it. -/
-theorem exists_omegaPlaces_stable_from {nodes : Cslib.ωSequence (KarpMillerNode P)}
-    {labels : Cslib.ωSequence T}
-    (hexec : (lts net).OmegaExecution nodes labels) :
-    ∃ n₀, ∀ n, n₀ ≤ n →
-      OmegaMarking.omegaPlaces (nodes n).marking =
-        OmegaMarking.omegaPlaces (nodes n₀).marking := by
-  let cardAt (n : ℕ) :=
-    (OmegaMarking.omegaPlaces (nodes n).marking).card
-  have himage : (cardAt '' (Set.univ : Set ℕ)).Finite := by
-    apply (Set.finite_Iic (Finset.univ : Finset P).card).subset
-    rintro k ⟨n, _, rfl⟩
-    exact Finset.card_le_univ _
-  obtain ⟨n₀, _, hmax⟩ :=
-    Set.Finite.exists_maximalFor' cardAt Set.univ himage Set.univ_nonempty
-  refine ⟨n₀, fun n hn => ?_⟩
-  have hsub := omegaPlaces_mono_of_omegaExecution hexec hn
-  have hcard : cardAt n ≤ cardAt n₀ := by
-    by_cases hle : cardAt n₀ ≤ cardAt n
-    · exact hmax (Set.mem_univ n) hle
-    · omega
-  exact (Finset.eq_of_subset_of_card_le hsub hcard).symm
-
-/-- On a suffix where the set of ω-places is stable, every Karp–Miller target
-marking is exactly the raw result of firing the corresponding transition. -/
-theorem marking_eq_firingResult_of_omegaPlaces_stable
-    {nodes : Cslib.ωSequence (KarpMillerNode P)}
-    {labels : Cslib.ωSequence T}
-    (hexec : (lts net).OmegaExecution nodes labels)
-    {n₀ n : ℕ}
-    (hstable : ∀ k, n₀ ≤ k →
-      OmegaMarking.omegaPlaces (nodes k).marking =
-        OmegaMarking.omegaPlaces (nodes n₀).marking)
-    (hn : n₀ ≤ n) :
-    (nodes (n + 1)).marking =
-      firingResult net (nodes n).marking (labels n) := by
-  apply (hexec n).marking_eq_firingResult_of_omegaPlaces_eq
-  exact (hstable n hn).trans
-    (hstable (n + 1) (hn.trans (Nat.le_succ n))).symm
-
 end FinitePlaces
 
 /-- If a node's ancestors contain no duplicates and the node is open,
@@ -417,6 +390,132 @@ theorem marking_mem_ancestors_of_omegaExecution {nodes : Cslib.ωSequence (KarpM
       rcases Nat.eq_or_lt_of_le (Nat.le_of_lt_succ hij) with (rfl | hij')
       · simp [Node.history]
       · simp [Node.history, ih hij']
+
+/-- Every marking is contained in the complete history of every node at the
+same or a later position of an infinite Karp–Miller execution. -/
+theorem marking_mem_history_of_omegaExecution
+    {nodes : Cslib.ωSequence (KarpMillerNode P)}
+    {labels : Cslib.ωSequence T}
+    (hexec : (lts net).OmegaExecution nodes labels)
+    {i j : ℕ} (hij : i ≤ j) :
+    (nodes i).marking ∈ (nodes j).history := by
+  rcases Nat.eq_or_lt_of_le hij with (rfl | hij')
+  · simp [Node.history]
+  · simp [Node.history,
+      marking_mem_ancestors_of_omegaExecution hexec hij']
+
+/-- On an infinite Karp–Miller execution, two distinct comparable markings
+with the same ω-places would force a new ω-place in the later marking.
+
+The earlier marking occurs in the history of the predecessor of the later
+node. Stability of the ω-place set makes the later marking equal to its raw
+firing result. Hence any strict component increase satisfies the acceleration
+condition and is replaced by `ω`. -/
+theorem exists_new_omegaPlace_of_lt_of_le_omegaExecution
+    {nodes : Cslib.ωSequence (KarpMillerNode P)}
+    {labels : Cslib.ωSequence T}
+    (hexec : (lts net).OmegaExecution nodes labels)
+    {i j : ℕ} (hij : i < j)
+    (hle : (nodes i).marking ≤ (nodes j).marking)
+    (homega : OmegaMarking.omegaPlaces (nodes i).marking =
+      OmegaMarking.omegaPlaces (nodes j).marking)
+    (hne : (nodes i).marking ≠ (nodes j).marking) :
+    ∃ p, p ∉ OmegaMarking.omegaPlaces (nodes i).marking ∧
+      p ∈ OmegaMarking.omegaPlaces (nodes j).marking := by
+  obtain ⟨k, rfl⟩ : ∃ k, j = k + 1 := by
+    use j - 1
+    omega
+  have hik : i ≤ k := by omega
+  have hhistory : (nodes i).marking ∈ (nodes k).history :=
+    marking_mem_history_of_omegaExecution hexec hik
+  have homegaPred : OmegaMarking.omegaPlaces (nodes k).marking =
+      OmegaMarking.omegaPlaces (nodes (k + 1)).marking := by
+    apply Finset.Subset.antisymm
+    · exact omegaPlaces_mono_of_step (hexec k)
+    · intro p hp
+      have hpEarlier : p ∈ OmegaMarking.omegaPlaces (nodes i).marking := by
+        rw [homega]
+        exact hp
+      exact omegaPlaces_mono_of_omegaExecution hexec hik hpEarlier
+  have hraw : (nodes (k + 1)).marking =
+      firingResult net (nodes k).marking (labels k) :=
+    (hexec k).marking_eq_firingResult_of_omegaPlaces_eq homegaPred
+  obtain ⟨p, hp⟩ : ∃ p,
+      (nodes i).marking p < (nodes (k + 1)).marking p := by
+    by_contra h
+    push Not at h
+    apply hne
+    funext p
+    exact le_antisymm (hle p) (h p)
+  have hpAccelerated : p ∈ Node.acceleratedPlaces
+      (firingResult net (nodes k).marking (labels k)) (nodes k) := by
+    simp only [Node.acceleratedPlaces, Finset.mem_filter,
+      Finset.mem_univ, true_and]
+    refine ⟨(nodes i).marking, hhistory, ?_, ?_⟩
+    · rw [← hraw]
+      exact hle
+    · rw [← hraw]
+      exact hp
+  have hpTop : (nodes (k + 1)).marking p = ⊤ :=
+    (hexec k).eq_top_of_mem_acceleratedPlaces hpAccelerated
+  refine ⟨p, ?_, ?_⟩
+  · rw [OmegaMarking.mem_omegaPlaces]
+    intro hpOldTop
+    rw [hpOldTop, hpTop] at hp
+    exact (lt_self_iff_false ⊤).mp hp
+  · rw [OmegaMarking.mem_omegaPlaces]
+    exact hpTop
+
+/-- The Karp–Miller LTS has no infinite execution.
+
+The generic ω-marking sequence lemma supplies two equal markings on any
+hypothetical infinite execution. The earlier marking is stored among the
+ancestors of the later node, so that node is a duplicate. But every step has
+an open source, contradicting the next step of the infinite execution. -/
+theorem not_omegaExecution
+    {nodes : Cslib.ωSequence (KarpMillerNode P)}
+    {labels : Cslib.ωSequence T} :
+    ¬ (lts net).OmegaExecution nodes labels := by
+  intro hexec
+  obtain ⟨i, j, hij, heq⟩ :=
+    OmegaMarking.exists_eq_pair_of_omegaPlaces_mono
+      (fun n => (nodes n).marking)
+      (fun hij => omegaPlaces_mono_of_omegaExecution hexec hij)
+      (fun hij hle homega hne =>
+        exists_new_omegaPlace_of_lt_of_le_omegaExecution
+          hexec hij hle homega hne)
+  have hancestor :=
+    marking_mem_ancestors_of_omegaExecution hexec hij
+  have hduplicate : (nodes j).IsDuplicate := by
+    change (nodes j).marking ∈ (nodes j).ancestors
+    rw [← heq]
+    exact hancestor
+  exact (hexec j).isOpen hduplicate
+
+/-- `Child net tgt src` means that `tgt` is an immediate Karp–Miller
+successor of `src`, for some transition label. The argument order is chosen
+for well-founded recursion: children are smaller than their parents. -/
+def Child (net : WeightedNet P T)
+    (tgt src : KarpMillerNode P) : Prop :=
+  ∃ t, Step net src t tgt
+
+/-- The Karp–Miller child relation is well-founded.
+
+An infinite descending chain for `Child net` would select a transition label
+at every position and therefore form an infinite execution of `lts net`,
+contradicting `not_omegaExecution`. -/
+theorem child_wellFounded : WellFounded (Child net) := by
+  rw [wellFounded_iff_isEmpty_descending_chain]
+  constructor
+  rintro ⟨nodes, hchildren⟩
+  let nodeSequence : Cslib.ωSequence (KarpMillerNode P) := nodes
+  let labels : Cslib.ωSequence T := fun n =>
+    Classical.choose (hchildren n)
+  apply not_omegaExecution (nodes := nodeSequence) (labels := labels)
+  intro n
+  change Step net (nodes n) (Classical.choose (hchildren n))
+    (nodes (n + 1))
+  exact Classical.choose_spec (hchildren n)
 
 /-- A Karp–Miller step `src t tgt` results in `tgt.ancestors` having no duplicates provided
 that `src.ancestors` has no duplicates. In other words, the no-duplicates property in ancestors is an invariant preserved by Karp–Miller steps (proved in the `reachable_ancestors_nodup` theorem). -/
@@ -609,6 +708,128 @@ def dfsFuel (net : WeightedNet P T) : ℕ → KarpMillerNode P →
         let tree ← dfsFuel net n tgt
         pure (t, tree)
       pure (.node src children)
+
+/-- Increasing the available depth by one preserves a successful DFS result. -/
+theorem dfsFuel_succ_of_eq_some
+    {fuel : ℕ} {src : KarpMillerNode P} {tree : KarpMillerTree P T}
+    (hdfs : dfsFuel net fuel src = some tree) :
+    dfsFuel net (fuel + 1) src = some tree := by
+  induction fuel generalizing src tree with
+  | zero => simp [dfsFuel] at hdfs
+  | succ n ih =>
+      unfold dfsFuel at hdfs ⊢
+      cases hchildren : (successors net src).mapM (fun x =>
+          (dfsFuel net n x.2).bind fun subtree => some (x.1, subtree)) with
+      | none => simp [hchildren] at hdfs
+      | some children =>
+          simp [hchildren] at hdfs
+          subst tree
+          have mapM_succ {candidates : List (T × KarpMillerNode P)}
+              {trees : List (T × KarpMillerTree P T)}
+              (hmap : candidates.mapM (fun x =>
+                  (dfsFuel net n x.2).bind fun subtree =>
+                    some (x.1, subtree)) = some trees) :
+              candidates.mapM (fun x =>
+                  (dfsFuel net (n + 1) x.2).bind fun subtree =>
+                    some (x.1, subtree)) = some trees := by
+            induction candidates generalizing trees with
+            | nil => simpa using hmap
+            | cons candidate candidates ihCandidates =>
+                rw [List.mapM_cons] at hmap ⊢
+                cases htree : dfsFuel net n candidate.2 with
+                | none => simp [htree] at hmap
+                | some child =>
+                    cases hrest : candidates.mapM (fun x =>
+                        (dfsFuel net n x.2).bind fun subtree =>
+                          some (x.1, subtree)) with
+                    | none => simp [htree, hrest] at hmap
+                    | some rest =>
+                        simp [htree, hrest] at hmap
+                        subst trees
+                        simp [ih htree, ihCandidates hrest]
+          simp [mapM_succ hchildren]
+
+/-- Any larger fuel bound preserves a successful DFS result. -/
+theorem dfsFuel_mono
+    {fuel fuel' : ℕ} (hle : fuel ≤ fuel')
+    {src : KarpMillerNode P} {tree : KarpMillerTree P T}
+    (hdfs : dfsFuel net fuel src = some tree) :
+    dfsFuel net fuel' src = some tree := by
+  obtain ⟨extra, rfl⟩ := Nat.exists_eq_add_of_le hle
+  induction extra with
+  | zero => simpa
+  | succ extra ih =>
+      rw [Nat.add_succ]
+      exact dfsFuel_succ_of_eq_some (ih (by omega))
+
+/-- Increasing the common fuel bound preserves a successful traversal of a
+list of candidate successors. -/
+theorem mapM_dfsFuel_mono
+    {fuel fuel' : ℕ} (hle : fuel ≤ fuel')
+    {candidates : List (T × KarpMillerNode P)}
+    {trees : List (T × KarpMillerTree P T)}
+    (hmap : candidates.mapM (fun x =>
+        (dfsFuel net fuel x.2).bind fun tree => some (x.1, tree)) =
+      some trees) :
+    candidates.mapM (fun x =>
+        (dfsFuel net fuel' x.2).bind fun tree => some (x.1, tree)) =
+      some trees := by
+  induction candidates generalizing trees with
+  | nil => simpa using hmap
+  | cons candidate candidates ih =>
+      rw [List.mapM_cons] at hmap ⊢
+      cases htree : dfsFuel net fuel candidate.2 with
+      | none => simp [htree] at hmap
+      | some tree =>
+          cases htrees : candidates.mapM (fun x =>
+              (dfsFuel net fuel x.2).bind fun subtree =>
+                some (x.1, subtree)) with
+          | none => simp [htree, htrees] at hmap
+          | some rest =>
+              simp [htree, htrees] at hmap
+              subst trees
+              simp [dfsFuel_mono hle htree, ih htrees]
+
+/-- Some finite fuel bound is sufficient to construct the complete
+Karp–Miller subtree below any node. -/
+theorem exists_dfsFuel (src : KarpMillerNode P) :
+    ∃ fuel tree, dfsFuel net fuel src = some tree := by
+  apply child_wellFounded.induction src
+  intro src smaller
+  have buildChildren : ∀ candidates : List (T × KarpMillerNode P),
+      (∀ candidate ∈ candidates, Child net candidate.2 src) →
+      ∃ fuel trees,
+        candidates.mapM (fun x =>
+          (dfsFuel net fuel x.2).bind fun tree => some (x.1, tree)) =
+            some trees := by
+    intro candidates
+    induction candidates with
+    | nil =>
+        intro _
+        exact ⟨0, [], by simp⟩
+    | cons candidate candidates ihCandidates =>
+        intro hchildren
+        obtain ⟨childFuel, childTree, hchildTree⟩ :=
+          smaller candidate.2 (hchildren candidate (by simp))
+        obtain ⟨restFuel, restTrees, hrestTrees⟩ :=
+          ihCandidates (fun child hmem =>
+            hchildren child (by simp [hmem]))
+        let fuel := max childFuel restFuel
+        have hchildTree' : dfsFuel net fuel candidate.2 =
+            some childTree :=
+          dfsFuel_mono (Nat.le_max_left _ _) hchildTree
+        have hrestTrees' : candidates.mapM (fun x =>
+            (dfsFuel net fuel x.2).bind fun tree =>
+              some (x.1, tree)) = some restTrees :=
+          mapM_dfsFuel_mono (Nat.le_max_right _ _) hrestTrees
+        refine ⟨fuel, (candidate.1, childTree) :: restTrees, ?_⟩
+        simp [List.mapM_cons, hchildTree', hrestTrees']
+  obtain ⟨fuel, trees, htrees⟩ := buildChildren (successors net src)
+    (fun candidate hmem =>
+      ⟨candidate.1, step_of_mem_successors hmem⟩)
+  refine ⟨fuel + 1, .node src trees, ?_⟩
+  unfold dfsFuel
+  simp [htrees]
 
 /-- A tree returned by `dfsFuel` has the source node supplied to the search
 as its root. -/
