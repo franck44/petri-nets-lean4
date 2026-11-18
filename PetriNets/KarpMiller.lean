@@ -152,6 +152,31 @@ def lts {P T : Type*} (net : WeightedNet P T) :
     Cslib.LTS (KarpMillerNode P) T where
   Tr := Step net
 
+/-- The source of every Karp–Miller step is open. -/
+theorem Step.isOpen {P T : Type*} {net : WeightedNet P T}
+    {src tgt : KarpMillerNode P} {t : T}
+    (hstep : Step net src t tgt) : src.IsOpen :=
+  hstep.1
+
+/-- A duplicate node is a leaf: it has no outgoing Karp–Miller step. -/
+theorem Node.IsDuplicate.no_step {P T : Type*} {net : WeightedNet P T}
+    {src : KarpMillerNode P} (hdup : src.IsDuplicate)
+    (t : T) (tgt : KarpMillerNode P) :
+    ¬ Step net src t tgt := by
+  intro hstep
+  exact hstep.isOpen hdup
+
+/-- The declarative Karp–Miller LTS is deterministic: an ω-firing has a
+unique result, and acceleration and branch extension are functions. -/
+theorem lts_deterministic {P T : Type*} (net : WeightedNet P T) :
+    (lts net).Deterministic := by
+  constructor
+  intro src t tgt₁ tgt₂ h₁ h₂
+  obtain ⟨_, m₁, hfires₁, htgt₁⟩ := h₁
+  obtain ⟨_, m₂, hfires₂, htgt₂⟩ := h₂
+  have hm : m₁ = m₂ := net.omegaFires_is_deterministic hfires₁ hfires₂
+  rw [htgt₁, htgt₂, hm]
+
 end KarpMiller
 
 end PetriNet
