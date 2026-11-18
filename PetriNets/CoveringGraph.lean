@@ -366,6 +366,94 @@ theorem WeightedNet.exists_omegaPlaces_stable_from
     · omega
   exact (Finset.eq_of_subset_of_card_le hsub hcard).symm
 
+/-- **Finiteness of covering graphs.** If the place and transition types are
+finite, only finitely many states of a covering graph are reachable from its
+initial marking.
+
+The proof is by contradiction and combines Kőnig's lemma with Dickson's lemma.
+Assume that infinitely many states are reachable. Since the transition type
+is finite and the covering graph is deterministic, the `injective` version of
+Kőnig lemma constructs an infinite execution
+
+```text
+m₀ → m₁ → m₂ → ⋯
+```
+
+whose markings are pairwise distinct. Since the place type is finite and an
+existing `ω` component is preserved by every covering step (monotonicity),
+the set of `ω`-places is constant after some position `n₀`.
+
+Dickson's lemma is then applied to the suffix beginning at `n₀`. It gives two
+positions `i < j` whose markings satisfy `mᵢ ≤ mⱼ`. The markings are distinct,
+by the injectivity obtained from Kőnig's lemma, so at least one place has
+strictly increased. As the `ω`-places have already stabilised, this strict
+increase occurs at a place whose value in `mⱼ` is not `ω`. The earlier marking
+`mᵢ` therefore justifies accelerating that place to `ω` after the step from
+`mⱼ`. This creates a new `ω`-place, contradicting stabilisation. Hence only
+finitely many states are reachable. -/
+theorem WeightedNet.coveringGraph_reachable_finite
+    {P T : Type*} [Finite P] [Finite T]
+    {net : WeightedNet P T} {m₀ : Marking P}
+    {graph : Cslib.LTS (OmegaMarking P) T}
+    (hgraph : net.IsCoveringGraphFrom m₀ graph) :
+    {m | graph.CanReach m₀.toOmega m}.Finite := by
+  classical
+  let _ : Fintype P := Fintype.ofFinite P
+  by_contra hfinite
+  have hinfinite : {m | graph.CanReach m₀.toOmega m}.Infinite :=
+    hfinite
+  obtain ⟨markings, labels, hexec, hinitial, hinjective⟩ :=
+    net.coveringGraph_omegaExecution_of_infinite hgraph hinfinite
+  obtain ⟨n₀, hstable⟩ :=
+    net.exists_omegaPlaces_stable_from hgraph hexec hinitial
+  obtain ⟨i, j, hij, hle⟩ :=
+    OmegaMarking.exists_le_pair (fun n => markings (n₀ + n))
+  let i' := n₀ + i
+  let j' := n₀ + j
+  have hi' : n₀ ≤ i' := by simp [i']
+  have hj' : n₀ ≤ j' := by simp [j']
+  have hij' : i' < j' := by omega
+  have hne : markings i' ≠ markings j' := by
+    intro heq
+    have := hinjective heq
+    omega
+  obtain ⟨p, hp⟩ : ∃ p, markings i' p < markings j' p := by
+    by_contra h
+    push Not at h
+    apply hne
+    funext p
+    exact le_antisymm (hle p) (h p)
+  have hreach (n : ℕ) : graph.CanReach m₀.toOmega (markings n) := by
+    rw [← hinitial]
+    exact ⟨labels.extract 0 n, hexec.extract_mTr (Nat.zero_le n)⟩
+  have hreach_i_j : graph.CanReach (markings i') (markings j') :=
+    ⟨labels.extract i' j', hexec.extract_mTr (Nat.le_of_lt hij')⟩
+  obtain ⟨raw, A, _, hjustified, hnext⟩ :=
+    hgraph.1 (hreach j') (hexec j')
+  have hpA : p ∈ A := by
+    apply (hjustified p).2
+    exact ⟨markings i', hreach i', hreach_i_j, hle, hp⟩
+  have hpnext : markings (j' + 1) p = ⊤ := by
+    rw [hnext]
+    exact OmegaMarking.accelerate_apply_of_mem hpA
+  have hsets_i_j : OmegaMarking.omegaPlaces (markings i') =
+      OmegaMarking.omegaPlaces (markings j') :=
+    (hstable i' hi').trans (hstable j' hj').symm
+  have hpfinite : p ∉ OmegaMarking.omegaPlaces (markings j') := by
+    intro hpomega
+    have hpomega_i : p ∈ OmegaMarking.omegaPlaces (markings i') := by
+      rw [hsets_i_j]
+      exact hpomega
+    rw [OmegaMarking.mem_omegaPlaces] at hpomega_i hpomega
+    rw [hpomega_i, hpomega] at hp
+    exact (lt_self_iff_false ⊤).mp hp
+  have hsets_next : OmegaMarking.omegaPlaces (markings (j' + 1)) =
+      OmegaMarking.omegaPlaces (markings j') :=
+    (hstable (j' + 1) (by omega)).trans (hstable j' hj').symm
+  apply hpfinite
+  rw [← hsets_next, OmegaMarking.mem_omegaPlaces]
+  exact hpnext
+
 /-- Suppose the reachable covering-graph state `srcω` covers the ordinary
 marking `src`, and `t` fires from `src` to `tgt`. Then the covering graph has
 a `t`-labelled edge from `srcω` to a state `tgtω` which covers `tgt`.
