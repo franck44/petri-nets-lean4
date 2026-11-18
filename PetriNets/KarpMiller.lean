@@ -404,6 +404,26 @@ theorem step_of_mem_successors {P T : Type*}
   cases hpair
   exact hsuccessor
 
+/-- Every Karp–Miller step is returned by the executable successor
+enumeration. -/
+theorem mem_successors_of_step {P T : Type*}
+    [FinEnum P] [FinEnum T]
+    {net : WeightedNet P T} {src tgt : KarpMillerNode P} {t : T}
+    (h : Step net src t tgt) :
+    (t, tgt) ∈ successors net src := by
+  simp only [successors, List.mem_filterMap]
+  refine ⟨t, FinEnum.mem_toList t, ?_⟩
+  simp [Step] at h
+  simp [h]
+
+/-- The executable successor list contains exactly the declarative
+Karp–Miller steps. -/
+theorem mem_successors_iff {P T : Type*}
+    [FinEnum P] [FinEnum T]
+    {net : WeightedNet P T} {src tgt : KarpMillerNode P} {t : T} :
+    (t, tgt) ∈ successors net src ↔ Step net src t tgt :=
+  ⟨step_of_mem_successors, mem_successors_of_step⟩
+
 /-- Depth-first Karp–Miller exploration with a bound on the remaining branch
 depth.
 
@@ -442,6 +462,67 @@ theorem dfsFuel_rootValue {P T : Type*}
           simp [hchildren] at h
           subst tree
           rfl
+
+/-- A candidate occurring in a successful `mapM` traversal produces a
+corresponding labelled child tree. -/
+theorem exists_child_of_mem_mapM_dfsFuel {P T : Type*}
+    [FinEnum P] [FinEnum T]
+    {net : WeightedNet P T} {n : ℕ}
+    {candidates : List (T × KarpMillerNode P)}
+    {children : List (T × KarpMillerTree P T)}
+    {t : T} {tgt : KarpMillerNode P}
+    (hmap : candidates.mapM (fun x =>
+        (dfsFuel net n x.2).bind fun tree => some (x.1, tree)) =
+      some children)
+    (hmem : (t, tgt) ∈ candidates) :
+    ∃ child, (t, child) ∈ children ∧ dfsFuel net n tgt = some child := by
+  induction candidates generalizing children with
+  | nil => simp at hmem
+  | cons candidate candidates ih =>
+      rcases candidate with ⟨u, node⟩
+      rw [List.mapM_cons] at hmap
+      cases htree : dfsFuel net n node with
+      | none => simp [htree] at hmap
+      | some tree =>
+          cases hchildren : candidates.mapM (fun x =>
+              (dfsFuel net n x.2).bind fun subtree =>
+                some (x.1, subtree)) with
+          | none => simp [htree, hchildren] at hmap
+          | some rest =>
+              simp [htree, hchildren] at hmap
+              subst children
+              simp only [List.mem_cons] at hmem
+              rcases hmem with hhead | htail
+              · cases hhead
+                exact ⟨tree, by simp, htree⟩
+              · obtain ⟨child, hchild, hdfs⟩ := ih hchildren htail
+                exact ⟨child, by simp [hchild], hdfs⟩
+
+/-- Every outgoing Karp–Miller step occurs among the immediate children of a
+successfully constructed DFS tree. -/
+theorem exists_child_of_dfsFuel {P T : Type*}
+    [FinEnum P] [FinEnum T]
+    {net : WeightedNet P T} {fuel : ℕ}
+    {src tgt : KarpMillerNode P} {t : T}
+    {tree : KarpMillerTree P T}
+    (hdfs : dfsFuel net fuel src = some tree)
+    (hstep : Step net src t tgt) :
+    ∃ child, (t, child) ∈ tree.children ∧ child.rootValue = tgt := by
+  cases fuel with
+  | zero => simp [dfsFuel] at hdfs
+  | succ n =>
+      unfold dfsFuel at hdfs
+      cases hchildren : (successors net src).mapM (fun x =>
+          (dfsFuel net n x.2).bind fun subtree => some (x.1, subtree)) with
+      | none => simp [hchildren] at hdfs
+      | some children =>
+          simp [hchildren] at hdfs
+          subst tree
+          obtain ⟨child, hchild, hchildDfs⟩ :=
+            exists_child_of_mem_mapM_dfsFuel hchildren
+              (mem_successors_of_step hstep)
+          refine ⟨child, hchild, ?_⟩
+          exact dfsFuel_rootValue hchildDfs
 
 /-- If a list of candidate steps is recursively explored successfully, the
 resulting child trees are valid and remain connected to their parent by those
