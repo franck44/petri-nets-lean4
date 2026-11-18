@@ -40,6 +40,9 @@ namespace PetriNet
 
 namespace KarpMiller
 
+variable {P T : Type*}
+variable {net : WeightedNet P T}
+
 /-- A node stores its current value and the values of the previous nodes on
 its branch, ordered from the root towards its parent.
 
@@ -57,17 +60,17 @@ namespace Node
 
 /-- The complete history of a node: its ancestors followed by its current
 marking. This list is nonempty by construction. -/
-def history {P : Type*} (node : KarpMillerNode P) :
+def history (node : KarpMillerNode P) :
     List (OmegaMarking P) :=
   node.ancestors ++ [node.marking]
 
 /-- The root node carrying the initial ω-marking. -/
-def root {P : Type*} (m₀ : OmegaMarking P) : KarpMillerNode P where
+def root (m₀ : OmegaMarking P) : KarpMillerNode P where
   marking := m₀
   ancestors := []
 
 /-- The root node obtained by embedding an ordinary initial marking. -/
-def initial {P : Type*} (m₀ : Marking P) : KarpMillerNode P :=
+def initial (m₀ : Marking P) : KarpMillerNode P :=
   root m₀.toOmega
 
 /-- Append a marking to a Karp–Miller branch and make it the current marking.
@@ -87,7 +90,7 @@ m₀ → ⋯ → mₙ → m.
 The complete history of `node` becomes the ancestor list of the new
 node. No freshness condition is imposed: `m` may equal an ancestor, in which
 case the result is a duplicate leaf. -/
-def append {P : Type*} (m : OmegaMarking P)
+def append (m : OmegaMarking P)
     (node : KarpMillerNode P) : KarpMillerNode P where
   marking := m
   ancestors := node.history
@@ -95,13 +98,17 @@ def append {P : Type*} (m : OmegaMarking P)
 /-- A node is a duplicate leaf when its current marking already occurs among
 its ancestors. Such a node is retained in the construction but is not
 expanded. -/
-def IsDuplicate {P : Type*} (node : KarpMillerNode P) : Prop :=
+def IsDuplicate (node : KarpMillerNode P) : Prop :=
   node.marking ∈ node.ancestors
 
 /-- A node is open when its marking does not duplicate an ancestor and it may
 therefore be expanded. -/
-def IsOpen {P : Type*} (node : KarpMillerNode P) : Prop :=
+def IsOpen (node : KarpMillerNode P) : Prop :=
   ¬ node.IsDuplicate
+
+section FinitePlaces
+
+variable [FinEnum P]
 
 /-- The places to accelerate in a marking produced after `node`.
 
@@ -111,14 +118,12 @@ history of `node` satisfies:
 ```text
 a ≤ m    and    a p < m p.
 ``` -/
-def acceleratedPlaces {P : Type*} [FinEnum P]
-    (m : OmegaMarking P) (node : KarpMillerNode P) : Finset P :=
+def acceleratedPlaces (m : OmegaMarking P) (node : KarpMillerNode P) : Finset P :=
   Finset.univ.filter fun p =>
     ∃ a ∈ node.history, a ≤ m ∧ a p < m p
 
 /-- A marking with no accelerated place is left unchanged. -/
 theorem accelerate_eq_self_of_acceleratedPlaces_eq_empty
-    {P : Type*} [FinEnum P]
     {m : OmegaMarking P} {node : KarpMillerNode P}
     (h : acceleratedPlaces m node = ∅) :
     OmegaMarking.accelerateFinset (acceleratedPlaces m node) m = m := by
@@ -126,20 +131,25 @@ theorem accelerate_eq_self_of_acceleratedPlaces_eq_empty
   rw [h]
   simp [OmegaMarking.accelerateFinset]
 
+end FinitePlaces
+
 end Node
 
 /-- The marking obtained by applying the firing arithmetic for `t` at `m`.
 When `t` is enabled, this is its unique ω-firing result. -/
-def firingResult {P T : Type*} (net : WeightedNet P T)
+def firingResult (net : WeightedNet P T)
     (m : OmegaMarking P) (t : T) : OmegaMarking P :=
   fun p => m p - net.pre p t + net.post p t
+
+section FinitePlaces
+
+variable [FinEnum P]
 
 /-- Compute a Karp–Miller successor without checking that the source is open
 or the transition is enabled. This helper performs the firing arithmetic,
 computes the places to accelerate, accelerates the result, and appends it to
 the source branch. The checked executable interface is `successor?`. -/
-def uncheckedSuccessor {P T : Type*} [FinEnum P]
-    (net : WeightedNet P T) (src : KarpMillerNode P) (t : T) :
+def uncheckedSuccessor (net : WeightedNet P T) (src : KarpMillerNode P) (t : T) :
     KarpMillerNode P :=
   let m := firingResult net src.marking t
   Node.append
@@ -148,9 +158,7 @@ def uncheckedSuccessor {P T : Type*} [FinEnum P]
 /-- Executable Karp–Miller successor. It returns `none` when the source is a
 duplicate leaf or `t` is disabled, and otherwise returns the constructed
 successor node. -/
-def successor? {P T : Type*}
-    [FinEnum P] [FinEnum T]
-    (net : WeightedNet P T) (src : KarpMillerNode P) (t : T) :
+def successor? (net : WeightedNet P T) (src : KarpMillerNode P) (t : T) :
     Option (KarpMillerNode P) :=
   if src.marking ∈ src.ancestors then none
   else if (∀ p, (net.pre p t : ℕ∞) ≤ src.marking p) then
@@ -170,16 +178,12 @@ src.marking --t→ m --acceleration→ tgt.marking
 The places to accelerate are computed from `m` and `src.history`. The final
 node `tgt` appends the accelerated marking, not `m`, to the current branch. A
 duplicate node is closed and therefore has no outgoing Karp–Miller step. -/
-def Step {P T : Type*}
-    [FinEnum P] [FinEnum T]
-    (net : WeightedNet P T)
+def Step (net : WeightedNet P T)
     (src : KarpMillerNode P) (t : T) (tgt : KarpMillerNode P) : Prop :=
   successor? net src t = some tgt
 
 /-- A Karp–Miller step preserves every place already equal to `ω`. -/
-theorem Step.preserves_top {P T : Type*}
-    [FinEnum P] [FinEnum T]
-    {net : WeightedNet P T} {src tgt : KarpMillerNode P} {t : T}
+theorem Step.preserves_top {src tgt : KarpMillerNode P} {t : T}
     (hstep : Step net src t tgt) {p : P}
     (hp : src.marking p = ⊤) :
     tgt.marking p = ⊤ := by
@@ -194,9 +198,7 @@ theorem Step.preserves_top {P T : Type*}
     · contradiction
 
 /-- Along a Karp–Miller step, the set of places equal to `ω` can only grow. -/
-theorem omegaPlaces_mono_of_step {P T : Type*}
-    [FinEnum P] [FinEnum T]
-    {net : WeightedNet P T} {src tgt : KarpMillerNode P} {t : T}
+theorem omegaPlaces_mono_of_step {src tgt : KarpMillerNode P} {t : T}
     (hstep : Step net src t tgt) :
     OmegaMarking.omegaPlaces src.marking ⊆
       OmegaMarking.omegaPlaces tgt.marking := by
@@ -212,8 +214,7 @@ the source and target ω-place sets implies that it was already `ω` in the
 source, and firing preserves that value. Every unselected place retains its
 raw firing value by definition. -/
 theorem Step.marking_eq_firingResult_of_omegaPlaces_eq
-    {P T : Type*} [FinEnum P] [FinEnum T]
-    {net : WeightedNet P T} {src tgt : KarpMillerNode P} {t : T}
+    {src tgt : KarpMillerNode P} {t : T}
     (hstep : Step net src t tgt)
     (homega : OmegaMarking.omegaPlaces src.marking =
       OmegaMarking.omegaPlaces tgt.marking) :
@@ -245,9 +246,7 @@ theorem Step.marking_eq_firingResult_of_omegaPlaces_eq
 
 /-- A Karp–Miller node has no outgoing step exactly when it is a duplicate or
 its ω-marking enables no transition. -/
-theorem no_step_iff_duplicate_or_terminal {P T : Type*}
-    [FinEnum P] [FinEnum T]
-    {net : WeightedNet P T} {src : KarpMillerNode P} :
+theorem no_step_iff_duplicate_or_terminal {src : KarpMillerNode P} :
     (∀ t tgt, ¬ Step net src t tgt) ↔
       src.IsDuplicate ∨ ∀ t, ¬ net.OmegaEnabled src.marking t := by
   constructor
@@ -279,36 +278,26 @@ theorem no_step_iff_duplicate_or_terminal {P T : Type*}
 /-- The LTS generated by the executable Karp–Miller successor function. Its
 states retain branch histories; projection to an LTS of ω-markings will be
 defined separately. -/
-def lts {P T : Type*}
-    [FinEnum P] [FinEnum T]
-    (net : WeightedNet P T) :
+def lts (net : WeightedNet P T) :
     Cslib.LTS (KarpMillerNode P) T where
   Tr := Step net
 
 /-- The source of every Karp–Miller step is open. -/
-theorem Step.isOpen {P T : Type*}
-    [FinEnum P] [FinEnum T]
-    {net : WeightedNet P T}
-    {src tgt : KarpMillerNode P} {t : T}
+theorem Step.isOpen {src tgt : KarpMillerNode P} {t : T}
     (hstep : Step net src t tgt) : src.IsOpen := by
   change src.marking ∉ src.ancestors
   intro hdup
   simp [Step, successor?, hdup] at hstep
 
 /-- A duplicate node is a leaf: it has no outgoing Karp–Miller step. -/
-theorem Node.IsDuplicate.no_step {P T : Type*}
-    [FinEnum P] [FinEnum T]
-    {net : WeightedNet P T}
-    {src : KarpMillerNode P} (hdup : src.IsDuplicate)
+theorem Node.IsDuplicate.no_step {src : KarpMillerNode P} (hdup : src.IsDuplicate)
     (t : T) (tgt : KarpMillerNode P) :
     ¬ Step net src t tgt := by
   intro hstep
   exact hstep.isOpen hdup
 
 /-- The Karp–Miller LTS is deterministic because `successor?` is a function. -/
-theorem lts_deterministic {P T : Type*}
-    [FinEnum P] [FinEnum T]
-    (net : WeightedNet P T) :
+theorem lts_deterministic (net : WeightedNet P T) :
     (lts net).Deterministic := by
   constructor
   intro src t tgt₁ tgt₂ h₁ h₂
@@ -318,10 +307,7 @@ theorem lts_deterministic {P T : Type*}
 
 /-- Along an infinite Karp–Miller execution, the set of `ω`-places at an
 earlier position is contained in the set at every later position. -/
-theorem omegaPlaces_mono_of_omegaExecution {P T : Type*}
-    [FinEnum P] [FinEnum T]
-    {net : WeightedNet P T}
-    {nodes : Cslib.ωSequence (KarpMillerNode P)}
+theorem omegaPlaces_mono_of_omegaExecution {nodes : Cslib.ωSequence (KarpMillerNode P)}
     {labels : Cslib.ωSequence T}
     (hexec : (lts net).OmegaExecution nodes labels)
     {i j : ℕ} (hij : i ≤ j) :
@@ -344,10 +330,7 @@ is constant from some position onwards.
 The sets grow monotonically and are all subsets of the finite place type.
 Choose a position at which their cardinality is maximal; every later set has
 the same cardinality and therefore equals it. -/
-theorem exists_omegaPlaces_stable_from {P T : Type*}
-    [FinEnum P] [FinEnum T]
-    {net : WeightedNet P T}
-    {nodes : Cslib.ωSequence (KarpMillerNode P)}
+theorem exists_omegaPlaces_stable_from {nodes : Cslib.ωSequence (KarpMillerNode P)}
     {labels : Cslib.ωSequence T}
     (hexec : (lts net).OmegaExecution nodes labels) :
     ∃ n₀, ∀ n, n₀ ≤ n →
@@ -372,8 +355,6 @@ theorem exists_omegaPlaces_stable_from {P T : Type*}
 /-- On a suffix where the set of ω-places is stable, every Karp–Miller target
 marking is exactly the raw result of firing the corresponding transition. -/
 theorem marking_eq_firingResult_of_omegaPlaces_stable
-    {P T : Type*} [FinEnum P] [FinEnum T]
-    {net : WeightedNet P T}
     {nodes : Cslib.ωSequence (KarpMillerNode P)}
     {labels : Cslib.ωSequence T}
     (hexec : (lts net).OmegaExecution nodes labels)
@@ -388,9 +369,11 @@ theorem marking_eq_firingResult_of_omegaPlaces_stable
   exact (hstable n hn).trans
     (hstable (n + 1) (hn.trans (Nat.le_succ n))).symm
 
+end FinitePlaces
+
 /-- If a node's ancestors contain no duplicates and the node is open,
 then the node is not a duplicate and its complete history contains no duplicates. -/
-theorem Node.history_nodup {P : Type*} {node : KarpMillerNode P}
+theorem Node.history_nodup {node : KarpMillerNode P}
     (hancestors : node.ancestors.Nodup) (hopen : node.IsOpen) :
     node.history.Nodup := by
   change node.marking ∉ node.ancestors at hopen
@@ -399,12 +382,13 @@ theorem Node.history_nodup {P : Type*} {node : KarpMillerNode P}
   apply hopen
   exact heq ▸ ha
 
+section FinitePlaces
+
+variable [FinEnum P]
+
 /-- The ancestors of the target of a Karp–Miller step `src t tgt`
 are exactly the complete history of `src`. -/
-theorem Step.ancestors_eq_history {P T : Type*}
-    [FinEnum P] [FinEnum T]
-    {net : WeightedNet P T}
-    {src tgt : KarpMillerNode P} {t : T}
+theorem Step.ancestors_eq_history {src tgt : KarpMillerNode P} {t : T}
     (hstep : Step net src t tgt) :
     tgt.ancestors = src.history := by
   rw [Step, successor?] at hstep
@@ -421,10 +405,7 @@ stored in the ancestor list of every later node.
 For consecutive nodes this follows because a step places the source marking
 at the head of the target history. For a more distant node, the existing
 ancestor membership is carried forward by each subsequent step. -/
-theorem marking_mem_ancestors_of_omegaExecution {P T : Type*}
-    [FinEnum P] [FinEnum T]
-    {net : WeightedNet P T}
-    {nodes : Cslib.ωSequence (KarpMillerNode P)}
+theorem marking_mem_ancestors_of_omegaExecution {nodes : Cslib.ωSequence (KarpMillerNode P)}
     {labels : Cslib.ωSequence T}
     (hexec : (lts net).OmegaExecution nodes labels)
     {i j : ℕ} (hij : i < j) :
@@ -439,10 +420,7 @@ theorem marking_mem_ancestors_of_omegaExecution {P T : Type*}
 
 /-- A Karp–Miller step `src t tgt` results in `tgt.ancestors` having no duplicates provided
 that `src.ancestors` has no duplicates. In other words, the no-duplicates property in ancestors is an invariant preserved by Karp–Miller steps (proved in the `reachable_ancestors_nodup` theorem). -/
-theorem Step.ancestors_nodup {P T : Type*}
-    [FinEnum P] [FinEnum T]
-    {net : WeightedNet P T}
-    {src tgt : KarpMillerNode P} {t : T}
+theorem Step.ancestors_nodup {src tgt : KarpMillerNode P} {t : T}
     (hstep : Step net src t tgt) (hsrc : src.ancestors.Nodup) :
     tgt.ancestors.Nodup := by
   rw [hstep.ancestors_eq_history]
@@ -450,10 +428,7 @@ theorem Step.ancestors_nodup {P T : Type*}
 
 /-- Every node reachable from the initial Karp–Miller node has a
 duplicate-free list of ancestors. -/
-theorem reachable_ancestors_nodup {P T : Type*}
-    [FinEnum P] [FinEnum T]
-    {net : WeightedNet P T}
-    {m₀ : Marking P} {node : KarpMillerNode P}
+theorem reachable_ancestors_nodup {m₀ : Marking P} {node : KarpMillerNode P}
     (hreach : (lts net).CanReach (Node.initial m₀) node) :
     node.ancestors.Nodup := by
   obtain ⟨labels, hmtr⟩ := hreach
@@ -472,25 +447,22 @@ inductive KarpMillerTree (P T : Type*) where
       (children : List (T × KarpMillerTree P T))
 
 /-- The Karp–Miller node value stored at a tree vertex. -/
-def KarpMillerTree.rootValue {P T : Type*} :
+def KarpMillerTree.rootValue :
     KarpMillerTree P T → KarpMillerNode P
   | .node rootValue _ => rootValue
 
 /-- The labelled immediate subtrees of a Karp–Miller tree. -/
-def KarpMillerTree.children {P T : Type*} :
+def KarpMillerTree.children :
     KarpMillerTree P T → List (T × KarpMillerTree P T)
   | .node _ children => children
 
 /-- A Karp–Miller tree is a leaf when it has no child subtree. -/
-def KarpMillerTree.IsLeaf {P T : Type*}
-    (tree : KarpMillerTree P T) : Prop :=
+def KarpMillerTree.IsLeaf (tree : KarpMillerTree P T) : Prop :=
   tree.children = []
 
 /-- A Karp–Miller tree is valid when each labelled parent–child edge is a
 Karp–Miller step and every child subtree is itself valid. -/
-inductive KarpMillerTree.IsValid {P T : Type*}
-    [FinEnum P] [FinEnum T]
-    (net : WeightedNet P T) : KarpMillerTree P T → Prop where
+inductive KarpMillerTree.IsValid (net : WeightedNet P T) : KarpMillerTree P T → Prop where
   | node {rootValue : KarpMillerNode P}
       {children : List (T × KarpMillerTree P T)}
       (validSteps : ∀ t child, (t, child) ∈ children →
@@ -501,8 +473,7 @@ inductive KarpMillerTree.IsValid {P T : Type*}
 
 /-- Every immediate edge of a valid Karp–Miller tree is a Karp–Miller step. -/
 theorem KarpMillerTree.IsValid.step_of_mem_children
-    {P T : Type*} [FinEnum P] [FinEnum T]
-    {net : WeightedNet P T} {tree child : KarpMillerTree P T} {t : T}
+    {tree child : KarpMillerTree P T} {t : T}
     (hvalid : tree.IsValid net) (hmem : (t, child) ∈ tree.children) :
     Step net tree.rootValue t child.rootValue := by
   cases hvalid with
@@ -524,7 +495,7 @@ def omegaValueToString (n : ℕ∞) : String :=
 
 mutual
   /-- Convert a Karp–Miller tree to its printable view. -/
-  def KarpMillerTree.toView {P T : Type*} [FinEnum P] :
+  def KarpMillerTree.toView :
       KarpMillerTree P T → KarpMillerTree.View P T
     | .node rootValue children =>
         .node
@@ -533,7 +504,7 @@ mutual
           (KarpMillerTree.childrenToViews children)
 
   /-- Convert a list of labelled child trees to printable views. -/
-  def KarpMillerTree.childrenToViews {P T : Type*} [FinEnum P] :
+  def KarpMillerTree.childrenToViews :
       List (T × KarpMillerTree P T) →
         List (T × KarpMillerTree.View P T)
     | [] => []
@@ -542,8 +513,7 @@ mutual
 end
 
 /-- Render the marking at a tree node as a DOT label, with one place per line. -/
-def KarpMillerTree.markingDotLabel {P : Type*}
-    [FinEnum P] [ToString P] (node : KarpMillerNode P) : String :=
+def KarpMillerTree.markingDotLabel [ToString P] (node : KarpMillerNode P) : String :=
   String.intercalate "\\n" <|
     (FinEnum.toList P).map fun p =>
       s!"{toString p} = {omegaValueToString (node.marking p)}"
@@ -551,8 +521,7 @@ def KarpMillerTree.markingDotLabel {P : Type*}
 mutual
   /-- Generate the DOT statements for a tree and return the next unused node
   identifier. -/
-  def KarpMillerTree.toDotLines {P T : Type*}
-      [FinEnum P] [ToString P] [ToString T]
+  def KarpMillerTree.toDotLines       [ToString P] [ToString T]
       (tree : KarpMillerTree P T) (id : ℕ) : ℕ × List String :=
     match tree with
     | .node rootValue children =>
@@ -562,8 +531,7 @@ mutual
         (result.1, nodeLine :: result.2)
 
   /-- Generate DOT edges and subtrees for a list of labelled children. -/
-  def KarpMillerTree.childrenToDotLines {P T : Type*}
-      [FinEnum P] [ToString P] [ToString T]
+  def KarpMillerTree.childrenToDotLines       [ToString P] [ToString T]
       (children : List (T × KarpMillerTree P T))
       (parentId nextId : ℕ) : ℕ × List String :=
     match children with
@@ -579,30 +547,27 @@ mutual
 end
 
 /-- Export a finite Karp–Miller tree in Graphviz DOT format. -/
-def KarpMillerTree.toDot {P T : Type*}
-    [FinEnum P] [ToString P] [ToString T]
+def KarpMillerTree.toDot [ToString P] [ToString T]
     (tree : KarpMillerTree P T) : String :=
   let lines := (tree.toDotLines 0).2
   String.intercalate "\n" <|
     ["digraph KarpMiller {", "  rankdir=LR;", "  node [shape=box];"] ++
       lines ++ ["}"]
 
+variable [FinEnum T]
+
 /-- Enumerate all successful labelled successors of a Karp–Miller node.
 
 The finite transition type supplies the list of candidate transitions.
 Disabled transitions and transitions from duplicate nodes are discarded by
 `successor?`. -/
-def successors {P T : Type*}
-    [FinEnum P] [FinEnum T]
-    (net : WeightedNet P T) (src : KarpMillerNode P) :
+def successors (net : WeightedNet P T) (src : KarpMillerNode P) :
     List (T × KarpMillerNode P) :=
   (FinEnum.toList T).filterMap fun t =>
     (successor? net src t).map fun tgt => (t, tgt)
 
 /-- Every pair returned by `successors` is a genuine Karp–Miller step. -/
-theorem step_of_mem_successors {P T : Type*}
-    [FinEnum P] [FinEnum T]
-    {net : WeightedNet P T} {src tgt : KarpMillerNode P} {t : T}
+theorem step_of_mem_successors {src tgt : KarpMillerNode P} {t : T}
     (h : (t, tgt) ∈ successors net src) :
     Step net src t tgt := by
   simp only [successors, List.mem_filterMap] at h
@@ -614,9 +579,7 @@ theorem step_of_mem_successors {P T : Type*}
 
 /-- Every Karp–Miller step is returned by the executable successor
 enumeration. -/
-theorem mem_successors_of_step {P T : Type*}
-    [FinEnum P] [FinEnum T]
-    {net : WeightedNet P T} {src tgt : KarpMillerNode P} {t : T}
+theorem mem_successors_of_step {src tgt : KarpMillerNode P} {t : T}
     (h : Step net src t tgt) :
     (t, tgt) ∈ successors net src := by
   simp only [successors, List.mem_filterMap]
@@ -626,9 +589,7 @@ theorem mem_successors_of_step {P T : Type*}
 
 /-- The executable successor list contains exactly the declarative
 Karp–Miller steps. -/
-theorem mem_successors_iff {P T : Type*}
-    [FinEnum P] [FinEnum T]
-    {net : WeightedNet P T} {src tgt : KarpMillerNode P} {t : T} :
+theorem mem_successors_iff {src tgt : KarpMillerNode P} {t : T} :
     (t, tgt) ∈ successors net src ↔ Step net src t tgt :=
   ⟨step_of_mem_successors, mem_successors_of_step⟩
 
@@ -640,9 +601,7 @@ node becomes a leaf. Otherwise all successful children are recursively
 explored with one less unit of fuel. The result is `none` if any child needs
 more fuel, and `some tree` when the complete subtree fits within the supplied
 bound. -/
-def dfsFuel {P T : Type*}
-    [FinEnum P] [FinEnum T]
-    (net : WeightedNet P T) : ℕ → KarpMillerNode P →
+def dfsFuel (net : WeightedNet P T) : ℕ → KarpMillerNode P →
       Option (KarpMillerTree P T)
   | 0, _ => none
   | n + 1, src => do
@@ -653,9 +612,7 @@ def dfsFuel {P T : Type*}
 
 /-- A tree returned by `dfsFuel` has the source node supplied to the search
 as its root. -/
-theorem dfsFuel_rootValue {P T : Type*}
-    [FinEnum P] [FinEnum T]
-    {net : WeightedNet P T} {fuel : ℕ}
+theorem dfsFuel_rootValue {fuel : ℕ}
     {src : KarpMillerNode P} {tree : KarpMillerTree P T}
     (h : dfsFuel net fuel src = some tree) :
     tree.rootValue = src := by
@@ -673,9 +630,7 @@ theorem dfsFuel_rootValue {P T : Type*}
 
 /-- A candidate occurring in a successful `mapM` traversal produces a
 corresponding labelled child tree. -/
-theorem exists_child_of_mem_mapM_dfsFuel {P T : Type*}
-    [FinEnum P] [FinEnum T]
-    {net : WeightedNet P T} {n : ℕ}
+theorem exists_child_of_mem_mapM_dfsFuel {n : ℕ}
     {candidates : List (T × KarpMillerNode P)}
     {children : List (T × KarpMillerTree P T)}
     {t : T} {tgt : KarpMillerNode P}
@@ -708,9 +663,7 @@ theorem exists_child_of_mem_mapM_dfsFuel {P T : Type*}
 
 /-- Every outgoing Karp–Miller step occurs among the immediate children of a
 successfully constructed DFS tree. -/
-theorem exists_child_of_dfsFuel {P T : Type*}
-    [FinEnum P] [FinEnum T]
-    {net : WeightedNet P T} {fuel : ℕ}
+theorem exists_child_of_dfsFuel {fuel : ℕ}
     {src tgt : KarpMillerNode P} {t : T}
     {tree : KarpMillerTree P T}
     (hdfs : dfsFuel net fuel src = some tree)
@@ -735,9 +688,7 @@ theorem exists_child_of_dfsFuel {P T : Type*}
 /-- If a list of candidate steps is recursively explored successfully, the
 resulting child trees are valid and remain connected to their parent by those
 steps. This is the list-processing part of `dfsFuel_isValid`. -/
-theorem validChildren_of_mapM_dfsFuel {P T : Type*}
-    [FinEnum P] [FinEnum T]
-    {net : WeightedNet P T} {n : ℕ} {src : KarpMillerNode P}
+theorem validChildren_of_mapM_dfsFuel {n : ℕ} {src : KarpMillerNode P}
     {candidates : List (T × KarpMillerNode P)}
     {children : List (T × KarpMillerTree P T)}
     (hsteps : ∀ t tgt, (t, tgt) ∈ candidates → Step net src t tgt)
@@ -778,9 +729,7 @@ theorem validChildren_of_mapM_dfsFuel {P T : Type*}
 
 /-- Every tree successfully constructed by `dfsFuel` is valid: each of its
 labelled edges is a Karp–Miller step, recursively throughout the tree. -/
-theorem dfsFuel_isValid {P T : Type*}
-    [FinEnum P] [FinEnum T]
-    {net : WeightedNet P T} {fuel : ℕ}
+theorem dfsFuel_isValid {fuel : ℕ}
     {src : KarpMillerNode P} {tree : KarpMillerTree P T}
     (h : dfsFuel net fuel src = some tree) :
     tree.IsValid net := by
@@ -807,9 +756,7 @@ theorem dfsFuel_isValid {P T : Type*}
 
 /-- A successfully constructed DFS tree is a leaf exactly when its root has
 no outgoing Karp–Miller step. -/
-theorem dfsFuel_isLeaf_iff_no_step {P T : Type*}
-    [FinEnum P] [FinEnum T]
-    {net : WeightedNet P T} {fuel : ℕ}
+theorem dfsFuel_isLeaf_iff_no_step {fuel : ℕ}
     {src : KarpMillerNode P} {tree : KarpMillerTree P T}
     (hdfs : dfsFuel net fuel src = some tree) :
     tree.IsLeaf ↔ ∀ t tgt, ¬ Step net src t tgt := by
@@ -831,15 +778,15 @@ theorem dfsFuel_isLeaf_iff_no_step {P T : Type*}
 
 /-- A successfully constructed DFS tree is a leaf exactly when its root node
 is a duplicate or its ω-marking enables no transition. -/
-theorem dfsFuel_isLeaf_iff_duplicate_or_terminal {P T : Type*}
-    [FinEnum P] [FinEnum T]
-    {net : WeightedNet P T} {fuel : ℕ}
+theorem dfsFuel_isLeaf_iff_duplicate_or_terminal {fuel : ℕ}
     {src : KarpMillerNode P} {tree : KarpMillerTree P T}
     (hdfs : dfsFuel net fuel src = some tree) :
     tree.IsLeaf ↔
       src.IsDuplicate ∨ ∀ t, ¬ net.OmegaEnabled src.marking t :=
   (dfsFuel_isLeaf_iff_no_step hdfs).trans
     no_step_iff_duplicate_or_terminal
+
+end FinitePlaces
 
 end KarpMiller
 
