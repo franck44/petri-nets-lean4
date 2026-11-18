@@ -69,26 +69,6 @@ def KarpMillerTree.children :
 def KarpMillerTree.IsLeaf (tree : KarpMillerTree P T) : Prop :=
   tree.children = []
 
-/-- A Karp–Miller tree is valid when each labelled parent–child edge belongs
-to the DFS LTS and every child subtree is itself valid. -/
-inductive KarpMillerTree.IsValid (net : WeightedNet P T) :
-    KarpMillerTree P T → Prop where
-  | node {rootValue : Branch P}
-      {children : List (T × KarpMillerTree P T)}
-      (validSteps : ∀ t child, (t, child) ∈ children →
-        (dfsLTS net).Tr rootValue t child.rootValue)
-      (validSubtrees : ∀ t child, (t, child) ∈ children →
-        child.IsValid net) :
-      IsValid net (.node rootValue children)
-
-/-- Every immediate edge of a valid Karp–Miller tree belongs to the DFS LTS. -/
-theorem KarpMillerTree.IsValid.tr_of_mem_children
-    {tree child : KarpMillerTree P T} {t : T}
-    (hvalid : tree.IsValid net) (hmem : (t, child) ∈ tree.children) :
-    (dfsLTS net).Tr tree.rootValue t child.rootValue := by
-  cases hvalid with
-  | node validSteps _ => exact validSteps t child hmem
-
 /-- Construct the complete Karp–Miller tree by depth-first search.
 
 The recursive calls are exactly the branches returned by `dfsSuccessors`.
@@ -131,32 +111,6 @@ theorem mem_karpMillerDFS_children_iff
   · rintro ⟨tgt, hsuccessor, rfl⟩
     refine ⟨⟨(t, tgt), hsuccessor⟩, ?_, rfl⟩
     simp
-
-/-- The tree constructed by `karpMillerDFS` is valid: every parent–child edge
-is a computed DFS transition, and every child subtree has the same property. -/
-theorem karpMillerDFS_isValid (net : WeightedNet P T) (src : Branch P) :
-    (karpMillerDFS net src).IsValid net := by
-  rw [karpMillerDFS]
-  apply KarpMillerTree.IsValid.node
-  · intro t child hmem
-    simp only [List.mem_map] at hmem
-    obtain ⟨candidate, hcandidate, hpair⟩ := hmem
-    rcases candidate with ⟨⟨u, tgt⟩, hsuccessor⟩
-    simp only at hpair
-    obtain ⟨rfl, rfl⟩ := hpair
-    rw [karpMillerDFS_rootValue]
-    exact hsuccessor
-  · intro t child hmem
-    simp only [List.mem_map] at hmem
-    obtain ⟨candidate, hcandidate, hpair⟩ := hmem
-    rcases candidate with ⟨⟨u, tgt⟩, hsuccessor⟩
-    simp only at hpair
-    obtain ⟨rfl, rfl⟩ := hpair
-    exact karpMillerDFS_isValid net tgt
-termination_by (dfsCall_wellFounded (net := net) (T := T)).wrap src
-decreasing_by
-  refine ⟨t, ?_⟩
-  exact hsuccessor
 
 end FinitePlaces
 
