@@ -69,6 +69,28 @@ def root {P : Type*} (m₀ : OmegaMarking P) : KarpMillerNode P where
 def initial {P : Type*} (m₀ : Marking P) : KarpMillerNode P :=
   root m₀.toOmega
 
+/-- Append a marking to a Karp–Miller branch and make it the current marking.
+
+If `node` represents the branch
+
+```text
+m₀ → ⋯ → mₙ,
+```
+
+then `append m node` represents
+
+```text
+m₀ → ⋯ → mₙ → m.
+```
+
+The complete history of `node` becomes the proper-ancestor list of the new
+node. No freshness condition is imposed: `m` may equal an ancestor, in which
+case the result is a duplicate leaf. -/
+def append {P : Type*} (m : OmegaMarking P)
+    (node : KarpMillerNode P) : KarpMillerNode P where
+  marking := m
+  ancestors := node.history
+
 /-- A node is a duplicate leaf when its current marking already occurs among
 its proper ancestors. Such a node is retained in the construction but is not
 expanded. -/
@@ -79,6 +101,18 @@ def IsDuplicate {P : Type*} (node : KarpMillerNode P) : Prop :=
 therefore be expanded. -/
 def IsOpen {P : Type*} (node : KarpMillerNode P) : Prop :=
   ¬ node.IsDuplicate
+
+/-- The set of places to be accelerated at the current node.
+
+If the current node `n` holds marking `m = n.marking`, a place `p` is considered for acceleration
+when some proper ancestor node `a ∈ node.ancestors` satisfies:
+
+```text
+a ≤ n.marking    and    a p < n.marking p.
+``` -/
+def acceleratedPlaces {P : Type*} (node : KarpMillerNode P) : Set P :=
+  {p | ∃ a ∈ node.ancestors,
+    a ≤ node.marking ∧ a p < node.marking p}
 
 end Node
 
