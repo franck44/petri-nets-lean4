@@ -39,70 +39,47 @@ section FinitePlaces
 
 variable [FinEnum P] [FinEnum T]
 
-/-- On an infinite Karp–Miller execution, two distinct comparable markings
-with the same ω-places would force a new ω-place in the later marking.
+/-- If the source marking of a finite prefix is strictly below the target of
+the next step, stable `ω`-place sets across that step force the strict
+component to be accelerated to a new `ω`-place. -/
+private theorem exists_new_omegaPlace_of_mTr_lt_tr
+    {src pred tgt : Branch P} {labels : List T} {t : T}
+    (hprefix : (dfsLTS net).MTr src labels pred)
+    (htr : (dfsLTS net).Tr pred t tgt)
+    (hlt : src.marking < tgt.marking)
+    (homegaPred : OmegaMarking.omegaPlaces pred.marking =
+      OmegaMarking.omegaPlaces tgt.marking) :
+    ∃ p, p ∉ OmegaMarking.omegaPlaces src.marking ∧
+      p ∈ OmegaMarking.omegaPlaces tgt.marking := by
+  -- Since the final step introduces no new `ω`-place, its acceleration does
+  -- not change the raw successor marking.
+  have hraw : tgt.marking = succMarking net pred.marking t :=
+    marking_eq_succMarking_of_tr_of_omegaPlaces_eq htr homegaPred
 
-The earlier marking occurs in the history of the predecessor of the later
-node. Stability of the ω-place set makes the later marking equal to its raw
-firing result. Hence any strict component increase satisfies the acceleration
-condition and is replaced by `ω`. -/
-theorem exists_new_omegaPlace_of_lt_of_le_omegaExecution
-    {nodes : Cslib.ωSequence (Branch P)}
-    {labels : Cslib.ωSequence T}
-    (hexec : (dfsLTS net).OmegaExecution nodes labels)
-    {i j : ℕ} (hij : i < j)
-    (hle : (nodes i).marking ≤ (nodes j).marking)
-    (homega : OmegaMarking.omegaPlaces (nodes i).marking =
-      OmegaMarking.omegaPlaces (nodes j).marking)
-    (hne : (nodes i).marking ≠ (nodes j).marking) :
-    ∃ p, p ∉ OmegaMarking.omegaPlaces (nodes i).marking ∧
-      p ∈ OmegaMarking.omegaPlaces (nodes j).marking := by
-  obtain ⟨k, rfl⟩ : ∃ k, j = k + 1 := by
-    use j - 1
-    omega
-  have hik : i ≤ k := by omega
-  have hhistory : (nodes i).marking ∈ (nodes k).history :=
-    marking_mem_history_of_omegaExecution hexec hik
-  have homegaPred : OmegaMarking.omegaPlaces (nodes k).marking =
-      OmegaMarking.omegaPlaces (nodes (k + 1)).marking := by
-    apply Finset.Subset.antisymm
-    · exact omegaPlaces_mono_of_tr (hexec k)
-    · intro p hp
-      have hpEarlier : p ∈ OmegaMarking.omegaPlaces (nodes i).marking := by
-        rw [homega]
-        exact hp
-      exact omegaPlaces_mono_of_omegaExecution hexec hik hpEarlier
-  have htr := mem_dfsSuccessors_iff.mp (hexec k)
-  have homegaSucc : OmegaMarking.omegaPlaces (nodes k).marking =
-      OmegaMarking.omegaPlaces
-        (succBranch net (nodes k) (labels k)).marking := by
-    rw [htr.2.2]
-    exact homegaPred
-  have hraw : (nodes (k + 1)).marking =
-      succMarking net (nodes k).marking (labels k) := by
-    rw [← htr.2.2]
-    exact succBranch_marking_eq_succMarking_of_omegaPlaces_eq
-      (nodes k) (labels k) homegaSucc
+  -- Strict growth from `src` to `tgt` is witnessed at some place `p`.
   obtain ⟨p, hp⟩ : ∃ p,
-      (nodes i).marking p < (nodes (k + 1)).marking p := by
-    by_contra h
-    push Not at h
-    apply hne
-    funext p
-    exact le_antisymm (hle p) (h p)
+      src.marking p < tgt.marking p := by
+    exact OmegaMarking.exists_place_lt_of_le_of_ne hlt.le hlt.ne
+
+  -- The source marking occurs in the history of `pred`. After replacing the
+  -- raw successor by `tgt.marking`, `hlt` and `hp` are exactly the two
+  -- inequalities required to select `p` for acceleration.
   have hpAccelerated : p ∈ Branch.acceleratedPlaces
-      (succMarking net (nodes k).marking (labels k)) (nodes k) := by
-    simp only [Branch.acceleratedPlaces, Finset.mem_filter,
-      Finset.mem_univ, true_and]
-    refine ⟨(nodes i).marking, hhistory, ?_, ?_⟩
+      (succMarking net pred.marking t) pred := by
+    apply mem_acceleratedPlaces_of_mTr hprefix
     · rw [← hraw]
-      exact hle
-    · rw [← hraw]
-      exact hp
-  have hpTop : (nodes (k + 1)).marking p = ⊤ := by
-    rw [← htr.2.2]
+      exact hlt.le
+    · rwa [← hraw]
+
+  -- Every selected place has value `ω` in the accelerated target.
+  have hpTop : tgt.marking p = ⊤ := by
+    have htgt := (mem_dfsSuccessors_iff.mp htr).2.2
+    rw [← htgt]
     exact succBranch_eq_top_of_mem_acceleratedPlaces
-      (nodes k) (labels k) hpAccelerated
+      pred t hpAccelerated
+
+  -- The place is new: it cannot already have been `ω` in `src`, because
+  -- `hp` says that its value increases strictly.
   refine ⟨p, ?_, ?_⟩
   · rw [OmegaMarking.mem_omegaPlaces]
     intro hpOldTop
@@ -110,6 +87,105 @@ theorem exists_new_omegaPlace_of_lt_of_le_omegaExecution
     exact (lt_self_iff_false ⊤).mp hp
   · rw [OmegaMarking.mem_omegaPlaces]
     exact hpTop
+
+/-- **Strict growth is incompatible with a stable set of `ω`-places.**
+
+The source marking of the finite prefix occurs in the predecessor's history.
+Endpoint stability propagates to the final step, where
+`exists_new_omegaPlace_of_mTr_lt_tr` applies. -/
+private theorem exists_new_omegaPlace_of_lt_of_omegaPlaces_eq
+    {src pred tgt : Branch P} {labels : List T} {t : T}
+    (hprefix : (dfsLTS net).MTr src labels pred)
+    (htr : (dfsLTS net).Tr pred t tgt)
+    (hlt : src.marking < tgt.marking)
+    (homega : OmegaMarking.omegaPlaces src.marking =
+      OmegaMarking.omegaPlaces tgt.marking) :
+    ∃ p, p ∉ OmegaMarking.omegaPlaces src.marking ∧
+      p ∈ OmegaMarking.omegaPlaces tgt.marking := by
+  exact exists_new_omegaPlace_of_mTr_lt_tr
+    hprefix htr hlt
+    (omegaPlaces_eq_of_between_mTr hprefix
+      (Cslib.LTS.MTr.single (dfsLTS net) htr) homega)
+
+/-- **Strict growth along a finite Karp–Miller execution strictly increases
+the set of `ω`-places.**
+
+If `src` reaches `tgt` and `src.marking < tgt.marking`, then some place that
+is finite in `src` is equal to `ω` in `tgt`.
+
+There are two cases. If the endpoint sets of `ω`-places differ, their
+monotonicity along the execution immediately gives such a place. If the sets
+are equal, `exists_new_omegaPlace_of_lt_of_omegaPlaces_eq` shows that the
+strict increase activates the acceleration rule and produces such a place
+anyway, contradicting their equality.
+
+Thus a strict increase between comparable markings on one branch always
+consumes at least one previously finite place by changing it to `ω`. Since the
+place type is finite, this is the progress property used to rule out infinite
+Karp–Miller branches. -/
+theorem omegaPlaces_ssubset_of_lt_mTr
+    {src tgt : Branch P} {labels : List T}
+    (hexec : (dfsLTS net).MTr src labels tgt)
+    (hlt : src.marking < tgt.marking) :
+    OmegaMarking.omegaPlaces src.marking ⊂
+      OmegaMarking.omegaPlaces tgt.marking := by
+  have hsubset := omegaPlaces_mono_of_mTr hexec
+  rw [Finset.ssubset_iff_subset_ne]
+  refine ⟨hsubset, ?_⟩
+  intro homega
+  rcases labels.eq_nil_or_concat with rfl | ⟨labels, t, rfl⟩
+  · have : src = tgt := Cslib.LTS.MTr.nil_eq (dfsLTS net) hexec
+    subst tgt
+    exact (lt_irrefl _ hlt).elim
+  · rw [List.concat_eq_append] at hexec
+    rw [Cslib.LTS.MTr.append_iff] at hexec
+    obtain ⟨pred, hprefix, hlast⟩ := hexec
+    have htr : (dfsLTS net).Tr pred t tgt := by simpa using hlast
+    obtain ⟨p, hpEarlier, hpLater⟩ :=
+      exists_new_omegaPlace_of_lt_of_omegaPlaces_eq
+        hprefix htr hlt homega
+    exact hpEarlier (homega.symm ▸ hpLater)
+
+/-- A strict increase along a finite Karp–Miller execution introduces a new
+`ω`-place. This is the witness form of
+`omegaPlaces_ssubset_of_lt_mTr`. -/
+theorem exists_new_omegaPlace_of_lt_mTr
+    {src tgt : Branch P} {labels : List T}
+    (hexec : (dfsLTS net).MTr src labels tgt)
+    (hlt : src.marking < tgt.marking) :
+    ∃ p, p ∉ OmegaMarking.omegaPlaces src.marking ∧
+      p ∈ OmegaMarking.omegaPlaces tgt.marking := by
+  have hstrict := omegaPlaces_ssubset_of_lt_mTr hexec hlt
+  rw [Finset.ssubset_iff_of_subset hstrict.le] at hstrict
+  obtain ⟨p, hpLater, hpEarlier⟩ := hstrict
+  exact ⟨p, hpEarlier, hpLater⟩
+
+/-- A strict increase across one Karp–Miller DFS step introduces a new
+`ω`-place in the target marking. This is the singleton case of
+`exists_new_omegaPlace_of_lt_mTr`. -/
+theorem exists_new_omegaPlace_of_lt_tr
+    {src tgt : Branch P} {t : T}
+    (htr : (dfsLTS net).Tr src t tgt)
+    (hlt : src.marking < tgt.marking) :
+    ∃ p, p ∉ OmegaMarking.omegaPlaces src.marking ∧
+      p ∈ OmegaMarking.omegaPlaces tgt.marking := by
+  exact exists_new_omegaPlace_of_lt_mTr
+    (Cslib.LTS.MTr.single (dfsLTS net) htr) hlt
+
+/-- Strict growth between two positions of an infinite Karp–Miller execution
+introduces a new `ω`-place. This is the finite-execution theorem
+`exists_new_omegaPlace_of_lt_mTr` applied to the prefix between the two
+positions. -/
+theorem exists_new_omegaPlace_of_lt_omegaExecution
+    {nodes : Cslib.ωSequence (Branch P)}
+    {labels : Cslib.ωSequence T}
+    (hexec : (dfsLTS net).OmegaExecution nodes labels)
+    {i j : ℕ} (hij : i < j)
+    (hlt : (nodes i).marking < (nodes j).marking) :
+    ∃ p, p ∉ OmegaMarking.omegaPlaces (nodes i).marking ∧
+      p ∈ OmegaMarking.omegaPlaces (nodes j).marking := by
+  exact exists_new_omegaPlace_of_lt_mTr
+    (hexec.extract_mTr hij.le) hlt
 
 /-- The Karp–Miller LTS has no infinite execution.
 
@@ -127,8 +203,8 @@ theorem not_omegaExecution
       (fun n => (nodes n).marking)
       (fun hij => omegaPlaces_mono_of_omegaExecution hexec hij)
       (fun hij hle homega hne =>
-        exists_new_omegaPlace_of_lt_of_le_omegaExecution
-          hexec hij hle homega hne)
+        exists_new_omegaPlace_of_lt_omegaExecution
+          hexec hij (lt_of_le_of_ne hle hne))
   have hancestor :=
     marking_mem_ancestors_of_omegaExecution hexec hij
   have hnotopen : ¬ (nodes j).IsOpen := by

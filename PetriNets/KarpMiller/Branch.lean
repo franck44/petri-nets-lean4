@@ -104,6 +104,14 @@ def acceleratedPlaces (m : OmegaMarking P) (branch : Branch P) : Finset P :=
   Finset.univ.filter fun p =>
     ∃ a ∈ branch.history, a ≤ m ∧ a p < m p
 
+/-- A place is selected for acceleration when a marking in the branch history
+is below the successor marking and is strictly smaller at that place. -/
+theorem mem_acceleratedPlaces {m a : OmegaMarking P} {branch : Branch P}
+    {p : P} (ha : a ∈ branch.history) (hle : a ≤ m) (hlt : a p < m p) :
+    p ∈ acceleratedPlaces m branch := by
+  simp only [acceleratedPlaces, Finset.mem_filter, Finset.mem_univ, true_and]
+  exact ⟨a, ha, hle, hlt⟩
+
 /-- A marking with no accelerated place is left unchanged. -/
 theorem accelerate_eq_self_of_acceleratedPlaces_eq_empty
     {m : OmegaMarking P} {branch : Branch P}

@@ -103,6 +103,27 @@ theorem omegaPlaces_mono_of_mTr {src tgt : Branch P} {labels : List T}
   | stepL htr _ ih =>
       exact (omegaPlaces_mono_of_tr htr).trans ih
 
+/-- If the source and target of a finite Karp–Miller execution have the same
+set of `ω`-places, then every intermediate branch has that same set.
+
+Here `mid` is any intermediate branch, witnessed by an execution from `src`
+to `mid` followed by an execution from `mid` to `tgt`. Monotonicity gives
+`omegaPlaces src ⊆ omegaPlaces mid ⊆ omegaPlaces tgt`; equality of the
+endpoint sets therefore forces equality at `mid`. -/
+theorem omegaPlaces_eq_of_between_mTr
+    {src mid tgt : Branch P} {left right : List T}
+    (hleft : (dfsLTS net).MTr src left mid)
+    (hright : (dfsLTS net).MTr mid right tgt)
+    (homega : OmegaMarking.omegaPlaces src.marking =
+      OmegaMarking.omegaPlaces tgt.marking) :
+    OmegaMarking.omegaPlaces mid.marking =
+      OmegaMarking.omegaPlaces tgt.marking := by
+  apply Finset.Subset.antisymm
+  · exact omegaPlaces_mono_of_mTr hright
+  · intro p hp
+    rw [← homega] at hp
+    exact omegaPlaces_mono_of_mTr hleft hp
+
 /-- Along an infinite Karp–Miller execution, the set of places equal to `ω`
 can only grow. This extends `omegaPlaces_mono_of_mTr` from finite executions
 to finite prefixes of an infinite execution. -/
@@ -113,6 +134,17 @@ theorem omegaPlaces_mono_of_omegaExecution {nodes : Cslib.ωSequence (Branch P)}
     OmegaMarking.omegaPlaces (nodes i).marking ⊆
       OmegaMarking.omegaPlaces (nodes j).marking := by
   exact omegaPlaces_mono_of_mTr (hexec.extract_mTr hij)
+
+/-- If a DFS step introduces no new `ω`-place, its target marking is the
+unaccelerated successor marking. -/
+theorem marking_eq_succMarking_of_tr_of_omegaPlaces_eq
+    {src tgt : Branch P} {t : T}
+    (htr : (dfsLTS net).Tr src t tgt)
+    (homega : OmegaMarking.omegaPlaces src.marking =
+      OmegaMarking.omegaPlaces tgt.marking) :
+    tgt.marking = succMarking net src.marking t := by
+  obtain ⟨_, _, rfl⟩ := mem_dfsSuccessors_iff.mp htr
+  exact succBranch_marking_eq_succMarking_of_omegaPlaces_eq src t homega
 
 /-- A Karp–Miller DFS step preserves every existing ancestor of the source
 branch in the target branch. -/
@@ -145,6 +177,42 @@ theorem ancestors_mono_of_omegaExecution
     (nodes i).ancestors ⊆ (nodes j).ancestors := by
   exact ancestors_mono_of_mTr (hexec.extract_mTr hij)
 
+/-- The source marking of a DFS step is stored among the ancestors of its
+target branch. -/
+theorem marking_mem_ancestors_of_tr {src tgt : Branch P} {t : T}
+    (htr : (dfsLTS net).Tr src t tgt) :
+    src.marking ∈ tgt.ancestors := by
+  obtain ⟨_, _, rfl⟩ := mem_dfsSuccessors_iff.mp htr
+  simp [succBranch, Branch.history]
+
+/-- The initial marking of a finite Karp–Miller execution belongs to the
+complete history of its final branch. -/
+theorem marking_mem_history_of_mTr {src tgt : Branch P} {labels : List T}
+    (hexec : (dfsLTS net).MTr src labels tgt) :
+    src.marking ∈ tgt.history := by
+  induction hexec with
+  | refl => simp [Branch.history]
+  | stepL htr htail _ =>
+      rw [Branch.history, List.mem_append]
+      exact Or.inl (ancestors_mono_of_mTr htail
+        (marking_mem_ancestors_of_tr htr))
+
+/-- If the initial marking of a finite execution is below a prospective raw
+successor marking `m`, and is strictly smaller at place `p`, then `p` is
+selected for acceleration.
+
+The execution makes `src.marking` an already-seen marking in `pred.history`.
+The remaining two hypotheses are exactly the non-strict and strict parts of
+the Karp–Miller acceleration criterion. In particular, strictness implies that
+`p` was not already equal to `ω` in `src.marking`. -/
+theorem mem_acceleratedPlaces_of_mTr
+    {src pred : Branch P} {labels : List T} {m : OmegaMarking P} {p : P}
+    (hexec : (dfsLTS net).MTr src labels pred)
+    (hle : src.marking ≤ m) (hlt : src.marking p < m p) :
+    p ∈ Branch.acceleratedPlaces m pred := by
+  exact Branch.mem_acceleratedPlaces
+    (marking_mem_history_of_mTr hexec) hle hlt
+
 /-- Every marking occurring earlier on an infinite Karp–Miller execution is
 stored in the ancestor list of every later node.
 
@@ -158,9 +226,7 @@ theorem marking_mem_ancestors_of_omegaExecution
     {i j : ℕ} (hij : i < j) :
     (nodes i).marking ∈ (nodes j).ancestors := by
   have hnext : (nodes i).marking ∈ (nodes (i + 1)).ancestors := by
-    obtain ⟨_, _, htgt⟩ := mem_dfsSuccessors_iff.mp (hexec i)
-    rw [← htgt]
-    simp [succBranch, Branch.history]
+    exact marking_mem_ancestors_of_tr (hexec i)
   exact ancestors_mono_of_omegaExecution hexec hij hnext
 
 /-- Every marking is contained in the complete history of every node at the

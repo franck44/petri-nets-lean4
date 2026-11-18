@@ -40,6 +40,20 @@ labelled `ω` leaves that place labelled `ω`. We do not need to give `ω - ω`
 a Petri net interpretation because arc weights are always finite and different to `ω`. -/
 abbrev OmegaMarking (P : Type*) := P → ℕ∞
 
+namespace OmegaMarking
+
+/-- Two distinct comparable ω-markings differ strictly at some place. -/
+theorem exists_place_lt_of_le_of_ne {P : Type*} {m m' : OmegaMarking P}
+    (hle : m ≤ m') (hne : m ≠ m') :
+    ∃ p, m p < m' p := by
+  by_contra h
+  push Not at h
+  apply hne
+  funext p
+  exact le_antisymm (hle p) (h p)
+
+end OmegaMarking
+
 /-- Embed an ordinary marking into the ω-markings. Every finite token count
 is mapped to the corresponding value in `ℕ∞`; no place is mapped to
 `ω`. -/
