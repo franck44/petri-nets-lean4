@@ -303,7 +303,7 @@ theorem WeightedNet.coveringGraph_omegaExecution_of_infinite
       graph.OmegaExecution markings labels ∧
       markings 0 = m₀.toOmega ∧ Function.Injective markings := by
   let _ : graph.Deterministic := hgraph.2.2
-  exact Cslib.LTS.exists_injective_omegaExecution_of_infinite_reachable
+  exact Cslib.LTS.konig_strict
     graph m₀.toOmega hinfinite
 
 /-- Along an infinite covering-graph execution, the set of `ω`-places at an

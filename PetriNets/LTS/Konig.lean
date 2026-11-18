@@ -369,11 +369,12 @@ theorem Execution.initialSegment_canReach {State Label : Type*}
       exact MTr.stepR (simplePathLTS lts) hprefix
         (hexec.simplePrefix_tr hnodup i hilt)
 
-/-- **Kőnig's infinity lemma for deterministic LTS.** Suppose the type of
+/-- **Weak Kőnig infinity lemma for deterministic LTS.** Suppose the type of
 labels is finite and the LTS is deterministic. If infinitely many states are
 reachable from `root`, there is an infinite execution starting at `root`.
 Note that this theorem does not imply that infinitely many different states
-are visited on the infinite execution.
+are visited on the infinite execution, which is why it is called the weak
+Kőnig lemma.
 
 TODO: this is a generic LTS result and should eventually be contributed to
 CSLib and moved to the `Cslib.LTS` library itself.
@@ -390,7 +391,7 @@ from `root` up to depth `d`, we can only visit a finite number of states.
 As there is an infinite number of reachable states, there must be a state with
 infinitely many descendants, which allows us to construct the infinite execution.
 -/
-theorem exists_omegaExecution_of_infinite_reachable
+theorem konig_weak
     {State Label : Type*} [Finite Label]
     (lts : LTS State Label) [lts.Deterministic]
     (root : State) (hinfinite : {s | lts.CanReach root s}.Infinite) :
@@ -531,7 +532,7 @@ theorem OmegaExecution.simplePath_states_prefix {State Label : Type*}
         obtain ⟨next, _, _, hstates⟩ := hexec j
         exact hprefix.trans ⟨[next], hstates.symm⟩
 
-/-- **Kőnig's infinity lemma with distinct states.**
+/-- **Strict Kőnig infinity lemma for deterministic LTS.**
 
 For a deterministic LTS with finitely many labels, and infinitely many reachable states
 from `root`, there is an infinite execution of the LTS starting at `root`
@@ -547,13 +548,12 @@ s₀ --a₀→ s₁ --a₁→ s₂ --a₂→ ⋯
 starting at `root`, in which the state function is injective (in other words
 the execution visits pairwise distinct states).
 
-The proof applies the simple version exists_omegaExecution_of_infinite_reachable
-(Kőnig's lemma building an infinite execution possibly with cycles)
-to `simplePathLTS lts`.
+The proof applies the weak version `konig_weak` (Kőnig's lemma building an
+infinite execution possibly with cycles) to `simplePathLTS lts`.
 
 Because `simplePathLTS lts` only allows extensions by fresh states,
 any infinite execution of it must consist of pairwise distinct states.-/
-theorem exists_injective_omegaExecution_of_infinite_reachable
+theorem konig_strict
     {State Label : Type*} [Finite Label]
     (lts : LTS State Label) [lts.Deterministic]
     (root : State) (hinfinite : {s | lts.CanReach root s}.Infinite) :
@@ -562,7 +562,7 @@ theorem exists_injective_omegaExecution_of_infinite_reachable
       states 0 = root ∧ Function.Injective states := by
   have hpaths := simplePathLTS_infinite_reachable lts root hinfinite
   obtain ⟨paths, labels, hexec, hroot⟩ :=
-    exists_omegaExecution_of_infinite_reachable
+    konig_weak
       (simplePathLTS lts) (SimplePath.root root) hpaths
   refine ⟨fun n => (paths n).last, labels, ?_, ?_, ?_⟩
   · intro n
