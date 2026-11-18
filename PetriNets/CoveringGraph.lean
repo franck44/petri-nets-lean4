@@ -274,6 +274,20 @@ def WeightedNet.IsCoveringGraphFrom {P T : Type*} (net : WeightedNet P T)
     net.TransitionCompleteFrom m₀.toOmega graph ∧
     graph.Deterministic
 
+/-- Along a reachable covering-graph edge, the set of places equal to `ω`
+can only grow. -/
+theorem WeightedNet.omegaPlaces_mono_of_tr {P T : Type*} [Fintype P]
+    {net : WeightedNet P T} {m₀ : Marking P}
+    {graph : Cslib.LTS (OmegaMarking P) T}
+    (hgraph : net.IsCoveringGraphFrom m₀ graph)
+    {src tgt : OmegaMarking P} {t : T}
+    (hreach : graph.CanReach m₀.toOmega src)
+    (htr : graph.Tr src t tgt) :
+    OmegaMarking.omegaPlaces src ⊆ OmegaMarking.omegaPlaces tgt := by
+  intro p hp
+  rw [OmegaMarking.mem_omegaPlaces] at hp ⊢
+  exact (hgraph.1 hreach htr).preserves_top hp
+
 /-- If a covering graph with finitely many transition labels has infinitely
 many states reachable from its initial marking, then it has an infinite
 execution starting at that marking.
