@@ -71,6 +71,17 @@ theorem append_ancestors (branch : Branch P) (m : OmegaMarking P) :
 def IsOpen (branch : Branch P) : Prop :=
   branch.marking ∉ branch.ancestors
 
+/-- If a branch has no duplicate ancestors and is open, then its complete
+history has no duplicates. -/
+theorem history_nodup {branch : Branch P}
+    (hancestors : branch.ancestors.Nodup) (hopen : branch.IsOpen) :
+    branch.history.Nodup := by
+  change branch.marking ∉ branch.ancestors at hopen
+  simp [history, List.nodup_append, hancestors]
+  intro m hm heq
+  apply hopen
+  exact heq ▸ hm
+
 section FinitePlaces
 
 variable [FinEnum P]
