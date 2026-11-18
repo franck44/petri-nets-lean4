@@ -6,8 +6,8 @@ Authors: Franck Cassez
 
 module
 
-public import PetriNets.KarpMiller
-public meta import PetriNets.KarpMiller
+public import PetriNets.KarpMiller.TreeView
+public meta import PetriNets.KarpMiller.TreeView
 
 /-!
 # Example: executing the Karp–Miller algorithm
