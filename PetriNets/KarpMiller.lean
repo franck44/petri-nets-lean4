@@ -277,6 +277,16 @@ inductive KarpMillerTree (P T : Type*) where
   | node (root : KarpMillerNode P)
       (children : List (T × KarpMillerTree P T))
 
+/-- The Karp–Miller node stored at the root of a tree. -/
+def KarpMillerTree.root {P T : Type*} :
+    KarpMillerTree P T → KarpMillerNode P
+  | .node root _ => root
+
+/-- The labelled immediate subtrees of a Karp–Miller tree. -/
+def KarpMillerTree.children {P T : Type*} :
+    KarpMillerTree P T → List (T × KarpMillerTree P T)
+  | .node _ children => children
+
 /-- A printable view of a Karp–Miller tree.
 
 Markings are functions and therefore cannot be printed directly. This view
@@ -368,6 +378,19 @@ def successors {P T : Type*}
   (FinEnum.toList T).filterMap fun t =>
     (successor? net src t).map fun tgt => (t, tgt)
 
+/-- Every pair returned by `successors` is a genuine Karp–Miller step. -/
+theorem step_of_mem_successors {P T : Type*}
+    [FinEnum P] [FinEnum T]
+    {net : WeightedNet P T} {src tgt : KarpMillerNode P} {t : T}
+    (h : (t, tgt) ∈ successors net src) :
+    Step net src t tgt := by
+  simp only [successors, List.mem_filterMap] at h
+  obtain ⟨u, _, hu⟩ := h
+  rw [Option.map_eq_some_iff] at hu
+  obtain ⟨node, hsuccessor, hpair⟩ := hu
+  cases hpair
+  exact hsuccessor
+
 /-- Depth-first Karp–Miller exploration with a bound on the remaining branch
 depth.
 
@@ -386,6 +409,26 @@ def dfsFuel {P T : Type*}
         let tree ← dfsFuel net n tgt
         pure (t, tree)
       pure (.node src children)
+
+/-- A tree returned by `dfsFuel` has the source node supplied to the search
+as its root. -/
+theorem dfsFuel_root {P T : Type*}
+    [FinEnum P] [FinEnum T]
+    {net : WeightedNet P T} {fuel : ℕ}
+    {src : KarpMillerNode P} {tree : KarpMillerTree P T}
+    (h : dfsFuel net fuel src = some tree) :
+    tree.root = src := by
+  cases fuel with
+  | zero => simp [dfsFuel] at h
+  | succ n =>
+      unfold dfsFuel at h
+      cases hchildren : (successors net src).mapM (fun x =>
+          (dfsFuel net n x.2).bind fun subtree => some (x.1, subtree)) with
+      | none => simp [hchildren] at h
+      | some children =>
+          simp [hchildren] at h
+          subst tree
+          rfl
 
 end KarpMiller
 
