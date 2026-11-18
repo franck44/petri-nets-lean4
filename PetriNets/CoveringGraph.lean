@@ -290,7 +290,7 @@ theorem WeightedNet.omegaPlaces_mono_of_tr {P T : Type*} [Fintype P]
 
 /-- If a covering graph with finitely many transition labels has infinitely
 many states reachable from its initial marking, then it has an infinite
-execution starting at that marking.
+execution starting at that marking and visiting pairwise distinct states.
 
 This is a direct application of the generic LTS form of Kőnig's lemma: the
 covering graph is deterministic by definition, and `T` is finite. -/
@@ -300,9 +300,10 @@ theorem WeightedNet.coveringGraph_omegaExecution_of_infinite
     (hgraph : net.IsCoveringGraphFrom m₀ graph)
     (hinfinite : {m | graph.CanReach m₀.toOmega m}.Infinite) :
     ∃ markings labels,
-      graph.OmegaExecution markings labels ∧ markings 0 = m₀.toOmega := by
+      graph.OmegaExecution markings labels ∧
+      markings 0 = m₀.toOmega ∧ Function.Injective markings := by
   let _ : graph.Deterministic := hgraph.2.2
-  exact Cslib.LTS.exists_omegaExecution_of_infinite_reachable
+  exact Cslib.LTS.exists_injective_omegaExecution_of_infinite_reachable
     graph m₀.toOmega hinfinite
 
 /-- Suppose the reachable covering-graph state `srcω` covers the ordinary
