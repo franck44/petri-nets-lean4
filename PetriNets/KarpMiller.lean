@@ -114,6 +114,30 @@ def acceleratedPlaces {P : Type*} (node : KarpMillerNode P) : Set P :=
   {p | ∃ a ∈ node.ancestors,
     a ≤ node.marking ∧ a p < node.marking p}
 
+/-- Accelerate a Karp–Miller node at all its accelerated places. -/
+noncomputable def accelerate {P : Type*}
+    (node : KarpMillerNode P) : KarpMillerNode P where
+  marking := OmegaMarking.accelerate node.acceleratedPlaces node.marking
+  ancestors := node.ancestors
+
+/-- Accelerating a node never decreases its current marking. -/
+theorem marking_le_accelerate {P : Type*} (node : KarpMillerNode P) :
+    node.marking ≤ node.accelerate.marking := by
+  exact OmegaMarking.le_accelerate node.acceleratedPlaces node.marking
+
+/-- Accelerating a node with no accelerated place leaves the node unchanged. -/
+theorem accelerate_eq_self_of_acceleratedPlaces_eq_empty {P : Type*}
+    {node : KarpMillerNode P} (h : node.acceleratedPlaces = ∅) :
+    node.accelerate = node := by
+  cases node with
+  | mk marking ancestors =>
+      change Node.mk (OmegaMarking.accelerate _ marking) ancestors =
+        Node.mk marking ancestors
+      rw [h]
+      congr 1
+      funext p
+      exact OmegaMarking.accelerate_apply_of_not_mem (by simp)
+
 end Node
 
 end KarpMiller
