@@ -65,7 +65,7 @@ def initial : Marking P := fun _ => 0
 Three units of fuel suffice for this example: the root, the accelerated
 `ω`-node, and its duplicate leaf. -/
 def dot : String :=
-  match KarpMiller.dfsFuel net 3 (KarpMiller.Node.initial initial) with
+  match KarpMiller.dfsFuel net 3 (KarpMiller.Branch.initial initial) with
   | some tree => tree.toDot
   | none => "// Insufficient DFS fuel"
 

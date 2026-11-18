@@ -58,7 +58,7 @@ mutual
 end
 
 /-- Render the marking at a tree node as a DOT label, with one place per line. -/
-def KarpMillerTree.markingDotLabel [ToString P] (node : KarpMillerNode P) : String :=
+def KarpMillerTree.markingDotLabel [ToString P] (node : Branch P) : String :=
   String.intercalate "\\n" <|
     (FinEnum.toList P).map fun p =>
       s!"{toString p} = {omegaValueToString (node.marking p)}"
