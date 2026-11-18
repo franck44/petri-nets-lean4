@@ -77,6 +77,15 @@ def WeightedNet.OmegaFires {P T : Type*} (net : WeightedNet P T)
     ∀ p,
       m' p = m p - net.pre p t + net.post p t
 
+/-- Firing preserves every component already equal to `ω`. Arc weights are
+finite, so consuming and producing tokens cannot change `ω`. -/
+theorem WeightedNet.OmegaFires.preserves_top {P T : Type*}
+    {net : WeightedNet P T} {src tgt : OmegaMarking P} {t : T}
+    (hfires : net.OmegaFires src t tgt) {p : P} (hp : src p = ⊤) :
+    tgt p = ⊤ := by
+  rw [hfires.2 p, hp]
+  simp
+
 /-- Suppose `src₁ ≤ src₂` and transition `t` fires from `src₁` to `tgt₁`.
 Then `t` also fires from `src₂` to some `tgt₂`, and `tgt₁ ≤ tgt₂`. Thus,
 starting with at least as many tokens at every place preserves the pointwise

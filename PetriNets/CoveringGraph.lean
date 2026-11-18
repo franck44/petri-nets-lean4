@@ -227,6 +227,20 @@ def WeightedNet.ValidCoverStep {P T : Type*} (net : WeightedNet P T)
     OmegaMarking.AccelerationJustifiedFrom graph root src A ∧
     tgt = OmegaMarking.accelerate A i
 
+/-- A valid covering step preserves every component already equal to `ω`.
+The firing itself preserves `ω`, and the subsequent acceleration can only
+introduce additional `ω` components. -/
+theorem WeightedNet.ValidCoverStep.preserves_top {P T : Type*}
+    {net : WeightedNet P T} {graph : Cslib.LTS (OmegaMarking P) T}
+    {root src tgt : OmegaMarking P} {t : T}
+    (hstep : net.ValidCoverStep graph root src t tgt)
+    {p : P} (hp : src p = ⊤) : tgt p = ⊤ := by
+  obtain ⟨i, A, hfires, _, rfl⟩ := hstep
+  by_cases hpA : p ∈ A
+  · exact OmegaMarking.accelerate_apply_of_mem hpA
+  · rw [OmegaMarking.accelerate_apply_of_not_mem hpA]
+    exact hfires.preserves_top hp
+
 /-- Every edge reachable from `m₀` obeys the covering-graph step rule.
 For an edge `src --t--> tgt`, first fire `t` to obtain `i`. A place `p` is
 accelerated to `ω` exactly when the path to `src` contains a marking `a` with
