@@ -146,6 +146,80 @@ theorem WeightedNet.FiresSequence.exists_reachable_ge_on
       (Nat.le_add_left (n * d p) (src p))
   exact hbound.trans hn
 
+/-- Combine finitely many pumpable segments ending at the same marking.
+
+Suppose that, for every `p ∈ A`, some sequence ts_p takes a marking `src_p` to
+`base` with `src_p ≤ base` and `src_p < base p` (strict increase at `p`).
+
+```text
+src₁ ──ts₁──▶ base       src₁ ≤ base,  src₁(p₁) < base(p₁)
+src₂ ──ts₂──▶ base       src₂ ≤ base,  src₂(p₂) < base(p₂)
+       ⋮
+srcᵣ ──tsᵣ──▶ base       srcᵣ ≤ base,  srcᵣ(pᵣ) < base(pᵣ)
+```
+Then we can concatenate the sequences ts_p to obtain a firing sequence from `base` to a marking `tgt` that strictly grows at every place `p ∈ A`.
+```text
+                         replay shifted copies
+base ──ts₁──▶ base + d₁ ──ts₂──▶ base + d₁ + d₂ ── ... ──tsᵣ──▶ tgt
+       where dᵢ = base - srcᵢ
+```
+
+Moreover
+```text
+base ≤ tgt       and       base(p) < tgt(p) for every p ∈ A
+```
+
+Each replay is enabled by monotonicity because its current source is at least
+`base`, and `base >= srcᵢ`.
+
+There is no specific order required for the concatenation of the sequences corresponding to different places in `A`. Any combination works.
+
+The proof is by induction on the size of the set `A`.
+-/
+theorem WeightedNet.FiresSequence.exists_combined_growth
+    (base : Marking P) (A : Finset P)
+    (hsegments : ∀ p ∈ A, ∃ src ts,
+      net.FiresSequence src ts base ∧ src ≤ base ∧ src p < base p) :
+    ∃ ts tgt,
+      net.FiresSequence base ts tgt ∧
+      base ≤ tgt ∧
+      ∀ p ∈ A, base p < tgt p := by
+  classical
+  induction A using Finset.induction with
+  | empty =>
+      /- base -[empty sequence]-> base -/
+      simp
+      use [], base
+      simp
+      exact WeightedNet.FiresSequence.nil base
+  | @insert p A hp ih =>
+      obtain ⟨src, ts, hseq, hle, hpLt⟩ := hsegments p (by simp)
+      obtain ⟨combined, tgt, hcombined, hbaseTgt, hstrict⟩ := ih (by
+        intro q hq
+        exact hsegments q (by simp [hq]))
+      let d : Marking P := base - src
+      have hpAgain : net.FiresSequence base ts (base + d) := by
+        exact hseq.fire_again hle
+      have hcombinedShifted :
+          net.FiresSequence (base + d) combined (tgt + d) := by
+        exact hcombined.add d
+      have hpGrowth : base p < (tgt + d) p := by
+        have hdp : 0 < d p := Nat.sub_pos_of_lt hpLt
+        change base p < tgt p + d p
+        exact (Nat.lt_add_of_pos_right hdp).trans_le
+          (Nat.add_le_add_right (hbaseTgt p) (d p))
+      refine ⟨ts ++ combined, tgt + d, hpAgain.append hcombinedShifted,
+        ?_, ?_⟩
+      · intro q
+        exact (hbaseTgt q).trans (by simp)
+      · intro q hq
+        rw [Finset.mem_insert] at hq
+        rcases hq with rfl | hq
+        · exact hpGrowth
+        · have hqLt := hstrict q hq
+          change base q < tgt q + d q
+          omega
+
 /-- Extend `WeightedNet.FiresSequence.add` to reachability: if `tgt` is
 reachable from `src`, then `tgt + d` is reachable from `src + d` for any
 additional marking `d`.
