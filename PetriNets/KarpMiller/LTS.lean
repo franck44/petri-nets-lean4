@@ -272,6 +272,43 @@ theorem ancestor_eq_predecessor_of_mTr
       · exact Or.inr ⟨t :: pre, mid, u, after,
           Cslib.LTS.MTr.stepL htr hpre, hstep, hmarking⟩
 
+/-- A non-fresh branch reached from an initial branch repeats the marking of
+an earlier fresh branch on the same DFS execution.
+
+```text
+Branch.initial m₀ ----pre----> ancestor ---- ... ----> src
+                              |                 |
+                              |                 |
+                              +--- marking -----+
+                                   equality
+
+                         ancestor.IsFresh       ¬ src.IsFresh
+```
+
+The marking of `src` occurs in `src.ancestors`. By
+`ancestor_eq_predecessor_of_mTr`, this stored marking corresponds to an
+actual earlier branch `ancestor` on the DFS execution. The theorem retains
+the prefix `pre` reaching that branch; the remaining suffix to `src` is not
+needed by its conclusion.
+
+The earlier branch is fresh because it is the source of a DFS edge. A
+duplicate branch has no successor and therefore cannot occur in that
+position. -/
+theorem exists_fresh_predecessor_of_not_fresh
+    {m₀ : Marking P} {src : Branch P} {labels : List T}
+    (hexec : (dfsLTS net).MTr (Branch.initial m₀) labels src)
+    (hnotfresh : ¬ src.IsFresh) :
+    ∃ pre ancestor,
+      (dfsLTS net).MTr (Branch.initial m₀) pre ancestor ∧
+      ancestor.IsFresh ∧ ancestor.marking = src.marking := by
+  have hmem : src.marking ∈ src.ancestors := by
+    simpa [Branch.IsFresh] using hnotfresh
+  rcases ancestor_eq_predecessor_of_mTr hexec hmem with hroot |
+      ⟨pre, ancestor, t, next, hpre, hstep, hmarking⟩
+  · simp [Branch.initial, Branch.root] at hroot
+  · exact ⟨pre, ancestor, hpre,
+      (mem_dfsSuccessors_iff.mp hstep).1, hmarking⟩
+
 /-- If the initial marking of a finite execution is below a prospective raw
 successor marking `m`, and is strictly smaller at place `p`, then `p` is
 selected for acceleration.
