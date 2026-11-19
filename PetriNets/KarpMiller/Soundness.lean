@@ -111,6 +111,32 @@ theorem firesSequence_of_dfsLTS_mTr_of_omegaPlaces_eq_empty
           htr hsrcFinite hmidFinite)
         (ih hmidFinite htgtFinite)
 
+/-- Firing from an ω-marking with no `ω`-places produces a successor with
+no `ω`-places.
+
+The function `succMarking` only applies the ordinary Petri-net update
+
+```text
+src(p) - pre(p, t) + post(p, t)
+```
+
+The proof is that subtraction and addition of finite values in `ℕ∞` remain finite. -/
+private theorem omegaPlaces_succMarking_eq_empty_of_src_eq_empty
+    [Fintype P] {src : OmegaMarking P} {t : T}
+    (hfinite : OmegaMarking.omegaPlaces src = ∅) :
+    OmegaMarking.omegaPlaces (succMarking net src t) = ∅ := by
+  apply Finset.subset_empty.mp
+  intro p hp
+  rw [OmegaMarking.mem_omegaPlaces] at hp
+  have hsrc : src p ≠ ⊤ := by
+    intro htop
+    have : p ∈ OmegaMarking.omegaPlaces src :=
+      OmegaMarking.mem_omegaPlaces.mpr htop
+    rw [hfinite] at this
+    simp at this
+  rw [succMarking, ← ENat.natCast_toNat hsrc] at hp
+  simp at hp
+
 end KarpMiller
 
 end PetriNet
