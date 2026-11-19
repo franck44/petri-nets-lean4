@@ -280,6 +280,26 @@ theorem lift_fires_to_dfsMTr
   · exact lift_fires_to_dfsMTr_of_fresh net hexec hfresh hcover hfires
   · exact lift_fires_to_dfsMTr_of_not_fresh net hexec hfresh hcover hfires
 
+/-- Lift a concrete firing sequence to a reachable branch of `dfsLTS` whose
+ω-marking covers the concrete target. At each step the proof uses either the
+fresh-successor case or redirects a duplicate branch to an earlier fresh
+occurrence with the same marking. -/
+theorem lift_firesSequence_to_dfsMTr
+    (net : WeightedNet P T) {m₀ src tgt : Marking P}
+    {branch : Branch P} {labels : List T} {ts : List T}
+    (hexec : (dfsLTS net).MTr (Branch.initial m₀) labels branch)
+    (hcover : src.toOmega ≤ branch.marking)
+    (hseq : net.FiresSequence src ts tgt) :
+    ∃ nextLabels next,
+      (dfsLTS net).MTr (Branch.initial m₀) nextLabels next ∧
+      tgt.toOmega ≤ next.marking := by
+  induction hseq generalizing branch labels with
+  | nil => exact ⟨labels, branch, hexec, hcover⟩
+  | cons head tail ih =>
+      obtain ⟨nextLabels, next, hnext, hcoverNext⟩ :=
+        lift_fires_to_dfsMTr net hexec hcover head
+      exact ih hnext hcoverNext
+
 end FinitePlaces
 
 end KarpMiller
