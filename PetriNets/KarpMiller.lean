@@ -52,13 +52,13 @@ variable [FinEnum P] [FinEnum T]
 /-- A finite Karp–Miller tree. Each child is paired with the transition used
 to generate it from the marking stored at the parent node. -/
 inductive KarpMillerTree (P T : Type*) where
-  | node (rootValue : Branch P)
+  | node (rootMarking : OmegaMarking P)
       (children : List (T × KarpMillerTree P T))
 
-/-- The Karp–Miller node value stored at a tree vertex. -/
-def KarpMillerTree.rootValue :
-    KarpMillerTree P T → Branch P
-  | .node rootValue _ => rootValue
+/-- The ω-marking stored at the root of a Karp–Miller tree. -/
+def KarpMillerTree.rootMarking :
+    KarpMillerTree P T → OmegaMarking P
+  | .node rootMarking _ => rootMarking
 
 /-- The labelled immediate subtrees of a Karp–Miller tree. -/
 def KarpMillerTree.children :
@@ -69,28 +69,46 @@ def KarpMillerTree.children :
 def KarpMillerTree.IsLeaf (tree : KarpMillerTree P T) : Prop :=
   tree.children = []
 
-/-- `tree.HasNode branch` means that `branch` occurs as a node value somewhere
-in `tree`. The root occurs directly; a node of any immediate subtree also
-occurs in the whole tree. -/
+/-- `tree.HasNode m` means that the ω-marking `m` occurs at some node of
+`tree`. The root marking occurs directly; a marking occurring in any
+immediate subtree also occurs in the whole tree. -/
 inductive KarpMillerTree.HasNode :
-    KarpMillerTree P T → Branch P → Prop where
-  | root {rootValue children} :
-      HasNode (.node rootValue children) rootValue
-  | child {rootValue children t subtree branch}
+    KarpMillerTree P T → OmegaMarking P → Prop where
+  | root {rootMarking children} :
+      HasNode (.node rootMarking children) rootMarking
+  | child {rootMarking children t subtree m}
       (hchild : (t, subtree) ∈ children)
-      (hnode : subtree.HasNode branch) :
-      HasNode (.node rootValue children) branch
+      (hnode : subtree.HasNode m) :
+      HasNode (.node rootMarking children) m
 
 omit [FinEnum P] [FinEnum T] in
 /-- A node of an immediate child subtree is also a node of the whole tree. -/
 theorem KarpMillerTree.HasNode.of_child
-    {tree subtree : KarpMillerTree P T} {t : T} {branch : Branch P}
+    {tree subtree : KarpMillerTree P T} {t : T} {m : OmegaMarking P}
     (hchild : (t, subtree) ∈ tree.children)
-    (hnode : subtree.HasNode branch) : tree.HasNode branch := by
+    (hnode : subtree.HasNode m) : tree.HasNode m := by
   cases tree
   exact KarpMillerTree.HasNode.child hchild hnode
 
-/-- Construct the complete Karp–Miller tree by depth-first search.
+/-- A Karp–Miller tree covers an ordinary marking `m` when one of its nodes
+has an ω-marking greater than or equal to `m.toOmega`. This is the induction
+invariant used to simulate ordinary firing sequences in the finite tree. -/
+def KarpMillerTree.Covers (tree : KarpMillerTree P T)
+    (m : Marking P) : Prop :=
+  ∃ mω, tree.HasNode mω ∧ m.toOmega ≤ mω
+
+/-- Construct the complete Karp–Miller tree by depth-first search, starting
+from the root branch `src`. For a net with initial marking `m₀`, the initial
+call is:
+
+```lean
+karpMillerDFS net (Branch.initial m₀)
+```
+
+Recursive calls receive the current branch, whose ancestors record the path
+from the root to its parent. This history is used internally for acceleration
+and duplicate detection; only the current ω-marking of each branch is stored
+in the resulting tree.
 
 The recursive calls are exactly the branches returned by `dfsSuccessors`.
 Their termination is justified by `dfsCall_wellFounded`; its accessibility
@@ -98,32 +116,48 @@ proof is used only by Lean's termination checker and is erased from the
 compiled algorithm. -/
 def karpMillerDFS (net : WeightedNet P T) (src : Branch P) :
     KarpMillerTree P T :=
-  .node src <| (dfsSuccessors net src).attach.map fun candidate =>
+  .node src.marking <| (dfsSuccessors net src).attach.map fun candidate =>
     (candidate.1.1, karpMillerDFS net candidate.1.2)
 termination_by (dfsCall_wellFounded (net := net) (T := T)).wrap src
 decreasing_by
   exact ⟨candidate.1.1, candidate.2⟩
 
-/-- The tree constructed by `karpMillerDFS` has the source branch as its
+/-- The tree constructed by `karpMillerDFS` stores the source marking at its
 root. -/
 @[simp]
-theorem karpMillerDFS_rootValue (net : WeightedNet P T) (src : Branch P) :
-    (karpMillerDFS net src).rootValue = src := by
+theorem karpMillerDFS_rootMarking (net : WeightedNet P T) (src : Branch P) :
+    (karpMillerDFS net src).rootMarking = src.marking := by
   rw [karpMillerDFS]
   rfl
 
-/-- The source branch occurs at the root of the tree constructed from it. -/
+/-- The source marking occurs at the root of the tree constructed from its
+branch. -/
 theorem karpMillerDFS_hasNode_root (net : WeightedNet P T) (src : Branch P) :
-    (karpMillerDFS net src).HasNode src := by
+    (karpMillerDFS net src).HasNode src.marking := by
   rw [karpMillerDFS]
   exact KarpMillerTree.HasNode.root
+
+/-- The tree rooted at `src` covers every ordinary marking already covered by
+`src.marking`. In particular, the initial Karp–Miller tree covers its initial
+marking. -/
+theorem karpMillerDFS_covers_root (net : WeightedNet P T)
+    (src : Branch P) {m : Marking P} (hcover : m.toOmega ≤ src.marking) :
+    (karpMillerDFS net src).Covers m := by
+  exact ⟨src.marking, karpMillerDFS_hasNode_root net src, hcover⟩
+
+/-- The Karp–Miller tree constructed from an initial marking covers that
+marking at its root. This is the base case of firing-sequence simulation. -/
+theorem karpMillerDFS_covers_initial (net : WeightedNet P T) (m₀ : Marking P) :
+    (karpMillerDFS net (Branch.initial m₀)).Covers m₀ := by
+  apply karpMillerDFS_covers_root
+  exact le_rfl
 
 /-- If `src` is fresh and `t` is enabled, its computed successor occurs as an
 immediate node of the Karp–Miller tree rooted at `src`. -/
 theorem karpMillerDFS_hasNode_succBranch (net : WeightedNet P T)
     (src : Branch P) (t : T) (hfresh : src.IsFresh)
     (henabled : net.OmegaEnabled src.marking t) :
-    (karpMillerDFS net src).HasNode (succBranch net src t) := by
+    (karpMillerDFS net src).HasNode (succBranch net src t).marking := by
   rw [karpMillerDFS]
   apply KarpMillerTree.HasNode.child
     (t := t) (subtree := karpMillerDFS net (succBranch net src t))
@@ -163,9 +197,9 @@ theorem lift_fires_to_karpMillerDFS
     (net : WeightedNet P T) {m m' : Marking P} {src : Branch P} {t : T}
     (hfresh : src.IsFresh) (hcover : m.toOmega ≤ src.marking)
     (hfires : net.Fires m t m') :
-    ∃ tgt, (karpMillerDFS net src).HasNode tgt ∧ m'.toOmega ≤ tgt.marking := by
+    (karpMillerDFS net src).Covers m' := by
   obtain ⟨henabled, hle⟩ := fires_le_succBranch hcover hfires
-  exact ⟨succBranch net src t,
+  exact ⟨(succBranch net src t).marking,
     karpMillerDFS_hasNode_succBranch net src t hfresh henabled, hle⟩
 
 end FinitePlaces

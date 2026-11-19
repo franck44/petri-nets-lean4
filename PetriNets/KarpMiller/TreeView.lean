@@ -28,7 +28,7 @@ variable [FinEnum P]
 
 Markings are functions and therefore cannot be printed directly. This view
 replaces each marking by the finite list of its place/value pairs and omits
-the ancestor history stored internally by the algorithm. -/
+the branch history used internally by the algorithm. -/
 inductive KarpMillerTree.View (P T : Type*) where
   | node (marking : List (P × String))
       (children : List (T × KarpMillerTree.View P T))
@@ -42,10 +42,10 @@ mutual
   /-- Convert a Karp–Miller tree to its printable view. -/
   def KarpMillerTree.toView :
       KarpMillerTree P T → KarpMillerTree.View P T
-    | .node rootValue children =>
+    | .node rootMarking children =>
         .node
           ((FinEnum.toList P).map fun p =>
-            (p, omegaValueToString (rootValue.marking p)))
+            (p, omegaValueToString (rootMarking p)))
           (KarpMillerTree.childrenToViews children)
 
   /-- Convert a list of labelled child trees to printable views. -/
@@ -58,10 +58,11 @@ mutual
 end
 
 /-- Render the marking at a tree node as a DOT label, with one place per line. -/
-def KarpMillerTree.markingDotLabel [ToString P] (node : Branch P) : String :=
+def KarpMillerTree.markingDotLabel [ToString P]
+    (m : OmegaMarking P) : String :=
   String.intercalate "\\n" <|
     (FinEnum.toList P).map fun p =>
-      s!"{toString p} = {omegaValueToString (node.marking p)}"
+      s!"{toString p} = {omegaValueToString (m p)}"
 
 mutual
   /-- Generate the DOT statements for a tree and return the next unused node
@@ -69,9 +70,9 @@ mutual
   def KarpMillerTree.toDotLines [ToString P] [ToString T]
       (tree : KarpMillerTree P T) (id : ℕ) : ℕ × List String :=
     match tree with
-    | .node rootValue children =>
+    | .node rootMarking children =>
         let nodeLine :=
-          s!"  n{id} [label=\"{KarpMillerTree.markingDotLabel rootValue}\"];"
+          s!"  n{id} [label=\"{KarpMillerTree.markingDotLabel rootMarking}\"];"
         let result := KarpMillerTree.childrenToDotLines children id (id + 1)
         (result.1, nodeLine :: result.2)
 
