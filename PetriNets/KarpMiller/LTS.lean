@@ -223,54 +223,49 @@ theorem reachable_ancestors_nodup {m₀ : Marking P} {node : Branch P}
 execution either was already an ancestor of the source, or is the marking of
 an intermediate branch from which the execution takes another DFS step.
 
-For an execution
-
-```text
-src -------------------------------> tgt
-                 labels
-```
-
-and a marking `a ∈ tgt.ancestors`, there are two possibilities:
+For a marking `a ∈ tgt.ancestors`, there are two possibilities:
 
 ```text
 (1)  a ∈ src.ancestors
 
-(2)  src ----------------> mid --------> next
-               pre                 t
-                            mid.marking = a
+(2)  src ──pre──▶ mid ──t──▶ next ──post──▶ tgt
+                    mid.marking = a
 ```
 
 In the second case, `mid` is an actual earlier branch of the execution and
-has an outgoing DFS edge. The theorem retains the prefix ending in `mid` and
-this outgoing edge; the unused suffix leading from `next` to `tgt` is not
-included in the conclusion.
+has an outgoing DFS edge. The theorem splits the labels as
+`labels = pre ++ t :: post` and retains both the prefix and the suffix.
 
 This is stronger than merely knowing that `a` belongs to the stored history:
 the outgoing edge proves that `mid` was fresh. It is the key observation used
-to redirect a non-fresh leaf to an earlier fresh occurrence of the same
-marking. -/
+both to redirect a non-fresh leaf to an earlier fresh occurrence and to
+recover a pumpable path segment in soundness proofs. -/
 theorem ancestor_eq_predecessor_of_mTr
     {src tgt : Branch P} {labels : List T} {a : OmegaMarking P}
     (hexec : (dfsLTS net).MTr src labels tgt)
     (ha : a ∈ tgt.ancestors) :
     a ∈ src.ancestors ∨
-      ∃ pre mid t next,
+      ∃ pre mid t next post,
+        labels = pre ++ t :: post ∧
         (dfsLTS net).MTr src pre mid ∧
-        (dfsLTS net).Tr mid t next ∧ mid.marking = a := by
+        (dfsLTS net).Tr mid t next ∧
+        (dfsLTS net).MTr next post tgt ∧
+        mid.marking = a := by
   induction hexec with
   | refl => exact Or.inl ha
   | @stepL src t next labels tgt htr htail ih =>
-      rcases ih ha with hsrc | ⟨pre, mid, u, after, hpre, hstep, hmarking⟩
+      rcases ih ha with hsrc | ⟨pre, mid, u, after, post, hlabels,
+          hpre, hstep, hpost, hmarking⟩
       · rw [show next.ancestors = src.history by
           obtain ⟨_, _, rfl⟩ := mem_dfsSuccessors_iff.mp htr
           rfl] at hsrc
         rw [Branch.history, List.mem_append, List.mem_singleton] at hsrc
         rcases hsrc with hancestor | hcurrent
         · exact Or.inl hancestor
-        · exact Or.inr ⟨[], src, t, next, Cslib.LTS.MTr.refl,
-            htr, hcurrent.symm⟩
-      · exact Or.inr ⟨t :: pre, mid, u, after,
-          Cslib.LTS.MTr.stepL htr hpre, hstep, hmarking⟩
+        · exact Or.inr ⟨[], src, t, next, labels, rfl,
+            Cslib.LTS.MTr.refl, htr, htail, hcurrent.symm⟩
+      · exact Or.inr ⟨t :: pre, mid, u, after, post,
+          by simp [hlabels], hpre.stepL htr, hstep, hpost, hmarking⟩
 
 /-- A non-fresh branch reached from an initial branch repeats the marking of
 an earlier fresh branch on the same DFS execution.
@@ -304,7 +299,8 @@ theorem exists_fresh_predecessor_of_not_fresh
   have hmem : src.marking ∈ src.ancestors := by
     simpa [Branch.IsFresh] using hnotfresh
   rcases ancestor_eq_predecessor_of_mTr hexec hmem with hroot |
-      ⟨pre, ancestor, t, next, hpre, hstep, hmarking⟩
+      ⟨pre, ancestor, t, next, post, hlabels, hpre, hstep, hpost,
+        hmarking⟩
   · simp [Branch.initial, Branch.root] at hroot
   · exact ⟨pre, ancestor, hpre,
       (mem_dfsSuccessors_iff.mp hstep).1, hmarking⟩
