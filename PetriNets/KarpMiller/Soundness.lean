@@ -53,4 +53,64 @@ theorem WeightedNet.omegaCoverableFrom_initial
   intro p
   exact ENat.natCast_le_natCast.mp (hle p)
 
+namespace KarpMiller
+
+variable {P T : Type*} {net : WeightedNet P T}
+
+/-- A Karp–Miller DFS edge whose target contains no `ω` is a
+concrete firing between the corresponding markings.
+
+The set of `ω`-places can only grow along a DFS edge, so the source is finite
+whenever the target is finite. Since the target has no `ω`, the step cannot
+have introduced an accelerated place. Its source and target therefore embed
+the concrete markings `src.marking.toNat` and `tgt.marking.toNat`, and the
+underlying ω-firing reflects to an ordinary firing. -/
+theorem fires_of_dfsLTS_tr_of_omegaPlaces_eq_empty
+    [FinEnum P] [FinEnum T] {src tgt : Branch P} {t : T}
+    (htr : (dfsLTS net).Tr src t tgt)
+    (hsrcFinite : OmegaMarking.omegaPlaces src.marking = ∅)
+    (htgtFinite : OmegaMarking.omegaPlaces tgt.marking = ∅) :
+    net.Fires (src.marking.toNat hsrcFinite) t
+      (tgt.marking.toNat htgtFinite) := by
+  obtain ⟨_, henabled, htarget⟩ := mem_dfsSuccessors_iff.mp htr
+  have hmarking : tgt.marking = succMarking net src.marking t := by
+    rw [← htarget]
+    apply succBranch_marking_eq_succMarking_of_omegaPlaces_eq
+    rw [hsrcFinite, htarget, htgtFinite]
+  have homega : net.OmegaFires src.marking t tgt.marking := by
+    exact ⟨henabled, fun p => congrFun hmarking p⟩
+  apply (net.fires_iff_omegaFires_toOmega
+    (src.marking.toNat hsrcFinite) (tgt.marking.toNat htgtFinite) t).mpr
+  simpa [OmegaMarking.toOmega_toNat_eq_self hsrcFinite,
+    OmegaMarking.toOmega_toNat_eq_self htgtFinite] using homega
+
+/-- A finite DFS execution whose endpoints contain no `ω` is a concrete
+firing sequence between the corresponding ordinary markings.
+
+Although only endpoint finiteness appears in the statement, every
+intermediate branch is finite as well: the set of `ω`-places can only grow
+along a DFS execution, and the final set is empty. The proof therefore applies
+`fires_of_dfsLTS_tr_of_omegaPlaces_eq_empty` to the first edge and proceeds
+inductively along the remaining execution. -/
+theorem firesSequence_of_dfsLTS_mTr_of_omegaPlaces_eq_empty
+    [FinEnum P] [FinEnum T] {src tgt : Branch P} {ts : List T}
+    (hexec : (dfsLTS net).MTr src ts tgt)
+    (hsrcFinite : OmegaMarking.omegaPlaces src.marking = ∅)
+    (htgtFinite : OmegaMarking.omegaPlaces tgt.marking = ∅) :
+    net.FiresSequence (src.marking.toNat hsrcFinite) ts
+      (tgt.marking.toNat htgtFinite) := by
+  induction hexec with
+  | refl =>
+      exact WeightedNet.FiresSequence.nil _
+  | @stepL src t mid ts tgt htr htail ih =>
+      have hmidFinite : OmegaMarking.omegaPlaces mid.marking = ∅ := by
+        apply Finset.subset_empty.mp
+        simpa [htgtFinite] using omegaPlaces_mono_of_mTr htail
+      exact WeightedNet.FiresSequence.cons
+        (fires_of_dfsLTS_tr_of_omegaPlaces_eq_empty
+          htr hsrcFinite hmidFinite)
+        (ih hmidFinite htgtFinite)
+
+end KarpMiller
+
 end PetriNet
