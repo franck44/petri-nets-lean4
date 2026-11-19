@@ -121,6 +121,9 @@ theorem WeightedNet.FiresSequence.pump {src tgt : Marking P} {ts : List T}
 finite set `A`, then one reachable marking can simultaneously exceed an
 arbitrary prescribed `bound` at every place in `A`.
 
+The resulting marking also remains above `src`; this is useful for places
+outside `A`, for which no strict-growth hypothesis is available.
+
 The proof chooses the number of repetitions to be the sum of all prescribed
 bounds. This number is at least each individual bound. Since the sequence
 adds at least one token at every place in `A` on each repetition, the marking
@@ -129,12 +132,13 @@ theorem WeightedNet.FiresSequence.exists_reachable_ge_on
     {src tgt : Marking P} {ts : List T} (A : Finset P) (bound : P → ℕ)
     (hseq : net.FiresSequence src ts tgt) (hle : src ≤ tgt)
     (hgrows : ∀ p ∈ A, src p < tgt p) :
-    ∃ m, net.Reachable src m ∧ ∀ p ∈ A, bound p ≤ m p := by
+    ∃ m, net.Reachable src m ∧ src ≤ m ∧
+      ∀ p ∈ A, bound p ≤ m p := by
   let n := ∑ p ∈ A, bound p
   let d : Marking P := tgt - src
   let m := src + n • d
   have hpump := hseq.pump hle n
-  refine ⟨m, ⟨(List.replicate n ts).flatten, hpump⟩, ?_⟩
+  refine ⟨m, ⟨(List.replicate n ts).flatten, hpump⟩, by simp [m], ?_⟩
   intro p hp
   have hbound : bound p ≤ n := by
     dsimp [n]
