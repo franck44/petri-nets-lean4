@@ -300,6 +300,25 @@ theorem lift_firesSequence_to_dfsMTr
         lift_fires_to_dfsMTr net hexec hcover head
       exact ih hnext hcoverNext
 
+/-- **Karp–Miller over-approximation for reachability.** For every marking
+`tgt` reachable from `m₀`, there exists an ω-marking `mω` occurring in the
+finite Karp–Miller tree such that `tgt.toOmega ≤ mω`.
+
+Reachability supplies a firing sequence from `m₀` to `tgt`.
+`lift_firesSequence_to_dfsMTr` produces a reachable DFS branch covering
+`tgt`, and `karpMillerDFS_hasNode_of_mTr` places its ω-marking in the finite
+tree. -/
+theorem karpMillerDFS_covers_of_reachable
+    (net : WeightedNet P T) {m₀ tgt : Marking P}
+    (hreach : net.Reachable m₀ tgt) :
+    ∃ mω,
+      (karpMillerDFS net (Branch.initial m₀)).HasNode mω ∧
+      tgt.toOmega ≤ mω := by
+  obtain ⟨ts, hseq⟩ := hreach
+  obtain ⟨labels, branch, hexec, hcover⟩ :=
+    lift_firesSequence_to_dfsMTr net Cslib.LTS.MTr.refl le_rfl hseq
+  exact ⟨branch.marking, karpMillerDFS_hasNode_of_mTr net hexec, hcover⟩
+
 end FinitePlaces
 
 end KarpMiller
