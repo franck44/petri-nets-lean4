@@ -169,6 +169,24 @@ theorem karpMillerDFS_hasNode_succBranch (net : WeightedNet P T)
     simp
   · exact karpMillerDFS_hasNode_root net (succBranch net src t)
 
+/-- Every branch reached by a finite execution of `dfsLTS` has its marking in
+the Karp–Miller tree constructed from the execution's source branch. -/
+theorem karpMillerDFS_hasNode_of_mTr
+    (net : WeightedNet P T) {src tgt : Branch P} {labels : List T}
+    (hexec : (dfsLTS net).MTr src labels tgt) :
+    (karpMillerDFS net src).HasNode tgt.marking := by
+  induction hexec with
+  | refl => exact karpMillerDFS_hasNode_root net _
+  | @stepL src t next labels tgt htr htail ih =>
+      rw [karpMillerDFS]
+      apply KarpMillerTree.HasNode.child
+        (t := t) (subtree := karpMillerDFS net next)
+      · simp only [List.mem_map]
+        refine ⟨⟨(t, next), ?_⟩, ?_, rfl⟩
+        · exact htr
+        · simp
+      · exact ih
+
 /-- Lift one ordinary firing step to the Karp–Miller tree rooted at a fresh
 branch. If `src.marking` covers `m` and `m` fires `t` to `m'`, the computed
 successor occurs in the tree and covers `m'`.
