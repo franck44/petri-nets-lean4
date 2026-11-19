@@ -117,24 +117,34 @@ theorem WeightedNet.FiresSequence.pump {src tgt : Marking P} {ts : List T}
         rw [add_comm (n * (tgt p - src p)) (tgt p - src p),
           ← Nat.add_assoc, Nat.add_sub_of_le (hle p)]
 
-/-- If a nondecreasing firing sequence strictly increases place `p`, then
-markings with arbitrarily many tokens at `p` are reachable from its source.
-The reachable witnesses are obtained by pumping the sequence. -/
-theorem WeightedNet.FiresSequence.exists_reachable_ge_at
-    {src tgt : Marking P} {ts : List T} {p : P}
+/-- If a nondecreasing firing sequence strictly increases every place in a
+finite set `A`, then one reachable marking can simultaneously exceed an
+arbitrary prescribed `bound` at every place in `A`.
+
+The proof chooses the number of repetitions to be the sum of all prescribed
+bounds. This number is at least each individual bound. Since the sequence
+adds at least one token at every place in `A` on each repetition, the marking
+provided by `FiresSequence.pump` satisfies all the bounds at once. -/
+theorem WeightedNet.FiresSequence.exists_reachable_ge_on
+    {src tgt : Marking P} {ts : List T} (A : Finset P) (bound : P → ℕ)
     (hseq : net.FiresSequence src ts tgt) (hle : src ≤ tgt)
-    (hlt : src p < tgt p) (k : ℕ) :
-    ∃ m, net.Reachable src m ∧ k ≤ m p := by
+    (hgrows : ∀ p ∈ A, src p < tgt p) :
+    ∃ m, net.Reachable src m ∧ ∀ p ∈ A, bound p ≤ m p := by
+  let n := ∑ p ∈ A, bound p
   let d : Marking P := tgt - src
-  let m := src + k • d
-  have hpump := hseq.pump hle k
-  have hdp : 0 < d p := by
-    exact Nat.sub_pos_of_lt hlt
-  have hk : k ≤ m p := by
+  let m := src + n • d
+  have hpump := hseq.pump hle n
+  refine ⟨m, ⟨(List.replicate n ts).flatten, hpump⟩, ?_⟩
+  intro p hp
+  have hbound : bound p ≤ n := by
+    dsimp [n]
+    exact Finset.single_le_sum (fun q _ => Nat.zero_le (bound q)) hp
+  have hdp : 0 < d p := Nat.sub_pos_of_lt (hgrows p hp)
+  have hn : n ≤ m p := by
     dsimp [m]
-    exact (Nat.le_mul_of_pos_right k hdp).trans
-      (Nat.le_add_left (k * d p) (src p))
-  exact ⟨m, ⟨(List.replicate k ts).flatten, hpump⟩, hk⟩
+    exact (Nat.le_mul_of_pos_right n hdp).trans
+      (Nat.le_add_left (n * d p) (src p))
+  exact hbound.trans hn
 
 /-- Extend `WeightedNet.FiresSequence.add` to reachability: if `tgt` is
 reachable from `src`, then `tgt + d` is reachable from `src + d` for any
