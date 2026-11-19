@@ -118,6 +118,27 @@ theorem mem_omegaPlaces {P : Type*} [Fintype P]
   classical
   simp [omegaPlaces]
 
+/-- Convert an ω-marking containing no `ω` to an ordinary marking.
+
+The proof argument makes this conversion deliberately unavailable for a
+genuinely infinite ω-marking: `ENat.toNat` alone assigns a natural value to
+`ω`, which would not be a faithful conversion. -/
+def toNat {P : Type*} [Fintype P] (m : OmegaMarking P)
+    (_ : omegaPlaces m = ∅) : Marking P :=
+  fun p => (m p).toNat
+
+/-- Converting an ω-marking without any `ω` component to natural numbers and
+embedding it again recovers the original marking. -/
+theorem toOmega_toNat_eq_self {P : Type*} [Fintype P]
+    {m : OmegaMarking P} (hfinite : omegaPlaces m = ∅) :
+    (m.toNat hfinite).toOmega = m := by
+  funext p
+  apply ENat.natCast_toNat
+  intro hp
+  have : p ∈ omegaPlaces m := mem_omegaPlaces.mpr hp
+  rw [hfinite] at this
+  simp at this
+
 /-- `accelerate A m` is the ω-marking obtained from `m` by replacing the
 values at the chosen set `A` of places by `ω`. At every place outside `A`, it
 retains the value of `m`.
