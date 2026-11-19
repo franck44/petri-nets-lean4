@@ -79,6 +79,43 @@ theorem omegaPlaces_mono_of_succBranch (src : Branch P) (t : T) :
   rw [OmegaMarking.mem_omegaPlaces] at hp ⊢
   exact succBranch_preserves_top src t hp
 
+/-- A Karp–Miller successor over-approximates an ordinary firing step.
+
+Suppose the ω-marking of `src` covers the ordinary marking `m`, and firing
+`t` takes `m` to `m'`. Then `t` is enabled at `src.marking`, and the
+accelerated successor branch covers `m'`:
+
+```text
+        Fires t
+ m --------------> m'
+ |                  |
+ | toOmega ≤        | toOmega ≤
+ v                  v
+src ----succBranch t----> successor
+```
+-/
+theorem fires_le_succBranch {m m' : Marking P} {src : Branch P} {t : T}
+    (hcover : m.toOmega ≤ src.marking) (hfires : net.Fires m t m') :
+    net.OmegaEnabled src.marking t ∧
+      m'.toOmega ≤ (succBranch net src t).marking := by
+  have hω : net.OmegaFires m.toOmega t m'.toOmega :=
+    (net.fires_iff_omegaFires_toOmega m m' t).mp hfires
+  obtain ⟨tgt, htgt, hle⟩ := hω.mono hcover
+  have htgt_eq : tgt = succMarking net src.marking t := by
+    funext p
+    exact htgt.2 p
+  constructor
+  · exact htgt.1
+  · calc
+      m'.toOmega ≤ tgt := hle
+      _ = succMarking net src.marking t := htgt_eq
+      _ ≤ (succBranch net src t).marking := by
+        intro p
+        by_cases hp : p ∈ Branch.acceleratedPlaces
+            (succMarking net src.marking t) src
+        · simp [succBranch, OmegaMarking.accelerateFinset, hp]
+        · simp [succBranch, OmegaMarking.accelerateFinset, hp]
+
 /-- If a Karp–Miller step does not introduce a new `ω`-place, acceleration
 does not change its successor marking.
 

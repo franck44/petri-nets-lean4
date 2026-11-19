@@ -69,6 +69,27 @@ def KarpMillerTree.children :
 def KarpMillerTree.IsLeaf (tree : KarpMillerTree P T) : Prop :=
   tree.children = []
 
+/-- `tree.HasNode branch` means that `branch` occurs as a node value somewhere
+in `tree`. The root occurs directly; a node of any immediate subtree also
+occurs in the whole tree. -/
+inductive KarpMillerTree.HasNode :
+    KarpMillerTree P T → Branch P → Prop where
+  | root {rootValue children} :
+      HasNode (.node rootValue children) rootValue
+  | child {rootValue children t subtree branch}
+      (hchild : (t, subtree) ∈ children)
+      (hnode : subtree.HasNode branch) :
+      HasNode (.node rootValue children) branch
+
+omit [FinEnum P] [FinEnum T] in
+/-- A node of an immediate child subtree is also a node of the whole tree. -/
+theorem KarpMillerTree.HasNode.of_child
+    {tree subtree : KarpMillerTree P T} {t : T} {branch : Branch P}
+    (hchild : (t, subtree) ∈ tree.children)
+    (hnode : subtree.HasNode branch) : tree.HasNode branch := by
+  cases tree
+  exact KarpMillerTree.HasNode.child hchild hnode
+
 /-- Construct the complete Karp–Miller tree by depth-first search.
 
 The recursive calls are exactly the branches returned by `dfsSuccessors`.
@@ -91,26 +112,61 @@ theorem karpMillerDFS_rootValue (net : WeightedNet P T) (src : Branch P) :
   rw [karpMillerDFS]
   rfl
 
-/-- The immediate children constructed by `karpMillerDFS` are exactly the
-branches in `dfsSuccessors`. More precisely, a child labelled by `t` is the
-recursively constructed tree rooted at a computed successor `tgt`. -/
-theorem mem_karpMillerDFS_children_iff
-    (net : WeightedNet P T) (src : Branch P)
-    (t : T) (child : KarpMillerTree P T) :
-    (t, child) ∈ (karpMillerDFS net src).children ↔
-      ∃ tgt, (t, tgt) ∈ dfsSuccessors net src ∧
-        child = karpMillerDFS net tgt := by
+/-- The source branch occurs at the root of the tree constructed from it. -/
+theorem karpMillerDFS_hasNode_root (net : WeightedNet P T) (src : Branch P) :
+    (karpMillerDFS net src).HasNode src := by
   rw [karpMillerDFS]
-  simp only [KarpMillerTree.children, List.mem_map]
-  constructor
-  · rintro ⟨candidate, hcandidate, hpair⟩
-    rcases candidate with ⟨⟨u, tgt⟩, hsuccessor⟩
-    simp only at hpair
-    obtain ⟨rfl, rfl⟩ := hpair
-    exact ⟨tgt, hsuccessor, rfl⟩
-  · rintro ⟨tgt, hsuccessor, rfl⟩
-    refine ⟨⟨(t, tgt), hsuccessor⟩, ?_, rfl⟩
+  exact KarpMillerTree.HasNode.root
+
+/-- If `src` is fresh and `t` is enabled, its computed successor occurs as an
+immediate node of the Karp–Miller tree rooted at `src`. -/
+theorem karpMillerDFS_hasNode_succBranch (net : WeightedNet P T)
+    (src : Branch P) (t : T) (hfresh : src.IsFresh)
+    (henabled : net.OmegaEnabled src.marking t) :
+    (karpMillerDFS net src).HasNode (succBranch net src t) := by
+  rw [karpMillerDFS]
+  apply KarpMillerTree.HasNode.child
+    (t := t) (subtree := karpMillerDFS net (succBranch net src t))
+  · simp only [List.mem_map]
+    have hsuccessor :
+        (t, succBranch net src t) ∈ dfsSuccessors net src :=
+      mem_dfsSuccessors_iff.mpr ⟨hfresh, henabled, rfl⟩
+    refine ⟨⟨(t, succBranch net src t), hsuccessor⟩, ?_, rfl⟩
     simp
+  · exact karpMillerDFS_hasNode_root net (succBranch net src t)
+
+/-- Lift one ordinary firing step to the Karp–Miller tree rooted at a fresh
+branch. If `src.marking` covers `m` and `m` fires `t` to `m'`, the computed
+successor occurs in the tree and covers `m'`.
+
+The result completes the following order-enriched simulation diagram:
+
+```text
+                  Fires t
+       m --------------------------> m'
+       |                              |
+       | toOmega ≤                    | toOmega ≤
+       v                              v
+src.marking ----------------> tgt.marking
+              tree child t
+```
+
+Here `tgt` is `succBranch net src t`, an immediate child of `src` in
+`karpMillerDFS net src`. The diagram commutes using the covering order rather
+than equality: acceleration may replace finite components of the lower target
+by `ω`.
+
+This is the local over-approximation step. Lifting a complete firing sequence
+additionally requires handling a non-fresh leaf by returning to the equal
+ancestor stored in its branch. -/
+theorem lift_fires_to_karpMillerDFS
+    (net : WeightedNet P T) {m m' : Marking P} {src : Branch P} {t : T}
+    (hfresh : src.IsFresh) (hcover : m.toOmega ≤ src.marking)
+    (hfires : net.Fires m t m') :
+    ∃ tgt, (karpMillerDFS net src).HasNode tgt ∧ m'.toOmega ≤ tgt.marking := by
+  obtain ⟨henabled, hle⟩ := fires_le_succBranch hcover hfires
+  exact ⟨succBranch net src t,
+    karpMillerDFS_hasNode_succBranch net src t hfresh henabled, hle⟩
 
 end FinitePlaces
 
