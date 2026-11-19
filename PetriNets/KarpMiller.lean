@@ -220,6 +220,66 @@ theorem lift_fires_to_karpMillerDFS
   exact ⟨(succBranch net src t).marking,
     karpMillerDFS_hasNode_succBranch net src t hfresh henabled, hle⟩
 
+/-- Lift one concrete firing from a fresh covering branch reachable in
+`dfsLTS`. The target branch is the computed successor of `src`, reached by
+appending the same transition `t` to the DFS path. -/
+theorem lift_fires_to_dfsMTr_of_fresh
+    (net : WeightedNet P T) {m₀ m m' : Marking P}
+    {src : Branch P} {labels : List T} {t : T}
+    (hexec : (dfsLTS net).MTr (Branch.initial m₀) labels src)
+    (hfresh : src.IsFresh) (hcover : m.toOmega ≤ src.marking)
+    (hfires : net.Fires m t m') :
+    ∃ nextLabels tgt,
+      (dfsLTS net).MTr (Branch.initial m₀) nextLabels tgt ∧
+      m'.toOmega ≤ tgt.marking := by
+  obtain ⟨henabled, hle⟩ := fires_le_succBranch hcover hfires
+  let tgt := succBranch net src t
+  have hstep : (dfsLTS net).Tr src t tgt :=
+    mem_dfsSuccessors_iff.mpr ⟨hfresh, henabled, rfl⟩
+  exact ⟨labels ++ [t], tgt,
+    Cslib.LTS.MTr.stepR (dfsLTS net) hexec hstep, hle⟩
+
+/-- Lift one concrete firing from a non-fresh covering branch reachable in
+`dfsLTS`. The proof redirects to an earlier fresh branch with the same
+marking, then follows its computed successor. -/
+theorem lift_fires_to_dfsMTr_of_not_fresh
+    (net : WeightedNet P T) {m₀ m m' : Marking P}
+    {src : Branch P} {labels : List T} {t : T}
+    (hexec : (dfsLTS net).MTr (Branch.initial m₀) labels src)
+    (hnotfresh : ¬ src.IsFresh) (hcover : m.toOmega ≤ src.marking)
+    (hfires : net.Fires m t m') :
+    ∃ nextLabels tgt,
+      (dfsLTS net).MTr (Branch.initial m₀) nextLabels tgt ∧
+      m'.toOmega ≤ tgt.marking := by
+  obtain ⟨pre, ancestor, hpre, hancestorFresh, hmarking⟩ :=
+    exists_fresh_predecessor_of_not_fresh hexec hnotfresh
+  have hcoverAncestor : m.toOmega ≤ ancestor.marking := by
+    rw [hmarking]
+    exact hcover
+  obtain ⟨henabled, hle⟩ :=
+    fires_le_succBranch hcoverAncestor hfires
+  let tgt := succBranch net ancestor t
+  have hstep : (dfsLTS net).Tr ancestor t tgt :=
+    mem_dfsSuccessors_iff.mpr ⟨hancestorFresh, henabled, rfl⟩
+  exact ⟨pre ++ [t], tgt,
+    Cslib.LTS.MTr.stepR (dfsLTS net) hpre hstep, hle⟩
+
+/-- Lift one concrete firing while maintaining a covering branch reachable
+in `dfsLTS` from the initial branch. The proof dispatches to the ordinary
+successor lemma when the current branch is fresh and to the redirection lemma
+when it is not. -/
+theorem lift_fires_to_dfsMTr
+    (net : WeightedNet P T) {m₀ m m' : Marking P}
+    {src : Branch P} {labels : List T} {t : T}
+    (hexec : (dfsLTS net).MTr (Branch.initial m₀) labels src)
+    (hcover : m.toOmega ≤ src.marking) (hfires : net.Fires m t m') :
+    ∃ nextLabels tgt,
+      (dfsLTS net).MTr (Branch.initial m₀) nextLabels tgt ∧
+      m'.toOmega ≤ tgt.marking := by
+  by_cases hfresh : src.IsFresh
+  · exact lift_fires_to_dfsMTr_of_fresh net hexec hfresh hcover hfires
+  · exact lift_fires_to_dfsMTr_of_not_fresh net hexec hfresh hcover hfires
+
 end FinitePlaces
 
 end KarpMiller
