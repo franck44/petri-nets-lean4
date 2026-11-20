@@ -273,9 +273,88 @@ theorem WeightedNet.FiresSequence.exists_reachable_ge_on
       (Nat.le_add_left (n * d p) (src p))
   exact hbound.trans hn
 
+/-- **Shift finitely many growth paths to a common endpoint.**
+
+Suppose every `p ∈ A` has a firing sequence with its own source and endpoint,
+such that the sequence is nondecreasing and strictly increases place `p`:
+
+```text
+srcₚ ──tsₚ──▶ endₚ       srcₚ ≤ endₚ       srcₚ(p) < endₚ(p)
+```
+
+Then all paths can be shifted to a single endpoint `base` while preserving
+their non-strict and strict growth properties:
+
+```text
+shiftedSrc₁ ──ts₁──▶ ┐
+shiftedSrc₂ ──ts₂──▶ ├── base
+        ⋮             │
+shiftedSrcᵣ ──tsᵣ──▶ ┘
+
+shiftedSrcₚ ≤ base       shiftedSrcₚ(p) < base(p)
+```
+
+The proof constructs `base` as the pointwise maximum of the finitely many
+endpoints. If `endₚ ≤ base`, adding `base - endₚ` to both ends of the path
+changes its endpoint to exactly `base`:
+
+```text
+srcₚ + (base - endₚ) ──tsₚ──▶ endₚ + (base - endₚ) = base.
+```
+
+Adding the same marking preserves both `≤` and strict growth at `p`. -/
+theorem WeightedNet.FiresSequence.exists_common_endpoint_growth
+    (A : Finset P)
+    (hpaths : ∀ p ∈ A, ∃ src tgt ts,
+      net.FiresSequence src ts tgt ∧ src ≤ tgt ∧ src p < tgt p) :
+    ∃ base, ∀ p ∈ A, ∃ src ts,
+      net.FiresSequence src ts base ∧ src ≤ base ∧ src p < base p := by
+  classical
+  induction A using Finset.induction with
+  | empty =>
+      exact ⟨0, by simp⟩
+  | @insert p A hp ih =>
+      obtain ⟨srcP, endP, tsP, hseqP, hleP, hltP⟩ :=
+        hpaths p (by simp)
+      obtain ⟨baseA, hbaseA⟩ := ih (by
+        intro q hq
+        exact hpaths q (by simp [hq]))
+      let base : Marking P := endP ⊔ baseA
+      have hendP : endP ≤ base := le_sup_left
+      have hbaseA_le : baseA ≤ base := le_sup_right
+      have shift {q : P} {src end_ : Marking P} {ts : List T}
+          (hseq : net.FiresSequence src ts end_)
+          (hle : src ≤ end_) (hlt : src q < end_ q)
+          (hend : end_ ≤ base) :
+          ∃ shiftedSrc,
+            net.FiresSequence shiftedSrc ts base ∧
+            shiftedSrc ≤ base ∧ shiftedSrc q < base q := by
+        let d : Marking P := base - end_
+        have hendEq : end_ + d = base := by
+          funext r
+          exact Nat.add_sub_of_le (hend r)
+        refine ⟨src + d, ?_, ?_, ?_⟩
+        · rw [← hendEq]
+          exact hseq.add d
+        · rw [← hendEq]
+          exact fun r => Nat.add_le_add_right (hle r) (d r)
+        · rw [← hendEq]
+          exact Nat.add_lt_add_right hlt (d q)
+      refine ⟨base, ?_⟩
+      intro q hq
+      rw [Finset.mem_insert] at hq
+      rcases hq with rfl | hq
+      · obtain ⟨shiftedSrc, hseq, hle, hlt⟩ :=
+          shift hseqP hleP hltP hendP
+        exact ⟨shiftedSrc, tsP, hseq, hle, hlt⟩
+      · obtain ⟨srcQ, tsQ, hseqQ, hleQ, hltQ⟩ := hbaseA q hq
+        obtain ⟨shiftedSrc, hseq, hle, hlt⟩ :=
+          shift hseqQ hleQ hltQ hbaseA_le
+        exact ⟨shiftedSrc, tsQ, hseq, hle, hlt⟩
+
 /-- Combine finitely many pumpable segments ending at the same marking.
 
-Suppose that, for every `p ∈ A`, some sequence ts_p takes a marking `src_p` to
+Suppose that, for every `p ∈ A`, some sequence ts_p takes a marking `src_p` to a common endpoint
 `base` with `src_p ≤ base` and `src_p < base p` (strict increase at `p`).
 
 ```text
