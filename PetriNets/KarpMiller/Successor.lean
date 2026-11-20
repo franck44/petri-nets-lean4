@@ -70,6 +70,24 @@ theorem succBranch_eq_top_of_mem_acceleratedPlaces
     (succBranch net src t).marking p = ⊤ := by
   simp [succBranch, OmegaMarking.accelerateFinset, hp]
 
+/-- Every `ω`-place newly introduced by `succBranch` was selected by the
+acceleration rule.
+
+If `p` was finite in the source but is `ω` in the successor, ordinary firing
+arithmetic cannot have produced `ω` at `p`: subtracting and adding finite arc
+weights preserves finiteness. Hence `p` belongs to `acceleratedPlaces`. -/
+theorem mem_acceleratedPlaces_of_mem_omegaPlaces_succBranch
+    (src : Branch P) (t : T) {p : P}
+    (hpSrc : p ∉ OmegaMarking.omegaPlaces src.marking)
+    (hpTgt : p ∈ OmegaMarking.omegaPlaces
+      (succBranch net src t).marking) :
+    p ∈ Branch.acceleratedPlaces (succMarking net src.marking t) src := by
+  rw [OmegaMarking.mem_omegaPlaces] at hpSrc hpTgt
+  by_contra hp
+  simp [succBranch, OmegaMarking.accelerateFinset, hp,
+    succMarking] at hpTgt
+  exact hpSrc hpTgt
+
 /-- Constructing a successor branch can only increase the set of places equal
 to `ω`. -/
 theorem omegaPlaces_mono_of_succBranch (src : Branch P) (t : T) :
