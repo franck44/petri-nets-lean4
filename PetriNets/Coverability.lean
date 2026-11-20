@@ -55,7 +55,7 @@ theorem exists_place_lt_of_le_of_ne {P : Type*} {m m' : OmegaMarking P}
 
 end OmegaMarking
 
-/-- Embed an ordinary marking into the ω-markings. Every finite token count
+/-- Embed a concrete marking into the ω-markings. Every finite token count
 is mapped to the corresponding value in `ℕ∞`; no place is mapped to
 `ω`. -/
 def Marking.toOmega {P : Type*} (m : Marking P) : OmegaMarking P :=
@@ -65,6 +65,15 @@ def Marking.toOmega {P : Type*} (m : Marking P) : OmegaMarking P :=
 theorem Marking.toOmega_apply {P : Type*} (m : Marking P) (p : P) :
     m.toOmega p = m p :=
   rfl
+
+/-- A concrete marking is canonically usable as an omega marking.
+We define a coercion from `Marking P` to `OmegaMarking P`, so that Lean
+inserts `Marking.toOmega` whenever an `OmegaMarking` is expected in a
+comparison. As a result, we can write, for example, `m ≤ mω`, with `m` a
+concrete marking and `mω` an omega marking, and Lean interprets it as
+`m.toOmega ≤ mω`. -/
+instance {P : Type*} : Coe (Marking P) (OmegaMarking P) where
+  coe := Marking.toOmega
 
 /-- Replace every `ω` component of an omega marking by a prescribed finite
 reserve, while retaining the exact value of every finite component.
