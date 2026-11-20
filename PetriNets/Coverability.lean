@@ -277,6 +277,37 @@ theorem WeightedNet.leastPreMarking_toOmega_le_of_omegaFires
     exact_mod_cast (show net.pre p t + (target p - net.post p t) ≤
       (omegaSrc p).toNat by omega)
 
+/-- Realise a finite demand below an ω-firing target by an ordinary firing.
+
+Given `omegaSrc ─t→ omegaTgt` and an ordinary `demand` represented below
+`omegaTgt`, the theorem constructs a finite source below `omegaSrc`. Firing
+`t` from that source produces its deterministic firing result, which covers
+`demand`:
+
+```text
+           omegaSrc ─────────t─────────▶ omegaTgt
+               ▲                           ▲
+            toOmega ≤                   toOmega ≤
+               │                           │
+          finiteSrc ──t──▶ firingResult   demand
+```
+-/
+theorem WeightedNet.exists_finite_firing_cover_of_omegaFires
+    {P T : Type*} {net : WeightedNet P T}
+    {omegaSrc omegaTgt : OmegaMarking P} {t : T} {demand : Marking P}
+    (hfires : net.OmegaFires omegaSrc t omegaTgt)
+    (hdemand : demand.toOmega ≤ omegaTgt) :
+    ∃ finiteSrc,
+      finiteSrc.toOmega ≤ omegaSrc ∧
+      net.Fires finiteSrc t (net.firingResult finiteSrc t) ∧
+      demand ≤ net.firingResult finiteSrc t := by
+  let finiteSrc := net.leastPreMarking t demand
+  have hsrcBelow : finiteSrc.toOmega ≤ omegaSrc :=
+    net.leastPreMarking_toOmega_le_of_omegaFires hfires hdemand
+  obtain ⟨hfiniteFires, hdemandBelow⟩ :=
+    net.fires_firingResult_cover_of_leastPreMarking_le t demand le_rfl
+  exact ⟨finiteSrc, hsrcBelow, hfiniteFires, hdemandBelow⟩
+
 /-- A marking `m` is coverable from `m₀` when there is a marking `m'`
 reachable from `m₀` such that `m ≤ m'`. The order on markings is pointwise:
 `m ≤ m'` means that `m p ≤ m' p` for every place `p`. -/
