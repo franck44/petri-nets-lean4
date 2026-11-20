@@ -113,6 +113,20 @@ theorem omegaPlaces_mono_of_mTr {src tgt : Branch P} {labels : List T}
   | stepL htr _ ih =>
       exact (omegaPlaces_mono_of_tr htr).trans ih
 
+/-- A place which is finite at the end of a finite Karp–Miller execution was
+already finite at its source.
+
+This is the contrapositive, at one place, of
+`omegaPlaces_mono_of_mTr`: once a component becomes `ω`, no later DFS step can
+make it finite again. -/
+theorem not_mem_omegaPlaces_of_mTr
+    {src tgt : Branch P} {labels : List T} {p : P}
+    (hexec : (dfsLTS net).MTr src labels tgt)
+    (hp : p ∉ OmegaMarking.omegaPlaces tgt.marking) :
+    p ∉ OmegaMarking.omegaPlaces src.marking := by
+  intro hpSrc
+  exact hp (omegaPlaces_mono_of_mTr hexec hpSrc)
+
 /-- If the source and target of a finite Karp–Miller execution have the same
 set of `ω`-places, then every intermediate branch has that same set.
 
