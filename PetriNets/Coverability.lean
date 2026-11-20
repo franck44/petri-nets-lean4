@@ -192,6 +192,45 @@ theorem WeightedNet.fires_iff_omegaFires_toOmega {P T : Type*}
       simp at hp
       exact_mod_cast hp
 
+/-- The least marking from which firing `t` can cover `target`.
+
+At each place, it contains the tokens consumed by `t`, plus the part of the
+target demand not supplied by the post-incidence of `t`:
+
+```text
+leastPreMarking(p) = pre(p,t) + (target(p) - post(p,t)).
+```
+
+This is the standard one-step predecessor construction used in backward
+coverability arguments. -/
+def WeightedNet.leastPreMarking {P T : Type*} (net : WeightedNet P T)
+    (t : T) (target : Marking P) : Marking P := fun p =>
+  net.pre p t + (target p - net.post p t)
+
+/-- Any marking above `leastPreMarking` enables `t`, and its post-firing
+marking covers `target`.
+
+Thus `leastPreMarking` is a threshold for one-step backward coverability, not
+merely one particular source from which the target can be covered. -/
+theorem WeightedNet.fires_firingResult_cover_of_leastPreMarking_le
+    {P T : Type*} (net : WeightedNet P T) (t : T) (target : Marking P)
+    {src : Marking P} (hsrc : net.leastPreMarking t target ≤ src) :
+    net.Fires src t (net.firingResult src t) ∧
+      target ≤ net.firingResult src t := by
+  have henabled : net.Enabled src t := by
+    intro p
+    calc
+      net.pre p t ≤ net.leastPreMarking t target p := by
+        simp [WeightedNet.leastPreMarking]
+      _ ≤ src p := hsrc p
+  have hfires : net.Fires src t (net.firingResult src t) :=
+    ⟨henabled, fun _ => rfl⟩
+  have htarget : target ≤ net.firingResult src t := by
+    intro p
+    have hp := hsrc p
+    simp [WeightedNet.leastPreMarking] at hp ⊢
+    omega
+  exact ⟨hfires, htarget⟩
 /-- A marking `m` is coverable from `m₀` when there is a marking `m'`
 reachable from `m₀` such that `m ≤ m'`. The order on markings is pointwise:
 `m ≤ m'` means that `m p ≤ m' p` for every place `p`. -/
