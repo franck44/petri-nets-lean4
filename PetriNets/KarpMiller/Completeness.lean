@@ -154,6 +154,30 @@ theorem lift_firesSequence_to_dfsMTr
         lift_fires_to_dfsMTr net hexec hcover head
       exact ih hnext hcoverNext
 
+/-- **Karp–Miller DFS over-approximation for reachability.** Every marking
+`tgt` reachable from `m₀` is covered by the marking of some branch reachable
+in `dfsLTS` from the initial branch.
+
+```text
+m₀ ──concrete firing sequence──▶ tgt
+
+Branch.initial m₀ ──DFS path──▶ branch
+                                      ▲
+                                      │ tgt ≤ branch.marking
+```
+
+This is the transition-system form of Karp–Miller completeness. The finite
+tree result below follows by transferring the reachable branch to a tree
+node. -/
+theorem dfsLTS_covers_of_reachable
+    {m₀ tgt : Marking P} (hreach : net.Reachable m₀ tgt) :
+    ∃ labels branch,
+      (dfsLTS net).MTr (Branch.initial m₀) labels branch ∧
+      tgt ≤ branch.marking := by
+  obtain ⟨ts, hseq⟩ := hreach
+  exact lift_firesSequence_to_dfsMTr net
+    Cslib.LTS.MTr.refl le_rfl hseq
+
 /-- **Karp–Miller over-approximation for reachability.** For every marking
 `tgt` reachable from `m₀`, there exists an ω-marking `mω` occurring in the
 finite Karp–Miller tree such that `tgt ≤ mω`.
@@ -168,9 +192,8 @@ theorem karpMillerDFS_covers_of_reachable
     ∃ mω,
       (karpMillerDFS net (Branch.initial m₀)).HasNode mω ∧
       tgt ≤ mω := by
-  obtain ⟨ts, hseq⟩ := hreach
   obtain ⟨labels, branch, hexec, hcover⟩ :=
-    lift_firesSequence_to_dfsMTr net Cslib.LTS.MTr.refl le_rfl hseq
+    dfsLTS_covers_of_reachable net hreach
   exact ⟨branch.marking, karpMillerDFS_hasNode_of_mTr net hexec, hcover⟩
 
 end PetriNet.KarpMiller
