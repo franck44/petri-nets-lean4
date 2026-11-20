@@ -277,6 +277,180 @@ theorem branch_growth_witnesses_of_newOmegaPlaces
   exact exists_branch_growth_witness_of_new_omegaPlace
     hprefix htr hp.2 hp.1
 
+/-- Concretise one abstract branch-growth witness.
+
+Suppose `ancestor` is an earlier branch on the DFS prefix and its marking is
+below the raw successor, with strict inequality at the newly accelerated
+place `p`:
+
+```text
+Branch.initial m₀ ──before──▶ ancestor ──segment──▶ src ──t──▶ raw
+                                │                              │
+                                └──── ancestor.marking ≤ raw ──┘
+                                      strict at p
+```
+
+The theorem constructs an ordinary firing sequence with the same growth
+shape:
+
+```text
+concreteSrc ──ts──▶ concreteEnd
+
+concreteSrc ≤ concreteEnd
+concreteSrc(p) < concreteEnd(p)
+```
+
+The endpoint remains below `raw`. At every place outside
+`newOmegaPlaces src tgt`, it also covers the requested finite `demand`.
+Existing `ω`-components are assigned sufficient finite reserve to enable the
+whole concrete execution and pay for any losses along it. -/
+theorem exists_concrete_growth_path_of_branch_witness
+    [FinEnum P] [FinEnum T] {m₀ demand : Marking P}
+    {ancestor src tgt : Branch P} {before segment : List T}
+    {t : T} {p : P}
+    (hbefore : (dfsLTS net).MTr (Branch.initial m₀) before ancestor)
+    (hsegment : (dfsLTS net).MTr ancestor segment src)
+    (htr : (dfsLTS net).Tr src t tgt)
+    (hp : p ∈ newOmegaPlaces src tgt)
+    (hle : ancestor.marking ≤ succMarking net src.marking t)
+    (hlt : ancestor.marking p < succMarking net src.marking t p)
+    (hdemand : demand.toOmega ≤ tgt.marking) :
+    ∃ concreteSrc concreteEnd ts,
+      net.FiresSequence concreteSrc ts concreteEnd ∧
+      concreteSrc ≤ concreteEnd ∧
+      concreteSrc p < concreteEnd p ∧
+      concreteEnd.toOmega ≤ succMarking net src.marking t ∧
+      ∀ q ∉ newOmegaPlaces src tgt, demand q ≤ concreteEnd q := by
+  sorry
+
+/- Shift concrete growth paths to a common endpoint while preserving the two
+side conditions required by Karp–Miller soundness. -/
+private theorem exists_common_growth_base_below
+    {A : Finset P} {raw : OmegaMarking P} {demand seed : Marking P}
+    (hseedRaw : seed.toOmega ≤ raw)
+    (hseedDemand : ∀ q ∉ A, demand q ≤ seed q)
+    (hpaths : ∀ p ∈ A, ∃ src tgt ts,
+      net.FiresSequence src ts tgt ∧ src ≤ tgt ∧ src p < tgt p ∧
+      tgt.toOmega ≤ raw ∧ ∀ q ∉ A, demand q ≤ tgt q) :
+    ∃ base,
+      base.toOmega ≤ raw ∧
+      (∀ q ∉ A, demand q ≤ base q) ∧
+      ∀ p ∈ A, ∃ src ts,
+        net.FiresSequence src ts base ∧ src ≤ base ∧ src p < base p := by
+  classical
+  have merge : ∀ B : Finset P, B ⊆ A →
+      ∃ base,
+        base.toOmega ≤ raw ∧
+        (∀ q ∉ A, demand q ≤ base q) ∧
+        ∀ p ∈ B, ∃ src ts,
+          net.FiresSequence src ts base ∧ src ≤ base ∧ src p < base p := by
+    intro B hBA
+    induction B using Finset.induction with
+    | empty =>
+        exact ⟨seed, hseedRaw, hseedDemand, by simp⟩
+    | @insert p B hp ih =>
+        have hpA : p ∈ A := hBA (by simp)
+        have hBA' : B ⊆ A := fun q hq => hBA (by simp [hq])
+        obtain ⟨srcP, endP, tsP, hseqP, hleP, hltP, hendPRaw,
+          hendPDemand⟩ := hpaths p hpA
+        obtain ⟨baseB, hbaseBRaw, hbaseBDemand, hbaseB⟩ := ih hBA'
+        let base : Marking P := endP ⊔ baseB
+        have hendP : endP ≤ base := le_sup_left
+        have hbaseB_le : baseB ≤ base := le_sup_right
+        have hbaseRaw : base.toOmega ≤ raw := by
+          intro q
+          change ((max (endP q) (baseB q) : ℕ) : ℕ∞) ≤ raw q
+          by_cases hle : endP q ≤ baseB q
+          · rw [max_eq_right hle]
+            exact hbaseBRaw q
+          · rw [max_eq_left (Nat.le_of_not_ge hle)]
+            exact hendPRaw q
+        have hbaseDemand : ∀ q ∉ A, demand q ≤ base q := by
+          intro q hq
+          exact (hendPDemand q hq).trans (hendP q)
+        have shift {q : P} {src end_ : Marking P} {ts : List T}
+            (hseq : net.FiresSequence src ts end_)
+            (hle : src ≤ end_) (hlt : src q < end_ q)
+            (hend : end_ ≤ base) :
+            ∃ shiftedSrc,
+              net.FiresSequence shiftedSrc ts base ∧
+              shiftedSrc ≤ base ∧ shiftedSrc q < base q := by
+          let d : Marking P := base - end_
+          have hendEq : end_ + d = base := by
+            funext r
+            exact Nat.add_sub_of_le (hend r)
+          refine ⟨src + d, ?_, ?_, ?_⟩
+          · rw [← hendEq]
+            exact hseq.add d
+          · rw [← hendEq]
+            exact fun r => Nat.add_le_add_right (hle r) (d r)
+          · rw [← hendEq]
+            exact Nat.add_lt_add_right hlt (d q)
+        refine ⟨base, hbaseRaw, hbaseDemand, ?_⟩
+        intro q hq
+        rw [Finset.mem_insert] at hq
+        rcases hq with rfl | hq
+        · obtain ⟨shiftedSrc, hseq, hle, hlt⟩ :=
+            shift hseqP hleP hltP hendP
+          exact ⟨shiftedSrc, tsP, hseq, hle, hlt⟩
+        · obtain ⟨srcQ, tsQ, hseqQ, hleQ, hltQ⟩ := hbaseB q hq
+          obtain ⟨shiftedSrc, hseq, hle, hlt⟩ :=
+            shift hseqQ hleQ hltQ hbaseB_le
+          exact ⟨shiftedSrc, tsQ, hseq, hle, hlt⟩
+  exact merge A Finset.Subset.rfl
+
+/-- Outside the newly introduced `ω`-places, a finite raw component is not
+changed by acceleration.
+
+If the DFS target were `ω` at `q`, while the raw successor were finite there,
+then `q` would belong to `newOmegaPlaces src tgt`, contrary to `hq`.
+Therefore the target is finite at `q`, and its value is the raw firing result.
+-/
+theorem target_eq_raw_of_not_mem_newOmegaPlaces
+    [FinEnum P] [FinEnum T] {src tgt : Branch P} {t : T} {q : P}
+    (htr : (dfsLTS net).Tr src t tgt)
+    (hq : q ∉ newOmegaPlaces src tgt)
+    (hraw : succMarking net src.marking t q ≠ ⊤) :
+    tgt.marking q = succMarking net src.marking t q := by
+  have htgtFinite : tgt.marking q ≠ ⊤ := by
+    intro htgt
+    have htgtMem : q ∈ OmegaMarking.omegaPlaces tgt.marking :=
+      OmegaMarking.mem_omegaPlaces.mpr htgt
+    have hsrcMem : q ∈ OmegaMarking.omegaPlaces src.marking := by
+      by_contra hsrc
+      apply hq
+      rw [newOmegaPlaces, Finset.mem_sdiff]
+      exact ⟨htgtMem, hsrc⟩
+    apply hraw
+    rw [← OmegaMarking.mem_omegaPlaces, omegaPlaces_succMarking]
+    exact hsrcMem
+  exact marking_apply_eq_succMarking_of_tr_of_ne_top htr htgtFinite
+
+/-- A finite approximation of the raw successor already covers the demand at
+every place which is not newly accelerated.
+
+At an existing `ω`-place, `finiteApprox` stores `demand q` directly. At a
+finite raw component, `target_eq_raw_of_not_mem_newOmegaPlaces` identifies the
+DFS target with the raw value, so the result follows from `hdemand`. -/
+theorem demand_le_finiteApprox_raw_of_not_mem_newOmegaPlaces
+    [FinEnum P] [FinEnum T] {demand : Marking P}
+    {src tgt : Branch P} {t : T} {q : P}
+    (htr : (dfsLTS net).Tr src t tgt)
+    (hdemand : demand.toOmega ≤ tgt.marking)
+    (hq : q ∉ newOmegaPlaces src tgt) :
+    demand q ≤ (succMarking net src.marking t).finiteApprox demand q := by
+  let raw := succMarking net src.marking t
+  by_cases hraw : raw q = ⊤
+  · simp [raw, hraw]
+  · have htgtRaw : tgt.marking q = raw q := by
+      simpa [raw] using
+        target_eq_raw_of_not_mem_newOmegaPlaces htr hq (by simpa [raw])
+    have hqDemand := hdemand q
+    change (demand q : ℕ∞) ≤ tgt.marking q at hqDemand
+    rw [htgtRaw, ← ENat.natCast_toNat hraw] at hqDemand
+    have := ENat.natCast_le_natCast.mp hqDemand
+    simpa [raw, OmegaMarking.finiteApprox, hraw] using this
+
 /-- Concretise the abstract branch witnesses at one common finite base.
 
 Let `raw = succMarking net src.marking t` and let `A` be the places newly
@@ -306,7 +480,7 @@ theorem exists_common_concrete_growth_base
     [FinEnum P] [FinEnum T] {m₀ demand : Marking P}
     {src tgt : Branch P} {t : T}
     (htr : (dfsLTS net).Tr src t tgt)
-    (hnew : (newOmegaPlaces src tgt).Nonempty)
+    (_hnew : (newOmegaPlaces src tgt).Nonempty)
     (hwitnesses : ∀ p ∈ newOmegaPlaces src tgt,
       ∃ ancestor before segment,
         (dfsLTS net).MTr (Branch.initial m₀) before ancestor ∧
@@ -320,7 +494,31 @@ theorem exists_common_concrete_growth_base
       ∀ p ∈ newOmegaPlaces src tgt, ∃ concreteSrc ts,
         net.FiresSequence concreteSrc ts base ∧
         concreteSrc ≤ base ∧ concreteSrc p < base p := by
-  sorry
+  /- Phase 1: choose a finite seed below the raw successor. At existing
+  `ω`-places the seed uses the requested demand as its reserve. -/
+  let A := newOmegaPlaces src tgt
+  let raw := succMarking net src.marking t
+  let seed := raw.finiteApprox demand
+  /- Phase 2: merge the concrete witness paths by pointwise maximum. The
+  helper preserves the raw upper bound and demand coverage while shifting all
+  paths to its common endpoint. -/
+  apply exists_common_growth_base_below
+      (net := net) (A := A) (raw := raw) (demand := demand) (seed := seed)
+  /- The finite approximation always embeds below the omega marking it
+  approximates. -/
+  · exact raw.finiteApprox_toOmega_le demand
+  /- Phase 3: show that the seed already covers the demand outside the places
+  which must be grown by pumping. -/
+  · intro q hq
+    exact demand_le_finiteApprox_raw_of_not_mem_newOmegaPlaces
+      htr hdemand hq
+  /- Phase 4: concretise each abstract branch witness. These paths are the
+  inputs which the common-endpoint helper shifts and merges. -/
+  · intro p hp
+    obtain ⟨ancestor, before, segment, hbefore, hsegment, hle, hlt⟩ :=
+      hwitnesses p hp
+    exact exists_concrete_growth_path_of_branch_witness
+      hbefore hsegment htr hp hle hlt hdemand
 
 /-- Realise a finite demand using growth witnesses for every newly
 accelerated place.
