@@ -237,6 +237,45 @@ theorem exists_branch_growth_witness_of_new_omegaPlace
         hafter.stepL hstep, hle, hlt⟩
   · exact ⟨src, labels, [], hprefix, Cslib.LTS.MTr.refl, hle, hlt⟩
 
+/-- The finite set of places which are `ω` in `tgt` but not in `src`.
+
+This proof-only definition directly uses the mathematical omega-place sets;
+it is not intended to be executed by the Karp–Miller algorithm. -/
+noncomputable def newOmegaPlaces [FinEnum P]
+    (src tgt : Branch P) : Finset P :=
+  OmegaMarking.omegaPlaces tgt.marking \
+    OmegaMarking.omegaPlaces src.marking
+
+/-- Lift the growth-witness theorem from one new `ω`-place to all new
+`ω`-places of a DFS step.
+
+The lifting introduces no additional Petri-net argument. Membership
+`p ∈ newOmegaPlaces src tgt` unfolds into exactly the two hypotheses required
+by `exists_branch_growth_witness_of_new_omegaPlace`:
+
+```text
+p ∈ omegaPlaces tgt.marking     p ∉ omegaPlaces src.marking.
+```
+
+Applying that theorem pointwise therefore gives a possibly different earlier
+branch and path segment for every newly accelerated place. This finite family
+is the input required by the later combined-pumping construction. -/
+theorem branch_growth_witnesses_of_newOmegaPlaces
+    [FinEnum P] [FinEnum T] {m₀ : Marking P} {labels : List T}
+    {src tgt : Branch P} {t : T}
+    (hprefix : (dfsLTS net).MTr (Branch.initial m₀) labels src)
+    (htr : (dfsLTS net).Tr src t tgt) :
+    ∀ p ∈ newOmegaPlaces src tgt,
+      ∃ ancestor before segment,
+        (dfsLTS net).MTr (Branch.initial m₀) before ancestor ∧
+        (dfsLTS net).MTr ancestor segment src ∧
+        ancestor.marking ≤ succMarking net src.marking t ∧
+        ancestor.marking p < succMarking net src.marking t p := by
+  intro p hp
+  rw [newOmegaPlaces, Finset.mem_sdiff] at hp
+  exact exists_branch_growth_witness_of_new_omegaPlace
+    hprefix htr hp.2 hp.1
+
 /-- Soundness of a DFS step which introduces at least one new `ω`-place.
 
 For an arbitrary finite demand below `tgt.marking`, the intended proof:
