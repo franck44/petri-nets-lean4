@@ -181,6 +181,65 @@ theorem WeightedNet.FiresSequence.repeat_with_reserve
       · funext p
         simp [gain, Pi.add_apply, Nat.add_mul, Nat.add_assoc]
 
+/-- **Meet finitely many bounds by reserve-backed repetition.** Suppose `ts`
+strictly increases every place in the finite set `A`. Then the execution
+provided by `repeat_with_reserve` can simultaneously exceed an arbitrary
+prescribed `bound` at all places in `A`.
+
+The sequence may decrease at places outside `A`; the initial marking
+`src + n • (src - tgt)` contains the reserve needed to pay for those losses.
+At each `p ∈ A`, the gain `tgt p - src p` is at least one. Choosing
+
+```text
+n = ∑ p ∈ A, bound p
+```
+
+therefore makes `n` at least every individual bound and adds at least `n`
+tokens at each growing place. The resulting marking is also pointwise above
+`tgt`, because it is exactly `tgt + n • (tgt - src)`.
+
+```text
+src + n·(src - tgt)
+          │
+          │  ts repeated n + 1 times
+          ▼
+tgt + n·(tgt - src) = reached
+          ▲
+          │  tgt ≤ reached
+          │  bound(p) ≤ reached(p)  for every p ∈ A
+```
+
+As with `repeat_with_reserve`, this theorem constructs a firing sequence from
+an enlarged source; it does not by itself prove that this source is reachable.
+In the Karp–Miller soundness proof, omega coverability will supply a reachable
+marking covering the required reserve. -/
+theorem WeightedNet.FiresSequence.repeat_with_reserve_ge_on
+    {src tgt : Marking P} {ts : List T}
+    (A : Finset P) (bound : P → ℕ)
+    (hseq : net.FiresSequence src ts tgt)
+    (hgrows : ∀ p ∈ A, src p < tgt p) :
+    let n := ∑ p ∈ A, bound p
+    net.FiresSequence
+        (src + n • (src - tgt))
+        (List.replicate (n + 1) ts).flatten
+        (tgt + n • (tgt - src)) ∧
+      tgt ≤ tgt + n • (tgt - src) ∧
+      ∀ p ∈ A, bound p ≤ (tgt + n • (tgt - src)) p := by
+  dsimp only
+  let n := ∑ p ∈ A, bound p
+  refine ⟨hseq.repeat_with_reserve n, by simp, ?_⟩
+  intro p hp
+  have hbound : bound p ≤ n := by
+    dsimp [n]
+    exact Finset.single_le_sum (fun q _ => Nat.zero_le (bound q)) hp
+  have hgain : 0 < (tgt - src) p :=
+    Nat.sub_pos_of_lt (hgrows p hp)
+  have hn : n ≤ (tgt + n • (tgt - src)) p := by
+    change n ≤ tgt p + n * (tgt p - src p)
+    exact (Nat.le_mul_of_pos_right n hgain).trans
+      (Nat.le_add_left (n * (tgt p - src p)) (tgt p))
+  exact hbound.trans hn
+
 /-- If a nondecreasing firing sequence strictly increases every place in a
 finite set `A`, then one reachable marking can simultaneously exceed an
 arbitrary prescribed `bound` at every place in `A`.
