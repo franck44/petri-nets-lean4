@@ -196,6 +196,47 @@ theorem exists_history_growth_witness_of_new_omegaPlace
       (net := net) src t hpSrc hpTgt
   simpa [Branch.acceleratedPlaces] using hpAccelerated
 
+/-- A newly introduced `ω`-place has a growth witness realised by an earlier
+branch on the DFS prefix.
+
+The historical marking supplied by
+`exists_history_growth_witness_of_new_omegaPlace` is either `src.marking`
+itself or the marking of an earlier branch `ancestor`. In both cases the
+prefix can be split into a path reaching `ancestor` and a segment from
+`ancestor` to `src`:
+
+```text
+Branch.initial m₀ ──before──▶ ancestor ──segment──▶ src ──t──▶ raw
+                                │                              │
+                                └──── ancestor.marking ≤ raw ──┘
+                                      strict at p
+```
+-/
+theorem exists_branch_growth_witness_of_new_omegaPlace
+    [FinEnum P] [FinEnum T] {m₀ : Marking P} {labels : List T}
+    {src tgt : Branch P} {t : T} {p : P}
+    (hprefix : (dfsLTS net).MTr (Branch.initial m₀) labels src)
+    (htr : (dfsLTS net).Tr src t tgt)
+    (hpSrc : p ∉ OmegaMarking.omegaPlaces src.marking)
+    (hpTgt : p ∈ OmegaMarking.omegaPlaces tgt.marking) :
+    ∃ ancestor before segment,
+      (dfsLTS net).MTr (Branch.initial m₀) before ancestor ∧
+      (dfsLTS net).MTr ancestor segment src ∧
+      ancestor.marking ≤ succMarking net src.marking t ∧
+      ancestor.marking p < succMarking net src.marking t p := by
+  obtain ⟨a, ha, hle, hlt⟩ :=
+    exists_history_growth_witness_of_new_omegaPlace htr hpSrc hpTgt
+  rw [Branch.history, List.mem_append, List.mem_singleton] at ha
+  rcases ha with ha | rfl
+  · rcases ancestor_eq_predecessor_of_mTr hprefix ha with hroot |
+        ⟨before, ancestor, u, next, after, _, hbefore, hstep,
+          hafter, hmarking⟩
+    · simp [Branch.initial, Branch.root] at hroot
+    · subst a
+      exact ⟨ancestor, before, u :: after, hbefore,
+        hafter.stepL hstep, hle, hlt⟩
+  · exact ⟨src, labels, [], hprefix, Cslib.LTS.MTr.refl, hle, hlt⟩
+
 /-- Soundness of a DFS step which introduces at least one new `ω`-place.
 
 For an arbitrary finite demand below `tgt.marking`, the intended proof:
