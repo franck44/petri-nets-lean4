@@ -172,6 +172,54 @@ theorem karpMillerDFS_hasNode_of_mTr
         · simp
       · exact ih
 
+/-- A node stored in the Karp–Miller tree is the marking of a branch reachable
+from the tree's source in `dfsLTS`.
+
+The proof follows the recursive construction of `karpMillerDFS`. The root
+gives the empty execution. For a node in a child subtree, the child transition
+is prefixed to the execution obtained recursively from that subtree. -/
+private theorem exists_dfsMTr_of_karpMillerDFS_hasNode
+    (net : WeightedNet P T) (src : Branch P) {mω : OmegaMarking P}
+    (hnode : (karpMillerDFS net src).HasNode mω) :
+    ∃ labels branch,
+      (dfsLTS net).MTr src labels branch ∧ branch.marking = mω := by
+  rw [karpMillerDFS] at hnode
+  cases hnode with
+  | root =>
+      exact ⟨[], src, Cslib.LTS.MTr.refl, rfl⟩
+  | @child root children t subtree mω hchild hsubtree =>
+      simp only [List.mem_map] at hchild
+      obtain ⟨candidate, hcandidate, heq⟩ := hchild
+      rcases candidate with ⟨⟨u, next⟩, hnext⟩
+      simp only at heq
+      cases heq
+      obtain ⟨labels, branch, hexec, hmarking⟩ :=
+        exists_dfsMTr_of_karpMillerDFS_hasNode net next hsubtree
+      exact ⟨t :: labels, branch, hexec.stepL hnext, hmarking⟩
+termination_by (dfsCall_wellFounded (net := net) (T := T)).wrap src
+decreasing_by
+  exact ⟨t, hnext⟩
+
+/-- Nodes of the Karp–Miller tree are exactly the markings of branches
+reachable from the tree's source in `dfsLTS`.
+
+```text
+(karpMillerDFS net src).HasNode mω
+  ↔ ∃ labels branch,
+      src ──labels──▶ branch ∧ branch.marking = mω
+```
+-/
+theorem karpMillerDFS_hasNode_iff_exists_dfsMTr
+    (net : WeightedNet P T) (src : Branch P) (mω : OmegaMarking P) :
+    (karpMillerDFS net src).HasNode mω ↔
+      ∃ labels branch,
+        (dfsLTS net).MTr src labels branch ∧ branch.marking = mω := by
+  constructor
+  · exact exists_dfsMTr_of_karpMillerDFS_hasNode net src
+  · rintro ⟨labels, branch, hexec, hmarking⟩
+    rw [← hmarking]
+    exact karpMillerDFS_hasNode_of_mTr net hexec
+
 end FinitePlaces
 
 end KarpMiller
