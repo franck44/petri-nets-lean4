@@ -249,6 +249,24 @@ def WeightedNet.leastPreMarking {P T : Type*} (net : WeightedNet P T)
     (t : T) (target : Marking P) : Marking P := fun p =>
   net.pre p t + (target p - net.post p t)
 
+/-- Propagate a target demand backwards through a transition sequence.
+
+The construction applies `leastPreMarking` from right to left:
+
+```text
+leastPreMarkingSequence []       target = target
+leastPreMarkingSequence (t::ts)  target =
+  leastPreMarking t (leastPreMarkingSequence ts target).
+```
+
+It is the least initial demand obtained by successively propagating the final
+demand backwards across every transition in the list. -/
+def WeightedNet.leastPreMarkingSequence {P T : Type*}
+    (net : WeightedNet P T) : List T → Marking P → Marking P
+  | [], target => target
+  | t :: ts, target =>
+      net.leastPreMarking t (net.leastPreMarkingSequence ts target)
+
 /-- Any marking above `leastPreMarking` enables `t`, and its post-firing
 marking covers `target`.
 
@@ -273,6 +291,38 @@ theorem WeightedNet.fires_firingResult_cover_of_leastPreMarking_le
     simp [WeightedNet.leastPreMarking] at hp ⊢
     omega
   exact ⟨hfires, htarget⟩
+
+/-- Any marking above the predecessor demand of a transition sequence can
+execute that sequence and reach a marking covering the requested target.
+
+```text
+leastPreMarkingSequence ts target ≤ src
+
+src ─────────────ts─────────────▶ reached
+                                  ▲
+                                  │ target ≤ reached
+```
+
+The proof follows the list from left to right. The first application of
+`fires_firingResult_cover_of_leastPreMarking_le` reaches a marking covering
+the predecessor demand of the tail; the induction hypothesis then executes
+the tail and covers the original target. -/
+theorem WeightedNet.firesSequence_cover_of_leastPreMarkingSequence_le
+    {P T : Type*} (net : WeightedNet P T) (ts : List T)
+    (target : Marking P) {src : Marking P}
+    (hsrc : net.leastPreMarkingSequence ts target ≤ src) :
+    ∃ reached,
+      net.FiresSequence src ts reached ∧ target ≤ reached := by
+  induction ts generalizing src with
+  | nil =>
+      exact ⟨src, WeightedNet.FiresSequence.nil src, hsrc⟩
+  | cons t ts ih =>
+      obtain ⟨hfirst, htailDemand⟩ :=
+        net.fires_firingResult_cover_of_leastPreMarking_le t
+          (net.leastPreMarkingSequence ts target) hsrc
+      obtain ⟨reached, htail, htarget⟩ :=
+        ih htailDemand
+      exact ⟨reached, WeightedNet.FiresSequence.cons hfirst htail, htarget⟩
 
 /-- Propagate a concrete target demand backwards across an ω-firing.
 
