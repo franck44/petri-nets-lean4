@@ -62,6 +62,33 @@ theorem WeightedNet.FiresSequence.add {src tgt : Marking P} {ts : List T}
   | cons head tail ih =>
       exact WeightedNet.FiresSequence.cons (WeightedNet.Fires.add head d) ih
 
+/-- Combine two firing sequences by supplying each with the marking required
+by the other.
+
+If `ts₁` fires from `src₁` to `tgt₁` and `ts₂` fires from `src₂` to
+`tgt₂`, adding `src₂` to the first execution makes it end at
+`tgt₁ + src₂`. The second execution can then start there after adding
+`tgt₁` to both its endpoints:
+
+```text
+src₁ + src₂ ──ts₁──▶ tgt₁ + src₂
+                         = src₂ + tgt₁ ──ts₂──▶ tgt₂ + tgt₁
+```
+
+Thus the concatenated sequence has the sum of the two sources as its source
+and the sum of the two targets as its target. No nondecreasing hypothesis is
+required: the added markings act as reserves for the two executions. -/
+theorem WeightedNet.FiresSequence.append_add
+    {src₁ tgt₁ src₂ tgt₂ : Marking P} {ts₁ ts₂ : List T}
+    (h₁ : net.FiresSequence src₁ ts₁ tgt₁)
+    (h₂ : net.FiresSequence src₂ ts₂ tgt₂) :
+    net.FiresSequence (src₁ + src₂) (ts₁ ++ ts₂) (tgt₁ + tgt₂) := by
+  have hfirst := h₁.add src₂
+  have hsecond := h₂.add tgt₁
+  rw [add_comm src₂ tgt₁] at hsecond
+  have hcombined := WeightedNet.FiresSequence.append hfirst hsecond
+  simpa [add_comm tgt₂ tgt₁] using hcombined
+
 /-- A nondecreasing firing sequence can be fired again from its target, and
 the second firing adds the same marking difference as the first.
 
