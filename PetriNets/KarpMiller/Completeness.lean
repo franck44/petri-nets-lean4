@@ -33,47 +33,6 @@ variable {P T : Type*}
 variable [FinEnum P] [FinEnum T]
 variable (net : WeightedNet P T)
 
-/-- The tree rooted at `src` covers every ordinary marking already covered by
-`src.marking`. In particular, the initial Karp–Miller tree covers its initial
-marking. -/
-theorem karpMillerDFS_covers_root
-    (src : Branch P) {m : Marking P} (hcover : m ≤ src.marking) :
-    (karpMillerDFS net src).Covers m := by
-  exact ⟨src.marking, karpMillerDFS_hasNode_root net src, hcover⟩
-
-/-- The Karp–Miller tree constructed from an initial marking covers that
-marking at its root. This is the base case of firing-sequence simulation. -/
-theorem karpMillerDFS_covers_initial (m₀ : Marking P) :
-    (karpMillerDFS net (Branch.initial m₀)).Covers m₀ := by
-  apply karpMillerDFS_covers_root
-  exact le_rfl
-
-/-- Lift one ordinary firing step to the Karp–Miller tree rooted at a fresh
-branch. If `src.marking` covers `m` and `m` fires `t` to `m'`, the computed
-successor occurs in the tree and covers `m'`.
-
-```text
-                  Fires t
-       m --------------------------> m'
-       |                              |
-       | ≤                            | ≤
-       v                              v
-src.marking ----------------> tgt.marking
-              tree child t
-```
-
-Here `tgt` is `succBranch net src t`. Acceleration may replace finite target
-components by `ω`, so the diagram commutes in the covering order rather than
-by equality. -/
-theorem lift_fires_to_karpMillerDFS
-    {m m' : Marking P} {src : Branch P} {t : T}
-    (hfresh : src.IsFresh) (hcover : m ≤ src.marking)
-    (hfires : net.Fires m t m') :
-    (karpMillerDFS net src).Covers m' := by
-  obtain ⟨henabled, hle⟩ := fires_le_succBranch hcover hfires
-  exact ⟨(succBranch net src t).marking,
-    karpMillerDFS_hasNode_succBranch net src t hfresh henabled, hle⟩
-
 /-- Lift one concrete firing from a fresh covering branch reachable in
 `dfsLTS`. The target branch is the computed successor of `src`, reached by
 appending the same transition `t` to the DFS path. -/
