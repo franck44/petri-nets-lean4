@@ -170,6 +170,32 @@ theorem omegaCoverableFrom_of_dfsLTS_tr_of_omegaPlaces_eq
   apply net.omegaCoverableFrom_of_omegaFires hsound
   exact ⟨(mem_dfsSuccessors_iff.mp htr).2.1, fun _ => rfl⟩
 
+/-- A newly introduced `ω`-place has a growth witness in the source history.
+
+If a DFS step changes `p` from finite to `ω`, then `p` was selected by the
+acceleration rule. Consequently, some marking `a` in `src.history` is below
+the raw firing successor and is strictly smaller there at `p`:
+
+```text
+a ∈ src.history       a ≤ raw       a(p) < raw(p)
+
+src ──t──▶ raw ──accelerate p──▶ tgt
+```
+-/
+theorem exists_history_growth_witness_of_new_omegaPlace
+    [FinEnum P] [FinEnum T] {src tgt : Branch P} {t : T} {p : P}
+    (htr : (dfsLTS net).Tr src t tgt)
+    (hpSrc : p ∉ OmegaMarking.omegaPlaces src.marking)
+    (hpTgt : p ∈ OmegaMarking.omegaPlaces tgt.marking) :
+    ∃ a ∈ src.history,
+      a ≤ succMarking net src.marking t ∧
+      a p < succMarking net src.marking t p := by
+  obtain ⟨_, _, rfl⟩ := mem_dfsSuccessors_iff.mp htr
+  have hpAccelerated :=
+    mem_acceleratedPlaces_of_mem_omegaPlaces_succBranch
+      (net := net) src t hpSrc hpTgt
+  simpa [Branch.acceleratedPlaces] using hpAccelerated
+
 /-- Soundness of a DFS step which introduces at least one new `ω`-place.
 
 For an arbitrary finite demand below `tgt.marking`, the intended proof:
