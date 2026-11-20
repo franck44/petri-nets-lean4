@@ -137,6 +137,86 @@ private theorem omegaPlaces_succMarking_eq_empty_of_src_eq_empty
   rw [succMarking, ← ENat.natCast_toNat hsrc] at hp
   simp at hp
 
+/-- Concretise one enabled firing from an ω-marking with no `ω`-places.
+
+If `src` is finite and enables `t`, its ordinary representation enables the
+same transition. The standard firing rule therefore provides an ordinary
+target whose embedding is exactly the ω-firing result:
+
+```text
+src.toNat ──t──▶ tgt
+    │              │
+ toOmega        toOmega
+    │              │
+    ▼              ▼
+   src ──t──▶ succMarking net src t
+```
+-/
+theorem exists_fires_to_succMarking_of_omegaPlaces_eq_empty
+    [Fintype P] {src : OmegaMarking P} {t : T}
+    (hfinite : OmegaMarking.omegaPlaces src = ∅)
+    (henabled : net.OmegaEnabled src t) :
+    ∃ tgt : Marking P,
+      net.Fires (src.toNat hfinite) t tgt ∧
+      tgt.toOmega = succMarking net src t := by
+  have hsrcEmbed : (src.toNat hfinite).toOmega = src :=
+    OmegaMarking.toOmega_toNat_eq_self hfinite
+  have henabledNat : net.Enabled (src.toNat hfinite) t := by
+    apply (net.enabled_iff_omegaEnabled_toOmega _ t).mpr
+    rwa [hsrcEmbed]
+  obtain ⟨tgt, hfires⟩ :=
+    (net.enabled_iff_exists_fires _ t).mp henabledNat
+  refine ⟨tgt, hfires, ?_⟩
+  have homega := (net.fires_iff_omegaFires_toOmega _ _ t).mp hfires
+  rw [hsrcEmbed] at homega
+  funext p
+  exact homega.2 p
+
+/-- Every node stored in the Karp–Miller tree is the marking of a branch
+reachable in the DFS transition system.
+
+This is the structural connection between the executable tree and `dfsLTS`:
+
+```text
+tree.HasNode mω
+        ⇒
+∃ branch, initial m₀ ──labels──▶ branch ∧ branch.marking = mω
+```
+
+The proof will follow the recursive construction of `karpMillerDFS`. -/
+private theorem exists_dfsMTr_of_karpMillerDFS_hasNode_from
+    [FinEnum P] [FinEnum T] (src : Branch P) {mω : OmegaMarking P}
+    (hnode : (karpMillerDFS net src).HasNode mω) :
+    ∃ labels branch,
+      (dfsLTS net).MTr src labels branch ∧ branch.marking = mω := by
+  rw [karpMillerDFS] at hnode
+  cases hnode with
+  | root =>
+      exact ⟨[], src, Cslib.LTS.MTr.refl, rfl⟩
+  | @child root children t subtree mω hchild hsubtree =>
+      simp only [List.mem_map] at hchild
+      obtain ⟨candidate, hcandidate, heq⟩ := hchild
+      rcases candidate with ⟨⟨u, next⟩, hnext⟩
+      simp only at heq
+      cases heq
+      obtain ⟨labels, branch, hexec, hmarking⟩ :=
+        exists_dfsMTr_of_karpMillerDFS_hasNode_from next hsubtree
+      exact ⟨t :: labels, branch, hexec.stepL hnext, hmarking⟩
+termination_by (dfsCall_wellFounded (net := net) (T := T)).wrap src
+decreasing_by
+  exact ⟨t, hnext⟩
+
+/-- Every node stored in the Karp–Miller tree generated from `m₀` is the
+marking of a branch reachable from `Branch.initial m₀` in `dfsLTS`. -/
+theorem exists_dfsMTr_of_karpMillerDFS_hasNode
+    [FinEnum P] [FinEnum T] {m₀ : Marking P} {mω : OmegaMarking P}
+    (hnode :
+      (karpMillerDFS net (Branch.initial m₀)).HasNode mω) :
+    ∃ labels branch,
+      (dfsLTS net).MTr (Branch.initial m₀) labels branch ∧
+      branch.marking = mω := by
+  exact exists_dfsMTr_of_karpMillerDFS_hasNode_from
+    (Branch.initial m₀) hnode
 end KarpMiller
 
 end PetriNet
