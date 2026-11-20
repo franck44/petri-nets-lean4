@@ -8,6 +8,7 @@ module
 
 public import PetriNets.KarpMiller
 import PetriNets.Monotonicity
+import PetriNets.StateEquation
 
 /-!
 # Soundness of the Karp–Miller construction
@@ -277,6 +278,103 @@ theorem branch_growth_witnesses_of_newOmegaPlaces
   exact exists_branch_growth_witness_of_new_omegaPlace
     hprefix htr hp.2 hp.1
 
+/- The natural-number token balance of a DFS execution at a place which is
+finite in its target. Finiteness propagates backwards because DFS steps
+preserve every existing `ω`-place. Accelerations therefore do not affect this
+coordinate, and its balance is the ordinary Petri-net balance. -/
+private theorem dfsMTr_balance_at_of_ne_top
+    [FinEnum P] [FinEnum T] {src tgt : Branch P} {ts : List T} {p : P}
+    (hexec : (dfsLTS net).MTr src ts tgt)
+    (htgt : tgt.marking p ≠ ⊤) :
+    (tgt.marking p).toNat +
+        ∑ t, firingCount ts t * net.pre p t =
+      (src.marking p).toNat +
+        ∑ t, firingCount ts t * net.post p t := by
+  induction hexec with
+  | refl => simp
+  | @stepL src t mid ts tgt htr htail ih =>
+      have hmid : mid.marking p ≠ ⊤ := by
+        intro hp
+        apply htgt
+        rw [← OmegaMarking.mem_omegaPlaces]
+        exact omegaPlaces_mono_of_mTr htail
+          (OmegaMarking.mem_omegaPlaces.mpr hp)
+      have hsrc : src.marking p ≠ ⊤ := by
+        intro hp
+        apply hmid
+        rw [← OmegaMarking.mem_omegaPlaces]
+        exact omegaPlaces_mono_of_tr htr
+          (OmegaMarking.mem_omegaPlaces.mpr hp)
+      have hstep :
+          (mid.marking p).toNat + net.pre p t =
+            (src.marking p).toNat + net.post p t := by
+        have henabled : net.pre p t ≤ (src.marking p).toNat := by
+          apply ENat.natCast_le_natCast.mp
+          rw [ENat.natCast_toNat hsrc]
+          exact (mem_dfsSuccessors_iff.mp htr).2.1 p
+        have hmarking :=
+          marking_apply_eq_succMarking_of_tr_of_ne_top htr hmid
+        rw [succMarking, ← ENat.natCast_toNat hsrc,
+          ← ENat.natCast_toNat hmid] at hmarking
+        have hmarkingNat :
+            (mid.marking p).toNat =
+              (src.marking p).toNat - net.pre p t + net.post p t := by
+          exact_mod_cast hmarking
+        omega
+      have htailBalance := ih htgt
+      simp_rw [firingCount_weighted_sum_cons]
+      omega
+
+/- A target demand at a finite coordinate can be propagated backwards along
+a DFS execution without exceeding the token count at the abstract source.
+
+Accelerations at other places are irrelevant. Since the target coordinate is
+finite, it remained finite throughout the path, and every DFS edge follows
+the ordinary firing equation at that coordinate. -/
+private theorem leastPreMarkingSequence_apply_le_of_dfsMTr
+    [FinEnum P] [FinEnum T] {src tgt : Branch P} {ts : List T}
+    {demand : Marking P} {p : P}
+    (hexec : (dfsLTS net).MTr src ts tgt)
+    (htgt : tgt.marking p ≠ ⊤)
+    (hdemand : (demand p : ℕ∞) ≤ tgt.marking p) :
+    net.leastPreMarkingSequence ts demand p ≤
+      (src.marking p).toNat := by
+  induction hexec with
+  | refl =>
+      rw [← ENat.natCast_toNat htgt] at hdemand
+      exact ENat.natCast_le_natCast.mp hdemand
+  | @stepL src t mid ts tgt htr htail ih =>
+      have hmid : mid.marking p ≠ ⊤ := by
+        intro hp
+        apply htgt
+        rw [← OmegaMarking.mem_omegaPlaces]
+        exact omegaPlaces_mono_of_mTr htail
+          (OmegaMarking.mem_omegaPlaces.mpr hp)
+      have hsrc : src.marking p ≠ ⊤ := by
+        intro hp
+        apply hmid
+        rw [← OmegaMarking.mem_omegaPlaces]
+        exact omegaPlaces_mono_of_tr htr
+          (OmegaMarking.mem_omegaPlaces.mpr hp)
+      have htailDemand :
+          net.leastPreMarkingSequence ts demand p ≤
+            (mid.marking p).toNat := ih htgt hdemand
+      have henabled : net.pre p t ≤ (src.marking p).toNat := by
+        apply ENat.natCast_le_natCast.mp
+        rw [ENat.natCast_toNat hsrc]
+        exact (mem_dfsSuccessors_iff.mp htr).2.1 p
+      have hmarking :=
+        marking_apply_eq_succMarking_of_tr_of_ne_top htr hmid
+      rw [succMarking, ← ENat.natCast_toNat hsrc,
+        ← ENat.natCast_toNat hmid] at hmarking
+      have hmarkingNat :
+          (mid.marking p).toNat =
+            (src.marking p).toNat - net.pre p t + net.post p t := by
+        exact_mod_cast hmarking
+      simp only [WeightedNet.leastPreMarkingSequence,
+        WeightedNet.leastPreMarking]
+      omega
+
 /-- Concretise one abstract branch-growth witness.
 
 Suppose `ancestor` is an earlier branch on the DFS prefix and its marking is
@@ -290,38 +388,286 @@ Branch.initial m₀ ──before──▶ ancestor ──segment──▶ src �
                                       strict at p
 ```
 
-The theorem constructs an ordinary firing sequence with the same growth
-shape:
+The theorem constructs an ordinary firing sequence which has the same effect
+on every newly accelerated place:
 
 ```text
 concreteSrc ──ts──▶ concreteEnd
 
-concreteSrc ≤ concreteEnd
+concreteSrc(q) ≤ concreteEnd(q)  for every newly accelerated q
 concreteSrc(p) < concreteEnd(p)
 ```
 
-The endpoint remains below `raw`. At every place outside
-`newOmegaPlaces src tgt`, it also covers the requested finite `demand`.
-Existing `ω`-components are assigned sufficient finite reserve to enable the
-whole concrete execution and pay for any losses along it. -/
+The endpoint remains below `raw`. The path may lose tokens at places which
+were already `ω`; those losses will later be paid for by reserve-backed
+repetition. -/
 theorem exists_concrete_growth_path_of_branch_witness
-    [FinEnum P] [FinEnum T] {m₀ demand : Marking P}
-    {ancestor src tgt : Branch P} {before segment : List T}
+    [FinEnum P] [FinEnum T]
+    {ancestor src tgt : Branch P} {segment : List T}
     {t : T} {p : P}
-    (hbefore : (dfsLTS net).MTr (Branch.initial m₀) before ancestor)
     (hsegment : (dfsLTS net).MTr ancestor segment src)
     (htr : (dfsLTS net).Tr src t tgt)
     (hp : p ∈ newOmegaPlaces src tgt)
     (hle : ancestor.marking ≤ succMarking net src.marking t)
-    (hlt : ancestor.marking p < succMarking net src.marking t p)
-    (hdemand : demand.toOmega ≤ tgt.marking) :
+    (hlt : ancestor.marking p < succMarking net src.marking t p) :
     ∃ concreteSrc concreteEnd ts,
       net.FiresSequence concreteSrc ts concreteEnd ∧
-      concreteSrc ≤ concreteEnd ∧
+      (∀ q, succMarking net src.marking t q ≠ ⊤ →
+        concreteSrc q ≤ concreteEnd q) ∧
       concreteSrc p < concreteEnd p ∧
-      concreteEnd.toOmega ≤ succMarking net src.marking t ∧
-      ∀ q ∉ newOmegaPlaces src tgt, demand q ≤ concreteEnd q := by
-  sorry
+      concreteEnd.toOmega ≤ succMarking net src.marking t := by
+  let raw := succMarking net src.marking t
+  let target := raw.finiteApprox 0
+  let labels := segment ++ [t]
+  let concreteSrc := net.leastPreMarkingSequence labels target
+  let concreteEnd := net.firingSequenceResult concreteSrc labels
+  have htargetRaw : target.toOmega ≤ raw :=
+    raw.finiteApprox_toOmega_le 0
+  have homega : net.OmegaFires src.marking t raw := by
+    exact ⟨(mem_dfsSuccessors_iff.mp htr).2.1, fun _ => rfl⟩
+  have htailDemand :
+      (net.leastPreMarking t target).toOmega ≤ src.marking :=
+    net.leastPreMarking_toOmega_le_of_omegaFires homega htargetRaw
+  have hsrcFinite_of_raw {q : P} (hraw : raw q ≠ ⊤) :
+      src.marking q ≠ ⊤ := by
+    intro htop
+    apply hraw
+    have hmem : q ∈ OmegaMarking.omegaPlaces src.marking :=
+      OmegaMarking.mem_omegaPlaces.mpr htop
+    have := (show OmegaMarking.omegaPlaces raw =
+        OmegaMarking.omegaPlaces src.marking by
+      simpa [raw] using omegaPlaces_succMarking (net := net)
+        (m := src.marking) (t := t))
+    rw [← OmegaMarking.mem_omegaPlaces, this]
+    exact hmem
+  have hrequiredAncestor {q : P} (hraw : raw q ≠ ⊤) :
+      concreteSrc q ≤ (ancestor.marking q).toNat := by
+    have hsrcFinite := hsrcFinite_of_raw hraw
+    dsimp only [concreteSrc, labels]
+    rw [net.leastPreMarkingSequence_append]
+    change net.leastPreMarkingSequence segment
+        (net.leastPreMarking t target) q ≤ (ancestor.marking q).toNat
+    apply leastPreMarkingSequence_apply_le_of_dfsMTr
+      (net := net) hsegment hsrcFinite
+    exact htailDemand q
+  have hsrcRaw : concreteSrc.toOmega ≤ raw := by
+    intro q
+    by_cases hraw : raw q = ⊤
+    · simp [hraw]
+    · have hrequired := hrequiredAncestor hraw
+      have hancestorFinite : ancestor.marking q ≠ ⊤ := by
+        intro htop
+        exact hraw (top_unique (by simpa [htop] using hle q))
+      have hancestorRaw :
+          (ancestor.marking q).toNat ≤ (raw q).toNat := by
+        apply ENat.natCast_le_natCast.mp
+        rw [ENat.natCast_toNat hancestorFinite,
+          ENat.natCast_toNat hraw]
+        exact hle q
+      change (concreteSrc q : ℕ∞) ≤ raw q
+      rw [← ENat.natCast_toNat hraw]
+      exact ENat.natCast_le_natCast.mpr (hrequired.trans hancestorRaw)
+  obtain ⟨hsequence, htargetEnd⟩ :=
+    net.firesSequence_cover_of_leastPreMarkingSequence_le
+      labels target (by rfl)
+  have effect_at {q : P} (hraw : raw q ≠ ⊤) :
+      concreteEnd q +
+          ∑ u, firingCount labels u * net.pre q u =
+        concreteSrc q +
+          ∑ u, firingCount labels u * net.post q u ∧
+      (raw q).toNat +
+          ∑ u, firingCount labels u * net.pre q u =
+        (ancestor.marking q).toNat +
+          ∑ u, firingCount labels u * net.post q u := by
+    have hconcrete := hsequence.balance q
+    have hsrcFinite := hsrcFinite_of_raw hraw
+    have hsegmentBalance :=
+      dfsMTr_balance_at_of_ne_top (net := net) hsegment hsrcFinite
+    have henabled : net.pre q t ≤ (src.marking q).toNat := by
+      apply ENat.natCast_le_natCast.mp
+      rw [ENat.natCast_toNat hsrcFinite]
+      exact homega.1 q
+    have hrawEq :
+        (raw q).toNat =
+          (src.marking q).toNat - net.pre q t + net.post q t := by
+      have heq : raw q = src.marking q - net.pre q t + net.post q t := rfl
+      rw [← ENat.natCast_toNat hsrcFinite,
+        ← ENat.natCast_toNat hraw] at heq
+      exact_mod_cast heq
+    constructor
+    · exact hconcrete
+    · simp_rw [firingCount_weighted_sum] at hsegmentBalance ⊢
+      simp [labels] at ⊢
+      omega
+  have hendRaw : concreteEnd.toOmega ≤ raw := by
+    intro q
+    by_cases hraw : raw q = ⊤
+    · simp [hraw]
+    · obtain ⟨hconcrete, habstract⟩ := effect_at hraw
+      have hsrcLe := hrequiredAncestor hraw
+      change (concreteEnd q : ℕ∞) ≤ raw q
+      rw [← ENat.natCast_toNat hraw]
+      exact ENat.natCast_le_natCast.mpr (by omega)
+  refine ⟨concreteSrc, concreteEnd, labels, hsequence, ?_, ?_, hendRaw⟩
+  · intro q hraw
+    obtain ⟨hconcrete, habstract⟩ := effect_at hraw
+    have hancestorRaw : (ancestor.marking q).toNat ≤ (raw q).toNat := by
+      have hancestorFinite : ancestor.marking q ≠ ⊤ := by
+        intro htop
+        exact hraw (top_unique (by simpa [htop] using hle q))
+      apply ENat.natCast_le_natCast.mp
+      rw [ENat.natCast_toNat hancestorFinite, ENat.natCast_toNat hraw]
+      exact hle q
+    omega
+  · have hpRaw : raw p ≠ ⊤ := by
+      intro htop
+      have hpParts := hp
+      rw [newOmegaPlaces, Finset.mem_sdiff] at hpParts
+      apply hpParts.2
+      have hmem : p ∈ OmegaMarking.omegaPlaces raw :=
+        OmegaMarking.mem_omegaPlaces.mpr htop
+      have heq : OmegaMarking.omegaPlaces raw =
+          OmegaMarking.omegaPlaces src.marking := by
+        simpa [raw] using omegaPlaces_succMarking (net := net)
+          (m := src.marking) (t := t)
+      rwa [heq] at hmem
+    obtain ⟨hconcrete, habstract⟩ := effect_at hpRaw
+    have hpAncestorFinite : ancestor.marking p ≠ ⊤ := by
+      intro htop
+      exact hpRaw (top_unique (by simpa [htop] using hle p))
+    have hpStrict : (ancestor.marking p).toNat < (raw p).toNat := by
+      apply ENat.natCast_lt_natCast.mp
+      rw [ENat.natCast_toNat hpAncestorFinite, ENat.natCast_toNat hpRaw]
+      exact hlt
+    omega
+
+/- Combine finitely many concrete paths while allowing losses only at the
+`omega` components of a common abstract upper bound.
+
+The initial base has the exact value of `raw` at every finite component. At
+an `omega` component it accumulates the sources of the paths still to be
+executed, which acts as their reserve. Consequently every path can be shifted
+to the current endpoint and appended. -/
+private theorem exists_combined_growth_below_omega
+    {A : Finset P} {raw : OmegaMarking P} (reserve : Marking P)
+    (hAfin : ∀ p ∈ A, raw p ≠ ⊤)
+    (hpaths : ∀ p ∈ A, ∃ src tgt ts,
+      net.FiresSequence src ts tgt ∧
+      (∀ q, raw q ≠ ⊤ → src q ≤ tgt q) ∧
+      src p < tgt p ∧ tgt.toOmega ≤ raw) :
+    ∃ base tgt ts,
+      base.toOmega ≤ raw ∧
+      net.FiresSequence base ts tgt ∧
+      (∀ q, raw q ≠ ⊤ → base q ≤ tgt q) ∧
+      (∀ q, raw q ≠ ⊤ → base q = (raw q).toNat) ∧
+      (∀ q, raw q = ⊤ → reserve q ≤ tgt q) ∧
+      ∀ p ∈ A, base p < tgt p := by
+  classical
+  have combine : ∀ I : Finset P, I ⊆ A →
+      ∃ base tgt ts,
+        base.toOmega ≤ raw ∧
+        net.FiresSequence base ts tgt ∧
+        (∀ q, raw q ≠ ⊤ → base q ≤ tgt q) ∧
+        (∀ q, raw q ≠ ⊤ → base q = (raw q).toNat) ∧
+        (∀ q, raw q = ⊤ → reserve q ≤ tgt q) ∧
+        ∀ p ∈ I, base p < tgt p := by
+    intro I hIA
+    induction I using Finset.induction with
+    | empty =>
+        let base := raw.finiteApprox reserve
+        refine ⟨base, base, [], raw.finiteApprox_toOmega_le reserve,
+          WeightedNet.FiresSequence.nil base, by simp, ?_, ?_, by simp⟩
+        · intro q hq
+          simp [base, OmegaMarking.finiteApprox, hq]
+        · intro q hq
+          simp [base, hq]
+    | @insert p I hp ih =>
+        have hpA : p ∈ A := hIA (by simp)
+        have hIA' : I ⊆ A := fun q hq => hIA (by simp [hq])
+        obtain ⟨base, end_, before, hbaseRaw, hbefore, hmono,
+          hbaseFinite, hreserveEnd, hgrows⟩ := ih hIA'
+        obtain ⟨srcP, tgtP, path, hpath, hpathMono, hpGrowth,
+          htgtRaw⟩ := hpaths p hpA
+        let extra : Marking P := fun q => if raw q = ⊤ then srcP q else 0
+        let mid : Marking P := end_ + extra
+        have hsrcMid : srcP ≤ mid := by
+          intro q
+          by_cases hq : raw q = ⊤
+          · simp [mid, extra, hq]
+          · have hsrcTgt : srcP q ≤ tgtP q := hpathMono q hq
+            have htgtLe : tgtP q ≤ (raw q).toNat := by
+              apply ENat.natCast_le_natCast.mp
+              rw [ENat.natCast_toNat hq]
+              exact htgtRaw q
+            have hrawBase : (raw q).toNat = base q :=
+              (hbaseFinite q hq).symm
+            exact hsrcTgt.trans <| htgtLe.trans <|
+              hrawBase.le.trans <| (hmono q hq).trans (by simp [mid])
+        let d : Marking P := mid - srcP
+        have hmidEq : srcP + d = mid := by
+          funext q
+          exact Nat.add_sub_of_le (hsrcMid q)
+        have hbeforeShifted := hbefore.add extra
+        have hpathShifted :
+            net.FiresSequence mid path (tgtP + d) := by
+          rw [← hmidEq]
+          exact hpath.add d
+        let newBase := base + extra
+        let newEnd := tgtP + d
+        have hcombined : net.FiresSequence newBase (before ++ path) newEnd :=
+          hbeforeShifted.append hpathShifted
+        have hnewBaseRaw : newBase.toOmega ≤ raw := by
+          intro q
+          by_cases hq : raw q = ⊤
+          · simp [hq]
+          · change ((newBase q : ℕ) : ℕ∞) ≤ raw q
+            simp [newBase, extra, hq, hbaseFinite q hq,
+              ENat.natCast_toNat hq]
+        have hnewBaseFinite : ∀ q, raw q ≠ ⊤ →
+            newBase q = (raw q).toNat := by
+          intro q hq
+          simp [newBase, extra, hq, hbaseFinite q hq]
+        have hnewMono : ∀ q, raw q ≠ ⊤ →
+            newBase q ≤ newEnd q := by
+          intro q hq
+          have hsrcLe := hsrcMid q
+          have hpathLe := hpathMono q hq
+          have hbaseMid : newBase q ≤ mid q := by
+            exact Nat.add_le_add_right (hmono q hq) (extra q)
+          dsimp [newEnd, d]
+          omega
+        refine ⟨newBase, newEnd, before ++ path, hnewBaseRaw, hcombined,
+          hnewMono, hnewBaseFinite, ?_, ?_⟩
+        · intro q hq
+          have hreserve := hreserveEnd q hq
+          have hd : d q = end_ q := by
+            simp [d, mid, extra, hq]
+          simp [newEnd, hd]
+          exact hreserve.trans (Nat.le_add_left _ _)
+        intro q hq
+        rw [Finset.mem_insert] at hq
+        rcases hq with rfl | hq
+        · have hpFinite := hAfin _ hpA
+          have hbaseMid : newBase q ≤ mid q := by
+            exact Nat.add_le_add_right (hmono q hpFinite) (extra q)
+          have hshiftGrowth : mid q < newEnd q := by
+            have hmidPoint := congrFun hmidEq q
+            dsimp [newEnd, d]
+            omega
+          exact hbaseMid.trans_lt hshiftGrowth
+        · have hqA := hIA' hq
+          have hqFinite := hAfin q hqA
+          have hbaseEq : newBase q = base q := by
+            simp [newBase, extra, hqFinite]
+          have hendLe : end_ q ≤ newEnd q := by
+            have hpathLe := hpathMono q hqFinite
+            have hmidPoint := congrFun hmidEq q
+            have hendMid : end_ q ≤ mid q := by simp [mid, extra, hqFinite]
+            dsimp [newEnd, d]
+            omega
+          rw [hbaseEq]
+          exact (hgrows q hq).trans_le hendLe
+  exact combine A Finset.Subset.rfl
 
 /- Shift concrete growth paths to a common endpoint while preserving the two
 side conditions required by Karp–Miller soundness. -/
@@ -451,36 +797,24 @@ theorem demand_le_finiteApprox_raw_of_not_mem_newOmegaPlaces
     have := ENat.natCast_le_natCast.mp hqDemand
     simpa [raw, OmegaMarking.finiteApprox, hraw] using this
 
-/-- Concretise the abstract branch witnesses at one common finite base.
+/-- Combine and repeat the concrete branch witnesses until they cover a
+prescribed finite demand.
 
-Let `raw = succMarking net src.marking t` and let `A` be the places newly
-accelerated by the DFS step. Given a finite demand below the accelerated
-target, this theorem constructs an ordinary marking `base` such that:
-
-* `base.toOmega ≤ raw`;
-* `base` already covers the demand outside `A`; and
-* every `p ∈ A` has a nondecreasing concrete firing path to `base` which is
-  strictly increasing at `p`.
+The combined path is nondecreasing at every finite component of `raw` and
+strictly increasing at every newly accelerated place. Possible losses occur
+only at existing `ω` components. `repeat_with_reserve_ge_on` pays for those
+losses in the source, which therefore still embeds below `raw`.
 
 ```text
-concreteSrc₁ ──ts₁──▶ ┐
-concreteSrc₂ ──ts₂──▶ ├── base ──toOmega≤──▶ raw
-        ⋮              │       covers demand outside A
-concreteSrcᵣ ──tsᵣ──▶ ┘
-
-concreteSrcₚ ≤ base       concreteSrcₚ(p) < base(p)
+concreteSrc ──combined witnesses, repeated with reserve──▶ reached
+     │                                                          ▲
+     └── toOmega ≤ raw                              demand ≤ ─┘
 ```
-
-The proof first concretises each abstract DFS segment with sufficient reserve
-at the already-`ω` places. It then applies
-`FiresSequence.exists_common_endpoint_growth` to replace their possibly
-different finite endpoints by their pointwise maximum. This is the remaining
-finite-realisation obligation in Karp–Miller soundness. -/
-theorem exists_common_concrete_growth_base
+-/
+theorem exists_concrete_growth_execution
     [FinEnum P] [FinEnum T] {m₀ demand : Marking P}
     {src tgt : Branch P} {t : T}
     (htr : (dfsLTS net).Tr src t tgt)
-    (_hnew : (newOmegaPlaces src tgt).Nonempty)
     (hwitnesses : ∀ p ∈ newOmegaPlaces src tgt,
       ∃ ancestor before segment,
         (dfsLTS net).MTr (Branch.initial m₀) before ancestor ∧
@@ -488,37 +822,65 @@ theorem exists_common_concrete_growth_base
         ancestor.marking ≤ succMarking net src.marking t ∧
         ancestor.marking p < succMarking net src.marking t p)
     (hdemand : demand.toOmega ≤ tgt.marking) :
-    ∃ base,
-      base.toOmega ≤ succMarking net src.marking t ∧
-      (∀ p ∉ newOmegaPlaces src tgt, demand p ≤ base p) ∧
-      ∀ p ∈ newOmegaPlaces src tgt, ∃ concreteSrc ts,
-        net.FiresSequence concreteSrc ts base ∧
-        concreteSrc ≤ base ∧ concreteSrc p < base p := by
-  /- Phase 1: choose a finite seed below the raw successor. At existing
-  `ω`-places the seed uses the requested demand as its reserve. -/
+    ∃ concreteSrc reached ts,
+      concreteSrc.toOmega ≤ succMarking net src.marking t ∧
+      net.FiresSequence concreteSrc ts reached ∧
+      demand ≤ reached := by
   let A := newOmegaPlaces src tgt
   let raw := succMarking net src.marking t
-  let seed := raw.finiteApprox demand
-  /- Phase 2: merge the concrete witness paths by pointwise maximum. The
-  helper preserves the raw upper bound and demand coverage while shifting all
-  paths to its common endpoint. -/
-  apply exists_common_growth_base_below
-      (net := net) (A := A) (raw := raw) (demand := demand) (seed := seed)
-  /- The finite approximation always embeds below the omega marking it
-  approximates. -/
-  · exact raw.finiteApprox_toOmega_le demand
-  /- Phase 3: show that the seed already covers the demand outside the places
-  which must be grown by pumping. -/
-  · intro q hq
-    exact demand_le_finiteApprox_raw_of_not_mem_newOmegaPlaces
-      htr hdemand hq
-  /- Phase 4: concretise each abstract branch witness. These paths are the
-  inputs which the common-endpoint helper shifts and merges. -/
-  · intro p hp
-    obtain ⟨ancestor, before, segment, hbefore, hsegment, hle, hlt⟩ :=
+  have hAfin : ∀ p ∈ A, raw p ≠ ⊤ := by
+    intro p hp htop
+    change p ∈ newOmegaPlaces src tgt at hp
+    rw [newOmegaPlaces, Finset.mem_sdiff] at hp
+    apply hp.2
+    have hmem : p ∈ OmegaMarking.omegaPlaces raw :=
+      OmegaMarking.mem_omegaPlaces.mpr htop
+    have heq : OmegaMarking.omegaPlaces raw =
+        OmegaMarking.omegaPlaces src.marking := by
+      simpa [raw] using omegaPlaces_succMarking (net := net)
+        (m := src.marking) (t := t)
+    rwa [heq] at hmem
+  have hpaths : ∀ p ∈ A, ∃ concreteSrc concreteEnd ts,
+      net.FiresSequence concreteSrc ts concreteEnd ∧
+      (∀ q, raw q ≠ ⊤ → concreteSrc q ≤ concreteEnd q) ∧
+      concreteSrc p < concreteEnd p ∧ concreteEnd.toOmega ≤ raw := by
+    intro p hp
+    obtain ⟨ancestor, _before, segment, _hbefore, hsegment, hle, hlt⟩ :=
       hwitnesses p hp
-    exact exists_concrete_growth_path_of_branch_witness
-      hbefore hsegment htr hp hle hlt hdemand
+    simpa [raw] using exists_concrete_growth_path_of_branch_witness
+      hsegment htr hp hle hlt
+  obtain ⟨base, grown, combined, hbaseRaw, hcombined, hmono,
+    hbaseFinite, hreserveGrown, hgrows⟩ :=
+    exists_combined_growth_below_omega (net := net) demand hAfin hpaths
+  obtain ⟨hrepeated, hgrownReached, hbounds⟩ :=
+    hcombined.repeat_with_reserve_ge_on A demand hgrows
+  let n := ∑ p ∈ A, demand p
+  let concreteSrc := base + n • (base - grown)
+  let reached := grown + n • (grown - base)
+  have hconcreteSrcRaw : concreteSrc.toOmega ≤ raw := by
+    intro q
+    by_cases hq : raw q = ⊤
+    · simp [hq]
+    · have hloss : base q - grown q = 0 :=
+        Nat.sub_eq_zero_of_le (hmono q hq)
+      have hsrcEq : concreteSrc q = base q := by
+        simp [concreteSrc, hloss]
+      change ((concreteSrc q : ℕ) : ℕ∞) ≤ raw q
+      rw [hsrcEq, hbaseFinite q hq, ENat.natCast_toNat hq]
+  refine ⟨concreteSrc, reached, (List.replicate (n + 1) combined).flatten,
+    hconcreteSrcRaw, ?_, ?_⟩
+  · simpa [concreteSrc, reached, n] using hrepeated
+  · intro q
+    by_cases hqA : q ∈ A
+    · simpa [reached, n] using hbounds q hqA
+    · by_cases hq : raw q = ⊤
+      · exact (hreserveGrown q hq).trans (hgrownReached q)
+      · have hdemandBase : demand q ≤ base q := by
+          have := demand_le_finiteApprox_raw_of_not_mem_newOmegaPlaces
+            htr hdemand hqA
+          simpa [raw, OmegaMarking.finiteApprox, hq,
+            hbaseFinite q hq] using this
+        exact hdemandBase.trans ((hmono q hq).trans (hgrownReached q))
 
 /-- Realise a finite demand using growth witnesses for every newly
 accelerated place.
@@ -549,7 +911,7 @@ theorem exists_reachable_cover_of_branch_growth_witnesses
     {src tgt : Branch P} {t : T}
     (hsound : net.OmegaCoverableFrom m₀ src.marking)
     (htr : (dfsLTS net).Tr src t tgt)
-    (hnew : (newOmegaPlaces src tgt).Nonempty)
+    (_hnew : (newOmegaPlaces src tgt).Nonempty)
     (hwitnesses : ∀ p ∈ newOmegaPlaces src tgt,
       ∃ ancestor before segment,
         (dfsLTS net).MTr (Branch.initial m₀) before ancestor ∧
@@ -560,28 +922,20 @@ theorem exists_reachable_cover_of_branch_growth_witnesses
     ∃ reached, net.Reachable m₀ reached ∧ demand ≤ reached := by
   let A := newOmegaPlaces src tgt
   let raw := succMarking net src.marking t
-  obtain ⟨base, hbaseRaw, hdemandBase, hsegments⟩ :=
-    exists_common_concrete_growth_base htr hnew hwitnesses hdemand
+  obtain ⟨concreteSrc, concreteEnd, labels, hsrcRaw, hsequence,
+    hdemandEnd⟩ :=
+    exists_concrete_growth_execution htr hwitnesses hdemand
   have hrawSound : net.OmegaCoverableFrom m₀ raw := by
     apply net.omegaCoverableFrom_of_omegaFires hsound
     exact ⟨(mem_dfsSuccessors_iff.mp htr).2.1, fun _ => rfl⟩
-  obtain ⟨reachableBase, hreachableBase, hbaseBelow⟩ :=
-    hrawSound base hbaseRaw
-  obtain ⟨combined, grown, hcombined, hbaseGrown, hgrows⟩ :=
-    WeightedNet.FiresSequence.exists_combined_growth
-      (net := net) base A (by
-      intro p hp
-      exact hsegments p hp)
-  obtain ⟨pumped, hpumped, hbasePumped, hdemandPumped⟩ :=
-    hcombined.exists_reachable_ge_on A demand hbaseGrown hgrows
-  obtain ⟨reached, hreachableReached, hpumpedBelow⟩ :=
-    hpumped.mono hbaseBelow
-  refine ⟨reached, hreachableBase.trans hreachableReached, ?_⟩
-  intro p
-  by_cases hp : p ∈ A
-  · exact (hdemandPumped p hp).trans (hpumpedBelow p)
-  · exact (hdemandBase p hp).trans
-      ((hbasePumped p).trans (hpumpedBelow p))
+  obtain ⟨reachableSrc, hreachableSrc, hsrcBelow⟩ :=
+    hrawSound concreteSrc hsrcRaw
+  obtain ⟨reached, hreachableReached, hendBelow⟩ :=
+    WeightedNet.Reachable.mono (net := net)
+      (⟨labels, hsequence⟩ : net.Reachable concreteSrc concreteEnd)
+      hsrcBelow
+  exact ⟨reached, hreachableSrc.trans hreachableReached,
+    hdemandEnd.trans hendBelow⟩
 
 /-- Soundness of a DFS step which introduces at least one new `ω`-place.
 
