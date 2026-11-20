@@ -147,12 +147,102 @@ theorem exists_fires_to_succMarking_of_omegaPlaces_eq_empty
   funext p
   exact homega.2 p
 
-/-- Soundness is preserved by one DFS step whose source is reachable from the
-initial branch.
+/-- Soundness of a DFS step which introduces no new `ω`-place.
 
-The prefix is essential for an accelerated step: it identifies the ancestor
-markings which justify acceleration and the firing segments which must be
-pumped. This theorem is the main mathematical soundness obligation. -/
+When the source and target have the same set of `ω`-places, the target is
+exactly the ordinary omega firing successor. Its soundness therefore follows
+from `WeightedNet.omegaCoverableFrom_of_omegaFires`.
+
+More explicitly, take an arbitrary concrete marking `demand` below
+`tgt.marking`. We compute the least marking `srcDemand` such that firing `t`
+from `srcDemand` covers `demand`. Its embedding satisfies
+`srcDemand.toOmega ≤ src.marking`, so `hsound` makes `srcDemand` coverable
+from `m₀`. Monotonicity of firing then makes `demand` coverable from `m₀`. -/
+theorem omegaCoverableFrom_of_dfsLTS_tr_of_omegaPlaces_eq
+    [FinEnum P] [FinEnum T] {m₀ : Marking P}
+    {src tgt : Branch P} {t : T}
+    (hsound : net.OmegaCoverableFrom m₀ src.marking)
+    (htr : (dfsLTS net).Tr src t tgt)
+    (homega : OmegaMarking.omegaPlaces src.marking =
+      OmegaMarking.omegaPlaces tgt.marking) :
+    net.OmegaCoverableFrom m₀ tgt.marking := by
+  rw [marking_eq_succMarking_of_tr_of_omegaPlaces_eq htr homega]
+  apply net.omegaCoverableFrom_of_omegaFires hsound
+  exact ⟨(mem_dfsSuccessors_iff.mp htr).2.1, fun _ => rfl⟩
+
+/-- Soundness of a DFS step which introduces at least one new `ω`-place.
+
+For an arbitrary finite demand below `tgt.marking`, the intended proof:
+
+1. extracts from `hprefix` the historical segments witnessing each newly
+   accelerated place;
+2. chooses enough repetitions to meet the demand at those places;
+3. propagates backwards the reserve required at already-`ω` places;
+4. uses `hsound` to obtain a reachable concrete source with that reserve; and
+5. executes the final transition and pumping segments forwards.
+
+The abstract prefix provides, for each newly accelerated place `p`, an earlier
+marking and a suffix which, followed by `t`, ends at the unaccelerated
+successor `raw`:
+
+```text
+Branch.initial m₀ ──pre──▶ ⋯ ──▶ ancestorₚ ──suffixₚ──▶ src ──t──▶ raw
+                                      │                              │
+                                      └──── ancestorₚ ≤ raw ─────────┘
+                                            ancestorₚ(p) < raw(p)
+
+raw ──accelerate new ω-places──▶ tgt.marking
+```
+
+After combining the growing segments and calculating the required reserve,
+the concrete witness execution has the form:
+
+```text
+m₀ ──reachable──▶ concreteSrc ──t──▶ concreteRaw
+                                         │
+                                         └──pump──▶ ⋯ ──pump──▶ reached
+                                                                    │
+                                                             demand ≤ reached
+```
+
+`concreteSrc` is chosen large enough at the old ω-places to enable the final
+transition and every pumping repetition. The repetitions make all newly
+accelerated places large enough for `demand`.
+
+This is the remaining acceleration-specific soundness obligation. -/
+theorem omegaCoverableFrom_of_dfsLTS_tr_of_omegaPlaces_ssubset
+    [FinEnum P] [FinEnum T] {m₀ : Marking P} {pre : List T}
+    {src tgt : Branch P} {t : T}
+    (hprefix : (dfsLTS net).MTr (Branch.initial m₀) pre src)
+    (hsound : net.OmegaCoverableFrom m₀ src.marking)
+    (htr : (dfsLTS net).Tr src t tgt)
+    (homega : OmegaMarking.omegaPlaces src.marking ⊂
+      OmegaMarking.omegaPlaces tgt.marking) :
+    net.OmegaCoverableFrom m₀ tgt.marking := by
+  sorry
+
+/-- Extend soundness by one step along a Karp–Miller DFS execution.
+
+`Branch.initial m₀` is the root branch: its current ω-marking is
+`m₀.toOmega` and its ancestor list is empty.
+
+The hypothesis `hprefix` specifies a finite DFS execution from this root to `src`,
+with transition labels `pre`.
+The hypothesis `hsound` is the induction hypothesis for that prefix: every
+concrete marking below the ω-marking `src.marking` is coverable from `m₀`.
+Finally, `htr` extends the execution by one transition `t`:
+
+```text
+Branch.initial m₀ ─────────pre─────────▶ src ──t──▶ tgt
+                                          │          │
+                                        sound  ⇒   sound
+```
+
+The proof distinguishes whether the set of `ω`-places is unchanged or grows
+strictly. The equality case is handled by
+`omegaCoverableFrom_of_dfsLTS_tr_of_omegaPlaces_eq`; the strict-subset case is
+handled by `omegaCoverableFrom_of_dfsLTS_tr_of_omegaPlaces_ssubset`.
+-/
 theorem omegaCoverableFrom_of_dfsLTS_tr
     [FinEnum P] [FinEnum T] {m₀ : Marking P} {pre : List T}
     {src tgt : Branch P} {t : T}
@@ -160,7 +250,14 @@ theorem omegaCoverableFrom_of_dfsLTS_tr
     (hsound : net.OmegaCoverableFrom m₀ src.marking)
     (htr : (dfsLTS net).Tr src t tgt) :
     net.OmegaCoverableFrom m₀ tgt.marking := by
-  sorry
+  by_cases homega : OmegaMarking.omegaPlaces src.marking =
+      OmegaMarking.omegaPlaces tgt.marking
+  · exact omegaCoverableFrom_of_dfsLTS_tr_of_omegaPlaces_eq
+      hsound htr homega
+  · apply omegaCoverableFrom_of_dfsLTS_tr_of_omegaPlaces_ssubset
+      hprefix hsound htr
+    rw [Finset.ssubset_iff_subset_ne]
+    exact ⟨omegaPlaces_mono_of_tr htr, homega⟩
 
 private theorem omegaCoverableFrom_of_dfsMTr_from
     [FinEnum P] [FinEnum T] {m₀ : Marking P} {pre labels : List T}
