@@ -267,6 +267,20 @@ def WeightedNet.leastPreMarkingSequence {P T : Type*}
   | t :: ts, target =>
       net.leastPreMarking t (net.leastPreMarkingSequence ts target)
 
+/-- Propagating a demand backwards through concatenated transition lists is
+the same as first propagating it through the suffix and then through the
+prefix. -/
+theorem WeightedNet.leastPreMarkingSequence_append {P T : Type*}
+    (net : WeightedNet P T) (ts₁ ts₂ : List T) (target : Marking P) :
+    net.leastPreMarkingSequence (ts₁ ++ ts₂) target =
+      net.leastPreMarkingSequence ts₁
+        (net.leastPreMarkingSequence ts₂ target) := by
+  induction ts₁ with
+  | nil => rfl
+  | cons t ts ih =>
+      simp only [List.cons_append, WeightedNet.leastPreMarkingSequence]
+      rw [ih]
+
 /-- Any marking above `leastPreMarking` enables `t`, and its post-firing
 marking covers `target`.
 
