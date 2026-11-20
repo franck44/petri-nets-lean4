@@ -69,6 +69,22 @@ def WeightedNet.Enabled {P T : Type*} (net : WeightedNet P T)
     (m : Marking P) (t : T) : Prop :=
   ∀ p, net.pre p t ≤ m p
 
+/-- The marking obtained by applying the token update of transition `t` to
+`src`.
+
+This is a total function: it computes `src - pre(t) + post(t)` even when `t`
+is not enabled. The relation `net.Fires src t tgt` additionally requires
+enabledness and states that `tgt = net.firingResult src t`. -/
+def WeightedNet.firingResult {P T : Type*} (net : WeightedNet P T)
+    (src : Marking P) (t : T) : Marking P := fun p =>
+  src p - net.pre p t + net.post p t
+
+@[simp]
+theorem WeightedNet.firingResult_apply {P T : Type*}
+    (net : WeightedNet P T) (src : Marking P) (t : T) (p : P) :
+    net.firingResult src t p = src p - net.pre p t + net.post p t :=
+  rfl
+
 /-- A marking is terminal when it enables no transition. This is a local
 property of a marking, distinct from termination of all runs of a net. -/
 def WeightedNet.IsTerminal {P T : Type*} (net : WeightedNet P T)
