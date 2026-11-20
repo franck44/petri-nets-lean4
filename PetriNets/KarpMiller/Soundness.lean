@@ -7,6 +7,7 @@ Authors: Franck Cassez
 module
 
 public import PetriNets.KarpMiller
+import PetriNets.Monotonicity
 
 /-!
 # Soundness of the Karp–Miller construction
@@ -276,6 +277,51 @@ theorem branch_growth_witnesses_of_newOmegaPlaces
   exact exists_branch_growth_witness_of_new_omegaPlace
     hprefix htr hp.2 hp.1
 
+/-- Concretise the abstract branch witnesses at one common finite base.
+
+Let `raw = succMarking net src.marking t` and let `A` be the places newly
+accelerated by the DFS step. Given a finite demand below the accelerated
+target, this theorem constructs an ordinary marking `base` such that:
+
+* `base.toOmega ≤ raw`;
+* `base` already covers the demand outside `A`; and
+* every `p ∈ A` has a nondecreasing concrete firing path to `base` which is
+  strictly increasing at `p`.
+
+```text
+concreteSrc₁ ──ts₁──▶ ┐
+concreteSrc₂ ──ts₂──▶ ├── base ──toOmega≤──▶ raw
+        ⋮              │       covers demand outside A
+concreteSrcᵣ ──tsᵣ──▶ ┘
+
+concreteSrcₚ ≤ base       concreteSrcₚ(p) < base(p)
+```
+
+The proof first concretises each abstract DFS segment with sufficient reserve
+at the already-`ω` places. It then applies
+`FiresSequence.exists_common_endpoint_growth` to replace their possibly
+different finite endpoints by their pointwise maximum. This is the remaining
+finite-realisation obligation in Karp–Miller soundness. -/
+theorem exists_common_concrete_growth_base
+    [FinEnum P] [FinEnum T] {m₀ demand : Marking P}
+    {src tgt : Branch P} {t : T}
+    (htr : (dfsLTS net).Tr src t tgt)
+    (hnew : (newOmegaPlaces src tgt).Nonempty)
+    (hwitnesses : ∀ p ∈ newOmegaPlaces src tgt,
+      ∃ ancestor before segment,
+        (dfsLTS net).MTr (Branch.initial m₀) before ancestor ∧
+        (dfsLTS net).MTr ancestor segment src ∧
+        ancestor.marking ≤ succMarking net src.marking t ∧
+        ancestor.marking p < succMarking net src.marking t p)
+    (hdemand : demand.toOmega ≤ tgt.marking) :
+    ∃ base,
+      base.toOmega ≤ succMarking net src.marking t ∧
+      (∀ p ∉ newOmegaPlaces src tgt, demand p ≤ base p) ∧
+      ∀ p ∈ newOmegaPlaces src tgt, ∃ concreteSrc ts,
+        net.FiresSequence concreteSrc ts base ∧
+        concreteSrc ≤ base ∧ concreteSrc p < base p := by
+  sorry
+
 /-- Realise a finite demand using growth witnesses for every newly
 accelerated place.
 
@@ -314,7 +360,30 @@ theorem exists_reachable_cover_of_branch_growth_witnesses
         ancestor.marking p < succMarking net src.marking t p)
     (hdemand : demand.toOmega ≤ tgt.marking) :
     ∃ reached, net.Reachable m₀ reached ∧ demand ≤ reached := by
-  sorry
+  let A := newOmegaPlaces src tgt
+  let raw := succMarking net src.marking t
+  obtain ⟨base, hbaseRaw, hdemandBase, hsegments⟩ :=
+    exists_common_concrete_growth_base htr hnew hwitnesses hdemand
+  have hrawSound : net.OmegaCoverableFrom m₀ raw := by
+    apply net.omegaCoverableFrom_of_omegaFires hsound
+    exact ⟨(mem_dfsSuccessors_iff.mp htr).2.1, fun _ => rfl⟩
+  obtain ⟨reachableBase, hreachableBase, hbaseBelow⟩ :=
+    hrawSound base hbaseRaw
+  obtain ⟨combined, grown, hcombined, hbaseGrown, hgrows⟩ :=
+    WeightedNet.FiresSequence.exists_combined_growth
+      (net := net) base A (by
+      intro p hp
+      exact hsegments p hp)
+  obtain ⟨pumped, hpumped, hbasePumped, hdemandPumped⟩ :=
+    hcombined.exists_reachable_ge_on A demand hbaseGrown hgrows
+  obtain ⟨reached, hreachableReached, hpumpedBelow⟩ :=
+    hpumped.mono hbaseBelow
+  refine ⟨reached, hreachableBase.trans hreachableReached, ?_⟩
+  intro p
+  by_cases hp : p ∈ A
+  · exact (hdemandPumped p hp).trans (hpumpedBelow p)
+  · exact (hdemandBase p hp).trans
+      ((hbasePumped p).trans (hpumpedBelow p))
 
 /-- Soundness of a DFS step which introduces at least one new `ω`-place.
 
