@@ -7,6 +7,7 @@ Authors: Franck Cassez
 module
 
 public import PetriNets.KarpMiller
+import PetriNets.Monotonicity
 
 /-!
 # Soundness of the Karp–Miller construction
@@ -171,6 +172,37 @@ theorem exists_fires_to_succMarking_of_omegaPlaces_eq_empty
   rw [hsrcEmbed] at homega
   funext p
   exact homega.2 p
+
+/- Transport a finite firing cover through soundness of its abstract source.
+
+```text
+finiteSrc ──t──▶ finiteTgt
+    │                 │
+    ≤                 ≤
+    │                 │
+reachableSrc ──t──▶ reachableTgt
+
+demand ≤ finiteTgt
+```
+
+Source soundness supplies `reachableSrc`; firing monotonicity supplies
+`reachableTgt`, which covers `demand`. -/
+private theorem coverableFrom_of_finite_firing_cover
+    {m₀ finiteSrc finiteTgt demand : Marking P}
+    {src : OmegaMarking P} {t : T}
+    (hsound : net.OmegaCoverableFrom m₀ src)
+    (hsrcBelow : finiteSrc.toOmega ≤ src)
+    (hfires : net.Fires finiteSrc t finiteTgt)
+    (hdemandBelow : demand ≤ finiteTgt) :
+    net.CoverableFrom m₀ demand := by
+  obtain ⟨reachableSrc, hreachableSrc, hfiniteSrcBelow⟩ :=
+    hsound finiteSrc hsrcBelow
+  have hfiniteReachable : net.Reachable finiteSrc finiteTgt :=
+    ⟨[t], WeightedNet.FiresSequence.singleton hfires⟩
+  obtain ⟨reachableTgt, hreachableTgt, hfiniteTgtBelow⟩ :=
+    hfiniteReachable.mono hfiniteSrcBelow
+  exact ⟨reachableTgt, hreachableSrc.trans hreachableTgt,
+    hdemandBelow.trans hfiniteTgtBelow⟩
 
 /-- Soundness is preserved by one DFS step whose source is reachable from the
 initial branch.
