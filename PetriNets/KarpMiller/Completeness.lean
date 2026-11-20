@@ -18,9 +18,9 @@ Every reachable marking `m` in the net is dominated by an ω-marking
 occurring in the tree, i.e. there exists an ω-marking `mω` in the tree
 such that `m ≤ mω`.
 
-The proof first lifts one firing to the DFS transition system. A fresh branch
-follows its computed successor; a non-fresh branch redirects to an earlier
-fresh occurrence with the same marking. Induction extends this simulation to
+The proof first lifts one firing to the DFS transition system. A
+first-occurrence branch follows its computed successor; a repeated branch redirects to an earlier
+first occurrence with the same marking. Induction extends this simulation to
 firing sequences, and `karpMillerDFS_hasNode_of_mTr` transfers the resulting
 DFS branch to the finite tree.
 -/
@@ -33,14 +33,14 @@ variable {P T : Type*}
 variable [FinEnum P] [FinEnum T]
 variable (net : WeightedNet P T)
 
-/-- Lift one concrete firing from a fresh covering branch reachable in
+/-- Lift one concrete firing from a first-occurrence covering branch reachable in
 `dfsLTS`. The target branch is the computed successor of `src`, reached by
 appending the same transition `t` to the DFS path. -/
-theorem lift_fires_to_dfsMTr_of_fresh
+theorem lift_fires_to_dfsMTr_of_first_occurrence
     {m₀ m m' : Marking P}
     {src : Branch P} {labels : List T} {t : T}
     (hexec : (dfsLTS net).MTr (Branch.initial m₀) labels src)
-    (hfresh : src.IsFresh) (hcover : m ≤ src.marking)
+    (hfirst : src.IsFirstOccurrence) (hcover : m ≤ src.marking)
     (hfires : net.Fires m t m') :
     ∃ nextLabels tgt,
       (dfsLTS net).MTr (Branch.initial m₀) nextLabels tgt ∧
@@ -48,24 +48,24 @@ theorem lift_fires_to_dfsMTr_of_fresh
   obtain ⟨henabled, hle⟩ := fires_le_succBranch hcover hfires
   let tgt := succBranch net src t
   have hstep : (dfsLTS net).Tr src t tgt :=
-    mem_dfsSuccessors_iff.mpr ⟨hfresh, henabled, rfl⟩
+    mem_dfsSuccessors_iff.mpr ⟨hfirst, henabled, rfl⟩
   exact ⟨labels ++ [t], tgt,
     Cslib.LTS.MTr.stepR (dfsLTS net) hexec hstep, hle⟩
 
-/-- Lift one concrete firing from a non-fresh covering branch reachable in
-`dfsLTS`. The proof redirects to an earlier fresh branch with the same
+/-- Lift one concrete firing from a repeated covering branch reachable in
+`dfsLTS`. The proof redirects to an earlier first-occurrence branch with the same
 marking, then follows its computed successor. -/
-theorem lift_fires_to_dfsMTr_of_not_fresh
+theorem lift_fires_to_dfsMTr_of_not_first_occurrence
     {m₀ m m' : Marking P}
     {src : Branch P} {labels : List T} {t : T}
     (hexec : (dfsLTS net).MTr (Branch.initial m₀) labels src)
-    (hnotfresh : ¬ src.IsFresh) (hcover : m ≤ src.marking)
+    (hnotfirst : ¬ src.IsFirstOccurrence) (hcover : m ≤ src.marking)
     (hfires : net.Fires m t m') :
     ∃ nextLabels tgt,
       (dfsLTS net).MTr (Branch.initial m₀) nextLabels tgt ∧
       m' ≤ tgt.marking := by
-  obtain ⟨pre, ancestor, hpre, hancestorFresh, hmarking⟩ :=
-    exists_fresh_predecessor_of_not_fresh hexec hnotfresh
+  obtain ⟨pre, ancestor, hpre, hancestorFirst, hmarking⟩ :=
+    exists_first_occurrence_predecessor_of_not_first_occurrence hexec hnotfirst
   have hcoverAncestor : m ≤ ancestor.marking := by
     rw [hmarking]
     exact hcover
@@ -73,13 +73,13 @@ theorem lift_fires_to_dfsMTr_of_not_fresh
     fires_le_succBranch hcoverAncestor hfires
   let tgt := succBranch net ancestor t
   have hstep : (dfsLTS net).Tr ancestor t tgt :=
-    mem_dfsSuccessors_iff.mpr ⟨hancestorFresh, henabled, rfl⟩
+    mem_dfsSuccessors_iff.mpr ⟨hancestorFirst, henabled, rfl⟩
   exact ⟨pre ++ [t], tgt,
     Cslib.LTS.MTr.stepR (dfsLTS net) hpre hstep, hle⟩
 
 /-- Lift one concrete firing while maintaining a covering branch reachable
 in `dfsLTS` from the initial branch. The proof dispatches to the ordinary
-successor lemma when the current branch is fresh and to the redirection lemma
+successor lemma when the current branch is a first occurrence and to the redirection lemma
 when it is not. -/
 theorem lift_fires_to_dfsMTr
     {m₀ m m' : Marking P}
@@ -89,13 +89,13 @@ theorem lift_fires_to_dfsMTr
     ∃ nextLabels tgt,
       (dfsLTS net).MTr (Branch.initial m₀) nextLabels tgt ∧
       m' ≤ tgt.marking := by
-  by_cases hfresh : src.IsFresh
-  · exact lift_fires_to_dfsMTr_of_fresh net hexec hfresh hcover hfires
-  · exact lift_fires_to_dfsMTr_of_not_fresh net hexec hfresh hcover hfires
+  by_cases hfirst : src.IsFirstOccurrence
+  · exact lift_fires_to_dfsMTr_of_first_occurrence net hexec hfirst hcover hfires
+  · exact lift_fires_to_dfsMTr_of_not_first_occurrence net hexec hfirst hcover hfires
 
 /-- Lift a concrete firing sequence to a reachable branch of `dfsLTS` whose
 ω-marking covers the concrete target. At each step the proof uses either the
-fresh-successor case or redirects a duplicate branch to an earlier fresh
+first-occurrence successor case or redirects a duplicate branch to an earlier first-occurrence
 occurrence with the same marking. -/
 theorem lift_firesSequence_to_dfsMTr
     {m₀ src tgt : Marking P}

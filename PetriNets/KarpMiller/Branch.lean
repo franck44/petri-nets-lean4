@@ -67,19 +67,20 @@ theorem append_ancestors (branch : Branch P) (m : OmegaMarking P) :
     (branch ++ m).ancestors = branch.history :=
   rfl
 
-/-- A branch is fresh when its current marking does not duplicate an ancestor. -/
-def IsFresh (branch : Branch P) : Prop :=
+/-- A branch is a first occurrence when its current marking does not duplicate
+an ancestor. -/
+def IsFirstOccurrence (branch : Branch P) : Prop :=
   branch.marking ∉ branch.ancestors
 
-/-- If a branch has no duplicate ancestors and is fresh, then its complete
-history has no duplicates. -/
+/-- If a branch has no duplicate ancestors and is a first occurrence, then
+its complete history has no duplicates. -/
 theorem history_nodup {branch : Branch P}
-    (hancestors : branch.ancestors.Nodup) (hfresh : branch.IsFresh) :
+    (hancestors : branch.ancestors.Nodup) (hfirst : branch.IsFirstOccurrence) :
     branch.history.Nodup := by
-  change branch.marking ∉ branch.ancestors at hfresh
+  change branch.marking ∉ branch.ancestors at hfirst
   simp [history, List.nodup_append, hancestors]
   intro m hm heq
-  apply hfresh
+  apply hfirst
   exact heq ▸ hm
 
 section FinitePlaces

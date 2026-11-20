@@ -19,11 +19,11 @@ depth-first search (DFS).
 A DFS branch stores its current ω-marking and its ancestor markings because
 acceleration depends on the history of the branch. The executable successor
 functions enumerate enabled transitions, accelerate their successor
-markings, and extend a fresh branch. These computed successors define the DFS
+markings, and extend a first-occurrence branch. These computed successors define the DFS
 labelled transition system.
 
 When the current marking already occurs among the ancestors, the branch is
-not fresh and becomes a leaf. The completed finite DFS tree retains these
+not a first occurrence and becomes a leaf. The completed finite DFS tree retains these
 closed leaves.
 
 Termination of `karpMillerDFS` is justified by the well-founded recursive-call
@@ -137,10 +137,10 @@ theorem karpMillerDFS_hasNode_root (net : WeightedNet P T) (src : Branch P) :
   rw [karpMillerDFS]
   exact KarpMillerTree.HasNode.root
 
-/-- If `src` is fresh and `t` is enabled, its computed successor occurs as an
+/-- If `src` is a first occurrence and `t` is enabled, its computed successor occurs as an
 immediate node of the Karp–Miller tree rooted at `src`. -/
 theorem karpMillerDFS_hasNode_succBranch (net : WeightedNet P T)
-    (src : Branch P) (t : T) (hfresh : src.IsFresh)
+    (src : Branch P) (t : T) (hfirst : src.IsFirstOccurrence)
     (henabled : net.OmegaEnabled src.marking t) :
     (karpMillerDFS net src).HasNode (succBranch net src t).marking := by
   rw [karpMillerDFS]
@@ -149,7 +149,7 @@ theorem karpMillerDFS_hasNode_succBranch (net : WeightedNet P T)
   · simp only [List.mem_map]
     have hsuccessor :
         (t, succBranch net src t) ∈ dfsSuccessors net src :=
-      mem_dfsSuccessors_iff.mpr ⟨hfresh, henabled, rfl⟩
+      mem_dfsSuccessors_iff.mpr ⟨hfirst, henabled, rfl⟩
     refine ⟨⟨(t, succBranch net src t), hsuccessor⟩, ?_, rfl⟩
     simp
   · exact karpMillerDFS_hasNode_root net (succBranch net src t)

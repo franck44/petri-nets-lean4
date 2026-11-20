@@ -198,8 +198,8 @@ provides positions `i < j` carrying equal markings.
 
 The marking at position `i` is stored among the ancestors of the branch at
 position `j`. Since the two current markings are equal, the current marking
-at `j` also occurs among its own ancestors. Thus the branch at `j` is not
-fresh and the DFS gives it no successor. This contradicts the transition from
+at `j` also occurs among its own ancestors. Thus the branch at `j` is not a
+first occurrence and the DFS gives it no successor. This contradicts the transition from
 position `j` to position `j + 1` supplied by the assumed infinite
 execution. -/
 theorem not_omegaExecution
@@ -222,15 +222,15 @@ theorem not_omegaExecution
   position `j`. -/
   have hancestor :=
     marking_mem_ancestors_of_omegaExecution hexec hij
-  /- This implies that the branch at position j is not fresh,
+  /- This implies that the branch at position j is not a first occurrence,
   since it has a duplicate marking among its ancestors. -/
-  have hnotfresh : ¬ (nodes j).IsFresh := by
-    simp only [Branch.IsFresh, not_not]
+  have hnotfirst : ¬ (nodes j).IsFirstOccurrence := by
+    simp only [Branch.IsFirstOccurrence, not_not]
     rw [← heq]
     exact hancestor
-  /- Finally, a non-fresh branch has no DFS successor, contradicting the next
+  /- Finally, a repeated branch has no DFS successor, contradicting the next
   step of the infinite execution. -/
-  exact hnotfresh (mem_dfsSuccessors_iff.mp (hexec j)).1
+  exact hnotfirst (mem_dfsSuccessors_iff.mp (hexec j)).1
 
 /-- `DfsCall net next current` means that computing the Karp–Miller DFS at
 `current` makes an immediate recursive call at `next`.

@@ -13,8 +13,8 @@ public import PetriNets.KarpMiller.Successor
 
 This module defines the executable successor list explored by the
 Karp–Miller DFS and exposes that list as a labelled transition system. A DFS
-edge is exactly membership in the computed successor list, so freshness and
-enabledness have a single executable source of truth.
+edge is exactly membership in the computed successor list, so first-occurrence
+status and enabledness have a single executable source of truth.
 -/
 
 @[expose] public section
@@ -32,10 +32,10 @@ variable [FinEnum P] [FinEnum T]
 
 /-- Compute the labelled successor branches explored by the Karp–Miller DFS.
 
-The freshness check belongs to the DFS algorithm. For a fresh branch,
-`succMarkings` enumerates the enabled transitions and their successor
+The first-occurrence check belongs to the DFS algorithm. For a
+first-occurrence branch, `succMarkings` enumerates the enabled transitions and their successor
 markings; `succBranch` then accelerates each marking with respect to the branch
-history and extends the branch. A branch that is not fresh has no DFS
+history and extends the branch. A branch that is not a first occurrence has no DFS
 successors. -/
 def dfsSuccessors (net : WeightedNet P T) (src : Branch P) :
     List (T × Branch P) :=
@@ -44,18 +44,18 @@ def dfsSuccessors (net : WeightedNet P T) (src : Branch P) :
     (succMarkings net src.marking).map fun candidate =>
       (candidate.1, succBranch net src candidate.1)
 
-/-- Membership in `dfsSuccessors` is characterised by freshness, enabledness,
-and construction of the target branch. -/
+/-- Membership in `dfsSuccessors` is characterised by first-occurrence
+status, enabledness, and construction of the target branch. -/
 theorem mem_dfsSuccessors_iff {src tgt : Branch P} {t : T} :
     (t, tgt) ∈ dfsSuccessors net src ↔
-      src.IsFresh ∧ net.OmegaEnabled src.marking t ∧
+      src.IsFirstOccurrence ∧ net.OmegaEnabled src.marking t ∧
         succBranch net src t = tgt := by
   constructor
   · intro h
     unfold dfsSuccessors at h
     split at h
     · simp at h
-    · rename_i hfresh
+    · rename_i hfirst
       simp only [List.mem_map] at h
       obtain ⟨candidate, hcandidate, hpair⟩ := h
       rcases candidate with ⟨u, m⟩
@@ -63,9 +63,9 @@ theorem mem_dfsSuccessors_iff {src tgt : Branch P} {t : T} :
       obtain ⟨rfl, rfl⟩ := hpair
       have henabled :=
         (enabled_and_eq_of_mem_succMarkings hcandidate).1
-      exact ⟨by simpa [Branch.IsFresh], henabled, rfl⟩
-  · rintro ⟨hfresh, henabled, rfl⟩
-    have hnotmem : src.marking ∉ src.ancestors := hfresh
+      exact ⟨by simpa [Branch.IsFirstOccurrence], henabled, rfl⟩
+  · rintro ⟨hfirst, henabled, rfl⟩
+    have hnotmem : src.marking ∉ src.ancestors := hfirst
     unfold dfsSuccessors
     simp only [hnotmem, ↓reduceIte, List.mem_map]
     refine ⟨(t, succMarking net src.marking t),
@@ -226,8 +226,8 @@ no duplicates. -/
 theorem ancestors_nodup_of_tr {src tgt : Branch P} {t : T}
     (htr : (dfsLTS net).Tr src t tgt) (hsrc : src.ancestors.Nodup) :
     tgt.ancestors.Nodup := by
-  obtain ⟨hfresh, _, rfl⟩ := mem_dfsSuccessors_iff.mp htr
-  simpa [succBranch] using src.history_nodup hsrc hfresh
+  obtain ⟨hfirst, _, rfl⟩ := mem_dfsSuccessors_iff.mp htr
+  simpa [succBranch] using src.history_nodup hsrc hfirst
 
 /-- Every node reachable from the initial Karp–Miller node has a
 duplicate-free list of ancestors. -/
@@ -261,8 +261,8 @@ has an outgoing DFS edge. The theorem splits the labels as
 `labels = pre ++ t :: post` and retains both the prefix and the suffix.
 
 This is stronger than merely knowing that `a` belongs to the stored history:
-the outgoing edge proves that `mid` was fresh. It is the key observation used
-both to redirect a non-fresh leaf to an earlier fresh occurrence and to
+the outgoing edge proves that `mid` was a first occurrence. It is the key
+observation used both to redirect a repeated leaf to an earlier first occurrence and to
 recover a pumpable path segment in soundness proofs. -/
 theorem ancestor_eq_predecessor_of_mTr
     {src tgt : Branch P} {labels : List T} {a : OmegaMarking P}
@@ -291,8 +291,8 @@ theorem ancestor_eq_predecessor_of_mTr
       · exact Or.inr ⟨t :: pre, mid, u, after, post,
           by simp [hlabels], hpre.stepL htr, hstep, hpost, hmarking⟩
 
-/-- A non-fresh branch reached from an initial branch repeats the marking of
-an earlier fresh branch on the same DFS execution.
+/-- A repeated branch reached from an initial branch repeats the marking of
+an earlier first-occurrence branch on the same DFS execution.
 
 ```text
 Branch.initial m₀ ----pre----> ancestor ---- ... ----> src
@@ -301,7 +301,7 @@ Branch.initial m₀ ----pre----> ancestor ---- ... ----> src
                               +--- marking -----+
                                    equality
 
-                         ancestor.IsFresh       ¬ src.IsFresh
+                         ancestor.IsFirstOccurrence       ¬ src.IsFirstOccurrence
 ```
 
 The marking of `src` occurs in `src.ancestors`. By
@@ -310,18 +310,18 @@ actual earlier branch `ancestor` on the DFS execution. The theorem retains
 the prefix `pre` reaching that branch; the remaining suffix to `src` is not
 needed by its conclusion.
 
-The earlier branch is fresh because it is the source of a DFS edge. A
-duplicate branch has no successor and therefore cannot occur in that
+The earlier branch is a first occurrence because it is the source of a DFS
+edge. A duplicate branch has no successor and therefore cannot occur in that
 position. -/
-theorem exists_fresh_predecessor_of_not_fresh
+theorem exists_first_occurrence_predecessor_of_not_first_occurrence
     {m₀ : Marking P} {src : Branch P} {labels : List T}
     (hexec : (dfsLTS net).MTr (Branch.initial m₀) labels src)
-    (hnotfresh : ¬ src.IsFresh) :
+    (hnotfirst : ¬ src.IsFirstOccurrence) :
     ∃ pre ancestor,
       (dfsLTS net).MTr (Branch.initial m₀) pre ancestor ∧
-      ancestor.IsFresh ∧ ancestor.marking = src.marking := by
+      ancestor.IsFirstOccurrence ∧ ancestor.marking = src.marking := by
   have hmem : src.marking ∈ src.ancestors := by
-    simpa [Branch.IsFresh] using hnotfresh
+    simpa [Branch.IsFirstOccurrence] using hnotfirst
   rcases ancestor_eq_predecessor_of_mTr hexec hmem with hroot |
       ⟨pre, ancestor, t, next, post, hlabels, hpre, hstep, hpost,
         hmarking⟩
@@ -386,14 +386,14 @@ instance (net : WeightedNet P T) :
   rw [mem_dfsSuccessors_iff] at h₁ h₂
   exact h₁.2.2.symm.trans h₂.2.2
 
-/-- A branch has no DFS successor exactly when it is not fresh or its current
-marking enables no transition. -/
-theorem no_tr_iff_not_fresh_or_terminal {src : Branch P} :
+/-- A branch has no DFS successor exactly when it is not a first occurrence
+or its current marking enables no transition. -/
+theorem no_tr_iff_not_first_occurrence_or_terminal {src : Branch P} :
     (∀ t tgt, ¬ (dfsLTS net).Tr src t tgt) ↔
-      ¬ src.IsFresh ∨ ∀ t, ¬ net.OmegaEnabled src.marking t := by
+      ¬ src.IsFirstOccurrence ∨ ∀ t, ¬ net.OmegaEnabled src.marking t := by
   classical
-  by_cases hfresh : src.IsFresh <;>
-    simp [dfsLTS, mem_dfsSuccessors_iff, hfresh]
+  by_cases hfirst : src.IsFirstOccurrence <;>
+    simp [dfsLTS, mem_dfsSuccessors_iff, hfirst]
 
 end FinitePlaces
 
