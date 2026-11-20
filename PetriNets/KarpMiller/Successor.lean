@@ -88,6 +88,19 @@ theorem mem_acceleratedPlaces_of_mem_omegaPlaces_succBranch
     succMarking] at hpTgt
   exact hpSrc hpTgt
 
+/-- At a place which remains finite in the successor branch, acceleration has
+not changed the raw firing result. -/
+theorem succBranch_marking_apply_eq_succMarking_of_ne_top
+    (src : Branch P) (t : T) {p : P}
+    (hp : (succBranch net src t).marking p ≠ ⊤) :
+    (succBranch net src t).marking p = succMarking net src.marking t p := by
+  have hpNotAccelerated : p ∉ Branch.acceleratedPlaces
+      (succMarking net src.marking t) src := by
+    intro hpAccelerated
+    exact hp (succBranch_eq_top_of_mem_acceleratedPlaces
+      (net := net) src t hpAccelerated)
+  simp [succBranch, OmegaMarking.accelerateFinset, hpNotAccelerated]
+
 /-- Constructing a successor branch can only increase the set of places equal
 to `ω`. -/
 theorem omegaPlaces_mono_of_succBranch (src : Branch P) (t : T) :

@@ -91,6 +91,16 @@ theorem omegaPlaces_mono_of_tr {src tgt : Branch P} {t : T}
   rw [← htr.2.2]
   exact omegaPlaces_mono_of_succBranch src t
 
+/-- At a place which is finite after a DFS step, the target component is the
+raw firing result. Acceleration can only replace a component by `ω`, so it
+cannot have affected this place. -/
+theorem marking_apply_eq_succMarking_of_tr_of_ne_top
+    {src tgt : Branch P} {t : T} {p : P}
+    (htr : (dfsLTS net).Tr src t tgt) (hp : tgt.marking p ≠ ⊤) :
+    tgt.marking p = succMarking net src.marking t p := by
+  obtain ⟨_, _, rfl⟩ := mem_dfsSuccessors_iff.mp htr
+  exact succBranch_marking_apply_eq_succMarking_of_ne_top src t hp
+
 /-- Along a finite Karp–Miller execution, the set of places equal to `ω` can
 only grow. This extends `omegaPlaces_mono_of_tr` from one transition to a
 sequence of transitions. -/
