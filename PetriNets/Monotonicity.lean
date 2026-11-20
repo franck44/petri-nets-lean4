@@ -89,6 +89,66 @@ theorem WeightedNet.FiresSequence.append_add
   have hcombined := WeightedNet.FiresSequence.append hfirst hsecond
   simpa [add_comm tgt₂ tgt₁] using hcombined
 
+/-- Combine finitely many firing sequences which grow a prescribed set of
+places.
+
+For every `p ∈ A`, suppose there is a firing sequence
+
+```text
+srcₚ ──tsₚ──▶ tgtₚ
+```
+
+which does not decrease any place in `A` and strictly increases its designated
+place `p`. Repeatedly applying `FiresSequence.append_add` gives one combined
+execution whose source and target are the pointwise sums of the individual
+sources and targets. Consequently, it strictly increases every place in `A`:
+
+```text
+combinedSrc ──combinedTs──▶ combinedTgt
+
+combinedSrc(q) < combinedTgt(q)    for every q ∈ A.
+```
+
+The individual paths may decrease places outside `A`; no global
+nondecreasing hypothesis is required. -/
+theorem WeightedNet.FiresSequence.exists_combined_growth_on
+    (A : Finset P)
+    (hpaths : ∀ p ∈ A, ∃ src tgt ts,
+      net.FiresSequence src ts tgt ∧
+      (∀ q ∈ A, src q ≤ tgt q) ∧
+      src p < tgt p) :
+    ∃ src tgt ts,
+      net.FiresSequence src ts tgt ∧
+      ∀ p ∈ A, src p < tgt p := by
+  classical
+  have combine : ∀ I : Finset P, I ⊆ A →
+      ∃ src tgt ts,
+        net.FiresSequence src ts tgt ∧
+        (∀ q ∈ A, src q ≤ tgt q) ∧
+        ∀ p ∈ I, src p < tgt p := by
+    intro I hIA
+    induction I using Finset.induction with
+    | empty =>
+        exact ⟨0, 0, [], WeightedNet.FiresSequence.nil 0, by simp, by simp⟩
+    | @insert p I hp ih =>
+        have hpA : p ∈ A := hIA (by simp)
+        have hIA' : I ⊆ A := fun q hq => hIA (by simp [hq])
+        obtain ⟨srcP, tgtP, tsP, hseqP, hmonoP, hgrowsP⟩ :=
+          hpaths p hpA
+        obtain ⟨srcI, tgtI, tsI, hseqI, hmonoI, hgrowsI⟩ := ih hIA'
+        refine ⟨srcP + srcI, tgtP + tgtI, tsP ++ tsI,
+          hseqP.append_add hseqI, ?_, ?_⟩
+        · intro q hq
+          exact Nat.add_le_add (hmonoP q hq) (hmonoI q hq)
+        · intro q hq
+          rw [Finset.mem_insert] at hq
+          rcases hq with rfl | hq
+          · exact Nat.add_lt_add_of_lt_of_le hgrowsP (hmonoI _ hpA)
+          · exact Nat.add_lt_add_of_le_of_lt (hmonoP q (hIA' hq))
+              (hgrowsI q hq)
+  obtain ⟨src, tgt, ts, hseq, _, hgrows⟩ := combine A Finset.Subset.rfl
+  exact ⟨src, tgt, ts, hseq, hgrows⟩
+
 /-- A nondecreasing firing sequence can be fired again from its target, and
 the second firing adds the same marking difference as the first.
 
