@@ -172,51 +172,65 @@ theorem exists_fires_to_succMarking_of_omegaPlaces_eq_empty
   funext p
   exact homega.2 p
 
-/-- Every node stored in the Karp–Miller tree is the marking of a branch
-reachable in the DFS transition system.
+/-- Soundness is preserved by one DFS step whose source is reachable from the
+initial branch.
 
-This is the structural connection between the executable tree and `dfsLTS`:
+The prefix is essential for an accelerated step: it identifies the ancestor
+markings which justify acceleration and the firing segments which must be
+pumped. This theorem is the main mathematical soundness obligation. -/
+theorem omegaCoverableFrom_of_dfsLTS_tr
+    [FinEnum P] [FinEnum T] {m₀ : Marking P} {pre : List T}
+    {src tgt : Branch P} {t : T}
+    (hprefix : (dfsLTS net).MTr (Branch.initial m₀) pre src)
+    (hsound : net.OmegaCoverableFrom m₀ src.marking)
+    (htr : (dfsLTS net).Tr src t tgt) :
+    net.OmegaCoverableFrom m₀ tgt.marking := by
+  sorry
 
-```text
-tree.HasNode mω
-        ⇒
-∃ branch, initial m₀ ──labels──▶ branch ∧ branch.marking = mω
-```
+private theorem omegaCoverableFrom_of_dfsMTr_from
+    [FinEnum P] [FinEnum T] {m₀ : Marking P} {pre labels : List T}
+    {src tgt : Branch P}
+    (hprefix : (dfsLTS net).MTr (Branch.initial m₀) pre src)
+    (hsound : net.OmegaCoverableFrom m₀ src.marking)
+    (hexec : (dfsLTS net).MTr src labels tgt) :
+    net.OmegaCoverableFrom m₀ tgt.marking := by
+  induction hexec generalizing pre with
+  | refl => exact hsound
+  | @stepL src t mid labels tgt htr htail ih =>
+      have hmidSound := omegaCoverableFrom_of_dfsLTS_tr
+        hprefix hsound htr
+      exact ih (Cslib.LTS.MTr.stepR (dfsLTS net) hprefix htr) hmidSound
 
-The proof will follow the recursive construction of `karpMillerDFS`. -/
-private theorem exists_dfsMTr_of_karpMillerDFS_hasNode_from
-    [FinEnum P] [FinEnum T] (src : Branch P) {mω : OmegaMarking P}
-    (hnode : (karpMillerDFS net src).HasNode mω) :
-    ∃ labels branch,
-      (dfsLTS net).MTr src labels branch ∧ branch.marking = mω := by
-  rw [karpMillerDFS] at hnode
-  cases hnode with
-  | root =>
-      exact ⟨[], src, Cslib.LTS.MTr.refl, rfl⟩
-  | @child root children t subtree mω hchild hsubtree =>
-      simp only [List.mem_map] at hchild
-      obtain ⟨candidate, hcandidate, heq⟩ := hchild
-      rcases candidate with ⟨⟨u, next⟩, hnext⟩
-      simp only at heq
-      cases heq
-      obtain ⟨labels, branch, hexec, hmarking⟩ :=
-        exists_dfsMTr_of_karpMillerDFS_hasNode_from next hsubtree
-      exact ⟨t :: labels, branch, hexec.stepL hnext, hmarking⟩
-termination_by (dfsCall_wellFounded (net := net) (T := T)).wrap src
-decreasing_by
-  exact ⟨t, hnext⟩
+/-- Every marking reached by the Karp–Miller DFS is omega coverable from the
+initial marking.
 
-/-- Every node stored in the Karp–Miller tree generated from `m₀` is the
-marking of a branch reachable from `Branch.initial m₀` in `dfsLTS`. -/
-theorem exists_dfsMTr_of_karpMillerDFS_hasNode
-    [FinEnum P] [FinEnum T] {m₀ : Marking P} {mω : OmegaMarking P}
+The proof starts with soundness of the embedded initial marking and repeatedly
+applies `omegaCoverableFrom_of_dfsLTS_tr` along the DFS execution. -/
+theorem omegaCoverableFrom_of_dfsMTr
+    [FinEnum P] [FinEnum T] {m₀ : Marking P} {labels : List T}
+    {branch : Branch P}
+    (hexec : (dfsLTS net).MTr (Branch.initial m₀) labels branch) :
+    net.OmegaCoverableFrom m₀ branch.marking := by
+  exact omegaCoverableFrom_of_dfsMTr_from
+    Cslib.LTS.MTr.refl (net.omegaCoverableFrom_initial m₀) hexec
+
+/-- **Soundness of the Karp–Miller tree.** Every ω-marking stored in the tree
+generated from `m₀` is omega coverable from `m₀`.
+
+The tree/DFS equivalence supplies a reachable branch carrying the stored
+marking; `omegaCoverableFrom_of_dfsMTr` supplies its soundness. -/
+theorem karpMillerDFS_omegaCoverableFrom_of_hasNode
+    [FinEnum P] [FinEnum T] (net : WeightedNet P T) (m₀ : Marking P)
+    {mω : OmegaMarking P}
     (hnode :
       (karpMillerDFS net (Branch.initial m₀)).HasNode mω) :
-    ∃ labels branch,
-      (dfsLTS net).MTr (Branch.initial m₀) labels branch ∧
-      branch.marking = mω := by
-  exact exists_dfsMTr_of_karpMillerDFS_hasNode_from
-    (Branch.initial m₀) hnode
+    net.OmegaCoverableFrom m₀ mω := by
+  obtain ⟨labels, branch, hexec, hmarking⟩ :=
+    (karpMillerDFS_hasNode_iff_exists_dfsMTr net
+      (Branch.initial m₀) mω).mp hnode
+  rw [← hmarking]
+  exact omegaCoverableFrom_of_dfsMTr hexec
+
 end KarpMiller
 
 end PetriNet
