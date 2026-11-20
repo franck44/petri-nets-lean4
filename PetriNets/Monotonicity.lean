@@ -117,6 +117,70 @@ theorem WeightedNet.FiresSequence.pump {src tgt : Marking P} {ts : List T}
         rw [add_comm (n * (tgt p - src p)) (tgt p - src p),
           ← Nat.add_assoc, Nat.add_sub_of_le (hle p)]
 
+/-- **Repeat a firing sequence with reserve.** An arbitrary firing sequence
+can be repeated by supplying enough initial tokens at every place which it
+decreases.
+
+Let `loss = src - tgt` and `gain = tgt - src`, both pointwise. These are the
+negative and positive parts of the effect of `ts`. Starting with `n` copies
+of `loss` in reserve allows `n + 1` repetitions; the final marking contains
+the original target plus `n` copies of `gain`:
+
+```text
+src + n·loss ─────────────ts^(n+1)────────────▶ tgt + n·gain
+
+inductive step:
+src + (n+1)·loss ──ts──▶ tgt + (n+1)·loss
+                              = src + n·loss + gain
+                        ──ts^(n+1)──▶ tgt + (n+1)·gain
+```
+
+At each place, either `loss` or `gain` is zero. This gives the pointwise
+identity which joins the first firing to the remaining repetitions:
+
+```text
+tgt + (n+1)·loss = (src + n·loss) + gain.
+```
+
+Unlike `FiresSequence.pump`, no hypothesis `src ≤ tgt` is required. The price
+is that the repeated execution starts at `src + n • loss`, not at `src`
+itself. A later application must separately show that this enlarged source is
+available or covered by a reachable marking. -/
+theorem WeightedNet.FiresSequence.repeat_with_reserve
+    {src tgt : Marking P} {ts : List T}
+    (hseq : net.FiresSequence src ts tgt) (n : ℕ) :
+    net.FiresSequence
+      (src + n • (src - tgt))
+      (List.replicate (n + 1) ts).flatten
+      (tgt + n • (tgt - src)) := by
+  induction n with
+  | zero => simpa using hseq
+  | succ n ih =>
+      let loss : Marking P := src - tgt
+      let gain : Marking P := tgt - src
+      /- Pay for the first repetition with all `n + 1` remaining copies of
+      the loss. -/
+      have hfirst := hseq.add ((n + 1) • loss)
+      /- Shift the induction hypothesis by one copy of the gain. -/
+      have htail := ih.add gain
+      have hjoin : tgt + (n + 1) • loss =
+          (src + n • loss) + gain := by
+        funext p
+        by_cases hle : src p ≤ tgt p
+        · have hloss : src p - tgt p = 0 := Nat.sub_eq_zero_of_le hle
+          simp [loss, gain, Pi.add_apply, hloss]
+          omega
+        · have hle' : tgt p ≤ src p := Nat.le_of_not_ge hle
+          have hgain : tgt p - src p = 0 := Nat.sub_eq_zero_of_le hle'
+          simp [loss, gain, Pi.add_apply, hgain, Nat.add_mul]
+          omega
+      rw [hjoin] at hfirst
+      have hall := WeightedNet.FiresSequence.append hfirst htail
+      convert hall using 1
+      · simp [List.replicate_succ]
+      · funext p
+        simp [gain, Pi.add_apply, Nat.add_mul, Nat.add_assoc]
+
 /-- If a nondecreasing firing sequence strictly increases every place in a
 finite set `A`, then one reachable marking can simultaneously exceed an
 arbitrary prescribed `bound` at every place in `A`.
