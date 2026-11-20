@@ -40,6 +40,14 @@ def succMarking (net : WeightedNet P T)
     (m : OmegaMarking P) (t : T) : OmegaMarking P :=
   fun p => m p - net.pre p t + net.post p t
 
+/-- Firing result preserves the set of `ω`-places.-/
+theorem omegaPlaces_succMarking [Fintype P]
+    (m : OmegaMarking P) (t : T) :
+    OmegaMarking.omegaPlaces (succMarking net m t) =
+      OmegaMarking.omegaPlaces m := by
+  ext p
+  simp [OmegaMarking.mem_omegaPlaces, succMarking]
+
 section FinitePlaces
 
 variable [FinEnum P]
