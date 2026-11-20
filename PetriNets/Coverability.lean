@@ -8,6 +8,7 @@ module
 
 public import PetriNets.Reachability
 public import Cslib.Foundations.Semantics.LTS.Basic
+import PetriNets.Monotonicity
 
 /-!
 # Coverability
@@ -314,5 +315,88 @@ reachable from `m₀` such that `m ≤ m'`. The order on markings is pointwise:
 def WeightedNet.CoverableFrom {P T : Type*} (net : WeightedNet P T)
     (m₀ m : Marking P) : Prop :=
   ∃ m', net.Reachable m₀ m' ∧ m ≤ m'
+
+/-- An ω-marking `mω` is omega coverable from `m₀` when every ordinary
+marking below `mω` is coverable from `m₀`.
+
+Equivalently, the downward closure of `mω` among ordinary markings is
+contained in the downward closure of the reachable markings from `m₀`:
+
+```text
+∀ m, m.toOmega ≤ mω → ∃ m', Reachable m₀ m' ∧ m ≤ m'.
+```
+-/
+def WeightedNet.OmegaCoverableFrom {P T : Type*} (net : WeightedNet P T)
+    (m₀ : Marking P) (mω : OmegaMarking P) : Prop :=
+  ∀ m, m.toOmega ≤ mω → net.CoverableFrom m₀ m
+
+/-- The initial marking embedded as an ω-marking is omega coverable from
+itself. Every ordinary marking below `m₀.toOmega` is covered by the reachable
+marking `m₀`. -/
+theorem WeightedNet.omegaCoverableFrom_initial
+    {P T : Type*} (net : WeightedNet P T) (m₀ : Marking P) :
+    net.OmegaCoverableFrom m₀ m₀.toOmega := by
+  intro m hle
+  refine ⟨m₀, WeightedNet.Reachable.refl net m₀, ?_⟩
+  intro p
+  exact ENat.natCast_le_natCast.mp (hle p)
+
+/- Transport a finite firing cover through soundness of its abstract source.
+
+```text
+finiteSrc ──t──▶ finiteTgt
+    │                 │
+    ≤                 ≤
+    │                 │
+reachableSrc ──t──▶ reachableTgt
+
+demand ≤ finiteTgt
+```
+
+Source soundness supplies `reachableSrc`; firing monotonicity supplies
+`reachableTgt`, which covers `demand`. -/
+private theorem coverableFrom_of_finite_firing_cover
+    {P T : Type*} {net : WeightedNet P T}
+    {m₀ finiteSrc finiteTgt demand : Marking P}
+    {src : OmegaMarking P} {t : T}
+    (hsound : net.OmegaCoverableFrom m₀ src)
+    (hsrcBelow : finiteSrc.toOmega ≤ src)
+    (hfires : net.Fires finiteSrc t finiteTgt)
+    (hdemandBelow : demand ≤ finiteTgt) :
+    net.CoverableFrom m₀ demand := by
+  obtain ⟨reachableSrc, hreachableSrc, hfiniteSrcBelow⟩ :=
+    hsound finiteSrc hsrcBelow
+  have hfiniteReachable : net.Reachable finiteSrc finiteTgt :=
+    ⟨[t], WeightedNet.FiresSequence.singleton hfires⟩
+  obtain ⟨reachableTgt, hreachableTgt, hfiniteTgtBelow⟩ :=
+    hfiniteReachable.mono hfiniteSrcBelow
+  exact ⟨reachableTgt, hreachableSrc.trans hreachableTgt,
+    hdemandBelow.trans hfiniteTgtBelow⟩
+
+/-- Omega coverability is preserved by an ω-firing.
+
+For every finite demand below `omegaTgt`, the firing determines a sufficient
+finite demand below `omegaSrc`. Source omega coverability supplies a reachable
+marking covering that demand, and firing monotonicity produces a reachable
+marking covering the original target demand.
+
+```text
+              OmegaFires t
+ omegaSrc ─────────────────▶ omegaTgt
+    │                            │
+  sound                        sound
+```
+-/
+theorem WeightedNet.omegaCoverableFrom_of_omegaFires
+    {P T : Type*} {net : WeightedNet P T}
+    {m₀ : Marking P} {omegaSrc omegaTgt : OmegaMarking P} {t : T}
+    (hsound : net.OmegaCoverableFrom m₀ omegaSrc)
+    (hfires : net.OmegaFires omegaSrc t omegaTgt) :
+    net.OmegaCoverableFrom m₀ omegaTgt := by
+  intro demand hdemand
+  obtain ⟨finiteSrc, hsrcBelow, hfiniteFires, hdemandBelow⟩ :=
+    net.exists_finite_firing_cover_of_omegaFires hfires hdemand
+  exact coverableFrom_of_finite_firing_cover
+    hsound hsrcBelow hfiniteFires hdemandBelow
 
 end PetriNet
