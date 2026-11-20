@@ -231,6 +231,52 @@ theorem WeightedNet.fires_firingResult_cover_of_leastPreMarking_le
     simp [WeightedNet.leastPreMarking] at hp ⊢
     omega
   exact ⟨hfires, htarget⟩
+
+/-- Propagate a concrete target demand backwards across an ω-firing.
+
+Assume `t` fires from `omegaSrc` to `omegaTgt`.
+Let `target` be a concrete marking
+
+Then the least ordinary marking sufficient to cover `target` after firing `t` lies below `omegaSrc`:
+
+```text
+          omegaSrc ─────────────t──────────────▶ omegaTgt
+              ▲                                      ▲
+           toOmega ≤                              toOmega ≤
+              │                                      │
+leastPreMarking t target ──t──▶ a marking covering target
+```
+
+At a place where `omegaSrc` is `ω`, this is immediate because
+the predecessor demand is finite. At a finite place, it follows from the
+ω-firing equation and `target.toOmega ≤ omegaTgt`.
+
+This theorem is the backward step used to turn a finite demand at an abstract
+ω-successor into a finite demand at its source. -/
+theorem WeightedNet.leastPreMarking_toOmega_le_of_omegaFires
+    {P T : Type*} {net : WeightedNet P T}
+    {omegaSrc omegaTgt : OmegaMarking P} {t : T} {target : Marking P}
+    (hfires : net.OmegaFires omegaSrc t omegaTgt)
+    (htarget : target.toOmega ≤ omegaTgt) :
+    (net.leastPreMarking t target).toOmega ≤ omegaSrc := by
+  intro p
+  by_cases hp : omegaSrc p = ⊤
+  · simp [WeightedNet.leastPreMarking, hp]
+  · have henabledNat : net.pre p t ≤ (omegaSrc p).toNat := by
+      exact ENat.natCast_le_natCast.mp <| by
+        rw [ENat.natCast_toNat hp]
+        exact hfires.1 p
+    have htargetNat : target p ≤
+        (omegaSrc p).toNat - net.pre p t + net.post p t := by
+      have hpCover := htarget p
+      rw [hfires.2 p, ← ENat.natCast_toNat hp] at hpCover
+      exact ENat.natCast_le_natCast.mp <| by
+        simpa using hpCover
+    simp only [WeightedNet.leastPreMarking, Marking.toOmega_apply]
+    rw [← ENat.natCast_toNat hp]
+    exact_mod_cast (show net.pre p t + (target p - net.post p t) ≤
+      (omegaSrc p).toNat by omega)
+
 /-- A marking `m` is coverable from `m₀` when there is a marking `m'`
 reachable from `m₀` such that `m ≤ m'`. The order on markings is pointwise:
 `m ≤ m'` means that `m p ≤ m' p` for every place `p`. -/
