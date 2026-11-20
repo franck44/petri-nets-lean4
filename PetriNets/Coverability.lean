@@ -293,14 +293,14 @@ theorem WeightedNet.fires_firingResult_cover_of_leastPreMarking_le
   exact ⟨hfires, htarget⟩
 
 /-- Any marking above the predecessor demand of a transition sequence can
-execute that sequence and reach a marking covering the requested target.
+execute that sequence, and its computed result covers the requested target.
 
 ```text
 leastPreMarkingSequence ts target ≤ src
 
-src ─────────────ts─────────────▶ reached
+src ─────────────ts─────────────▶ firingSequenceResult src ts
                                   ▲
-                                  │ target ≤ reached
+                                  │ target ≤ result
 ```
 
 The proof follows the list from left to right. The first application of
@@ -311,18 +311,17 @@ theorem WeightedNet.firesSequence_cover_of_leastPreMarkingSequence_le
     {P T : Type*} (net : WeightedNet P T) (ts : List T)
     (target : Marking P) {src : Marking P}
     (hsrc : net.leastPreMarkingSequence ts target ≤ src) :
-    ∃ reached,
-      net.FiresSequence src ts reached ∧ target ≤ reached := by
+    net.FiresSequence src ts (net.firingSequenceResult src ts) ∧
+      target ≤ net.firingSequenceResult src ts := by
   induction ts generalizing src with
   | nil =>
-      exact ⟨src, WeightedNet.FiresSequence.nil src, hsrc⟩
+      exact ⟨WeightedNet.FiresSequence.nil src, hsrc⟩
   | cons t ts ih =>
       obtain ⟨hfirst, htailDemand⟩ :=
         net.fires_firingResult_cover_of_leastPreMarking_le t
           (net.leastPreMarkingSequence ts target) hsrc
-      obtain ⟨reached, htail, htarget⟩ :=
-        ih htailDemand
-      exact ⟨reached, WeightedNet.FiresSequence.cons hfirst htail, htarget⟩
+      obtain ⟨htail, htarget⟩ := ih htailDemand
+      exact ⟨WeightedNet.FiresSequence.cons hfirst htail, htarget⟩
 
 /-- Propagate a concrete target demand backwards across an ω-firing.
 
