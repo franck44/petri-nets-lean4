@@ -276,6 +276,46 @@ theorem branch_growth_witnesses_of_newOmegaPlaces
   exact exists_branch_growth_witness_of_new_omegaPlace
     hprefix htr hp.2 hp.1
 
+/-- Realise a finite demand using growth witnesses for every newly
+accelerated place.
+
+The hypotheses provide, for each `p ∈ newOmegaPlaces src tgt`, an earlier
+branch whose marking is below the raw successor and is strictly smaller at
+`p`. The intended proof concretises these abstract branch segments with
+sufficient reserves at the already-`ω` places, combines their positive
+effects using `FiresSequence.exists_combined_growth`, and repeats the combined
+sequence until all components of `demand` are covered.
+
+```text
+                            src ──t──▶ raw ──accelerate──▶ tgt.marking
+                             ▲           ▲                       ▲
+                             │           │                       │
+ancestorₚ ──segmentₚ─────────┘           │                       │
+    │                                    │                       │
+    └──── marking ≤ raw, strict at p ────┘                       │
+                                                                 │
+m₀ ──reachable──▶ finiteRaw ──combined pumps──▶ reached           │
+                                                   demand ≤ reached
+```
+
+The conclusion is the concrete witness required by `CoverableFrom`: one
+marking reachable from `m₀` which covers the prescribed demand. -/
+theorem exists_reachable_cover_of_branch_growth_witnesses
+    [FinEnum P] [FinEnum T] {m₀ demand : Marking P}
+    {src tgt : Branch P} {t : T}
+    (hsound : net.OmegaCoverableFrom m₀ src.marking)
+    (htr : (dfsLTS net).Tr src t tgt)
+    (hnew : (newOmegaPlaces src tgt).Nonempty)
+    (hwitnesses : ∀ p ∈ newOmegaPlaces src tgt,
+      ∃ ancestor before segment,
+        (dfsLTS net).MTr (Branch.initial m₀) before ancestor ∧
+        (dfsLTS net).MTr ancestor segment src ∧
+        ancestor.marking ≤ succMarking net src.marking t ∧
+        ancestor.marking p < succMarking net src.marking t p)
+    (hdemand : demand.toOmega ≤ tgt.marking) :
+    ∃ reached, net.Reachable m₀ reached ∧ demand ≤ reached := by
+  sorry
+
 /-- Soundness of a DFS step which introduces at least one new `ω`-place.
 
 For an arbitrary finite demand below `tgt.marking`, the intended proof:
@@ -325,7 +365,15 @@ theorem omegaCoverableFrom_of_dfsLTS_tr_of_omegaPlaces_ssubset
     (homega : OmegaMarking.omegaPlaces src.marking ⊂
       OmegaMarking.omegaPlaces tgt.marking) :
     net.OmegaCoverableFrom m₀ tgt.marking := by
-  sorry
+  intro demand hdemand
+  obtain ⟨p, hpTgt, hpSrc⟩ := Finset.exists_of_ssubset homega
+  have hnew : (newOmegaPlaces src tgt).Nonempty := by
+    refine ⟨p, ?_⟩
+    rw [newOmegaPlaces, Finset.mem_sdiff]
+    exact ⟨hpTgt, hpSrc⟩
+  apply exists_reachable_cover_of_branch_growth_witnesses
+    hsound htr hnew ?_ hdemand
+  exact branch_growth_witnesses_of_newOmegaPlaces hprefix htr
 
 /-- Extend soundness by one step along a Karp–Miller DFS execution.
 
