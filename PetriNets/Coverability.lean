@@ -66,6 +66,47 @@ theorem Marking.toOmega_apply {P : Type*} (m : Marking P) (p : P) :
     m.toOmega p = m p :=
   rfl
 
+/-- Replace every `ω` component of an omega marking by a prescribed finite
+reserve, while retaining the exact value of every finite component.
+
+```text
+finiteApprox (3, ω, 5, ω) (r₀, r₁, r₂, r₃) = (3, r₁, 5, r₃)
+```
+
+This construction is used when an omega-coverability hypothesis must provide
+a reachable ordinary marking with sufficiently many tokens at the omega
+places. -/
+def OmegaMarking.finiteApprox {P : Type*}
+    (m : OmegaMarking P) (reserve : Marking P) : Marking P :=
+  fun p => if m p = ⊤ then reserve p else (m p).toNat
+
+/-- A finite approximation embeds below the omega marking it approximates. -/
+theorem OmegaMarking.finiteApprox_toOmega_le {P : Type*}
+    (m : OmegaMarking P) (reserve : Marking P) :
+    (m.finiteApprox reserve).toOmega ≤ m := by
+  intro p
+  by_cases hp : m p = ⊤
+  · simp [OmegaMarking.finiteApprox, hp]
+  · simp only [Marking.toOmega_apply, OmegaMarking.finiteApprox, hp,
+      ↓reduceIte]
+    exact (ENat.natCast_toNat hp).le
+
+/-- At an `ω` component, `finiteApprox` uses the supplied reserve. -/
+@[simp]
+theorem OmegaMarking.finiteApprox_apply_of_eq_top {P : Type*}
+    {m : OmegaMarking P} {reserve : Marking P} {p : P}
+    (hp : m p = ⊤) :
+    m.finiteApprox reserve p = reserve p := by
+  simp [OmegaMarking.finiteApprox, hp]
+
+/-- At a finite component, `finiteApprox` retains its exact natural value. -/
+theorem OmegaMarking.finiteApprox_apply_of_ne_top {P : Type*}
+    {m : OmegaMarking P} {reserve : Marking P} {p : P}
+    (hp : m p ≠ ⊤) :
+    (m.finiteApprox reserve p : ℕ∞) = m p := by
+  simp only [OmegaMarking.finiteApprox, hp, ↓reduceIte]
+  exact ENat.natCast_toNat hp
+
 /-- A transition is enabled at an ω-marking when every place contains at
 least its finite pre-incidence weight. A place labelled `ω` satisfies every
 finite pre-incidence requirement, so it never prevents a transition from
@@ -329,6 +370,42 @@ contained in the downward closure of the reachable markings from `m₀`:
 def WeightedNet.OmegaCoverableFrom {P T : Type*} (net : WeightedNet P T)
     (m₀ : Marking P) (mω : OmegaMarking P) : Prop :=
   ∀ m, m.toOmega ≤ mω → net.CoverableFrom m₀ m
+
+/-- Obtain a reachable cover for a chosen finite approximation of an
+omega-coverable marking.
+
+The marking `mω.finiteApprox reserve` retains the exact finite components of
+`mω` and uses `reserve p` wherever `mω p = ω`. Since this concrete marking
+is below `mω`, the definition of `OmegaCoverableFrom` supplies a reachable
+marking `reached` which covers it:
+
+```text
+                         mω
+                          ▲
+                          │ toOmega ≤
+                          │
+mω.finiteApprox reserve ≤ reached
+                              ▲
+                              │ Reachable from m₀
+                              │
+                             m₀
+```
+
+Equivalently, the resulting reachable marking satisfies:
+
+* if `mω p = (n : ℕ∞)` for some `n : ℕ`, then `n ≤ reached p`; and
+* if `mω p = ω`, then `reserve p ≤ reached p`.
+
+Thus callers may choose arbitrarily large, independently specified finite
+reserves at the omega places. The reachable witness may depend on the chosen
+reserve; the theorem does not claim that one concrete marking realises all
+possible reserves simultaneously. -/
+theorem WeightedNet.OmegaCoverableFrom.coverable_finiteApprox
+    {P T : Type*} {net : WeightedNet P T}
+    {m₀ : Marking P} {mω : OmegaMarking P}
+    (h : net.OmegaCoverableFrom m₀ mω) (reserve : Marking P) :
+    net.CoverableFrom m₀ (mω.finiteApprox reserve) := by
+  exact h (mω.finiteApprox reserve) (mω.finiteApprox_toOmega_le reserve)
 
 /-- The initial marking embedded as an ω-marking is omega coverable from
 itself. Every ordinary marking below `m₀.toOmega` is covered by the reachable
