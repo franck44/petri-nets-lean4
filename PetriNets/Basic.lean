@@ -92,8 +92,15 @@ produces `m'`. -/
 def WeightedNet.Fires {P T : Type*} (net : WeightedNet P T)
     (m : Marking P) (t : T) (m' : Marking P) : Prop :=
   net.Enabled m t ∧
-    ∀ p,
-      m' p = m p - net.pre p t + net.post p t
+    ∀ p, m' p = net.firingResult m t p
+
+/-- The target of a valid firing is exactly the marking computed by
+`firingResult`. -/
+theorem WeightedNet.Fires.eq_firingResult {P T : Type*}
+    {net : WeightedNet P T} {m m' : Marking P} {t : T}
+    (h : net.Fires m t m') : m' = net.firingResult m t := by
+  funext p
+  exact h.right p
 
 /-- A transition is enabled at a marking exactly when it can fire to some
 target marking. -/
@@ -111,8 +118,6 @@ theorem WeightedNet.fires_is_deterministic {P T : Type*} {net : WeightedNet P T}
     {m m₁ m₂ : Marking P} {t : T}
     (h₁ : net.Fires m t m₁)
     (h₂ : net.Fires m t m₂) : m₁ = m₂ := by
-  -- Markings are functions, so it suffices to compare every place.
-  funext p
-  exact (h₁.right p).trans (h₂.right p).symm
+  exact h₁.eq_firingResult.trans h₂.eq_firingResult.symm
 
 end PetriNet

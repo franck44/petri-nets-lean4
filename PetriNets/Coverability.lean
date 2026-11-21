@@ -233,7 +233,7 @@ theorem WeightedNet.fires_iff_omegaFires_toOmega {P T : Type*}
       exact henabled
     · intro p
       simp
-      rw [hfires p]
+      rw [hfires p, WeightedNet.firingResult_apply]
       rw [ENat.natCast_add, ENat.natCast_sub]
   · rintro ⟨henabled, hfires⟩
     constructor
@@ -241,6 +241,7 @@ theorem WeightedNet.fires_iff_omegaFires_toOmega {P T : Type*}
     · intro p
       have hp := hfires p
       simp at hp
+      change m' p = m p - net.pre p t + net.post p t
       exact_mod_cast hp
 
 /-- The least marking from which firing `t` can cover `target`.

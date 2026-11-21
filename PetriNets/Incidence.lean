@@ -86,7 +86,8 @@ theorem WeightedNet.Fires.balance {P T : Type*} {net : WeightedNet P T}
     {m m' : Marking P} {t : T} (h : net.Fires m t m') :
     ∀ p, m' p + net.pre p t = m p + net.post p t := by
   intro p
-  have hfire := h.right p
+  have hfire : m' p = m p - net.pre p t + net.post p t := by
+    simpa using h.right p
   have henabled := h.left p
   omega
 
@@ -100,7 +101,7 @@ theorem WeightedNet.Fires.int_state_equation {P T : Type*}
     {m m' : Marking P} {t : T} (h : net.Fires m t m') :
     ∀ p, (m' p : ℤ) = (m p : ℤ) + net.incidence p t := by
   intro p
-  rw [h.right p]
+  rw [h.right p, WeightedNet.firingResult_apply]
   simp only [Nat.cast_add, Nat.cast_sub (h.left p), WeightedNet.incidence]
   ring
 

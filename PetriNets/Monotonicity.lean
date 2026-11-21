@@ -41,7 +41,8 @@ theorem WeightedNet.Fires.add {m m' : Marking P} {t : T}
   · have hle: m ≤ m + d := by simp
     exact WeightedNet.Enabled.mono h.left hle
   · intro p
-    have hfire := h.right p
+    have hfire : m' p = m p - net.pre p t + net.post p t := by
+      simpa using h.right p
     have henabled := h.left p
     /- use point-wise addition (m' + d) p = m' p + d p and (m + d) p = m p + d p -/
     change m' p + d p = (m p + d p) - net.pre p t + net.post p t
