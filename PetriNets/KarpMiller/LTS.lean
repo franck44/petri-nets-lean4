@@ -19,6 +19,20 @@ status and enabledness have a single executable source of truth.
 
 @[expose] public section
 
+namespace Cslib.LTS.CanReach
+
+/-- Extend reachability by one transition on the right.
+
+TODO: this generic result should eventually move to CSLib's LTS library. -/
+theorem stepR {State Label : Type*} {lts : Cslib.LTS State Label}
+    {src mid tgt : State} {label : Label}
+    (hreach : lts.CanReach src mid) (hstep : lts.Tr mid label tgt) :
+    lts.CanReach src tgt := by
+  obtain ⟨labels, hexec⟩ := hreach
+  exact ⟨labels ++ [label], Cslib.LTS.MTr.stepR lts hexec hstep⟩
+
+end Cslib.LTS.CanReach
+
 namespace PetriNet
 
 namespace KarpMiller
