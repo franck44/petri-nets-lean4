@@ -11,17 +11,21 @@ public import PetriNets.Basic
 /-!
 # Incidence matrix of a weighted P/T net
 
-Our weighted P/T net representation contains two natural-number incidence
-matrices, both with places as rows and transitions as columns:
+Provides the integer incidence matrix of a weighted P/T net and the
+corresponding one-step state equation.
+
+A weighted P/T net represents its pre- and post-incidence information as
+functions `P → T → ℕ`. Since this type is definitionally equal to
+`Matrix P T ℕ`, these functions can also be viewed as matrices with places as
+rows and transitions as columns:
 
 * the pre-incidence matrix `Pre` records token consumption: `Pre p t` is the
   number of tokens consumed from place `p` by transition `t`;
 * the post-incidence matrix `Post` records token production: `Post p t` is the
   number of tokens produced in place `p` by transition `t`.
 
-In Lean, `Matrix P T ℕ` is definitionally equivalent to `P → T → ℕ`.
-Consequently, the functions `WeightedNet.pre` and `WeightedNet.post` already
-are the pre- and post-incidence matrices; no separate definitions are needed.
+Consequently, `WeightedNet.pre` and `WeightedNet.post` already serve as the
+pre- and post-incidence matrices; no separate definitions are needed.
 
 The integer incidence matrix `C` combines these two matrices as follows:
 
@@ -45,7 +49,7 @@ transition `t`, its component at place `p` is
 Consider places `p₁, p₂` and transitions `t₁, t₂`, with
 pre and post incidence matrices
 
-```
+```text
 Pre:       t₁ t₂         Post:       t₁ t₂
       p₁  [1  0]                p₁  [0  1]
       p₂  [0  2]                p₂  [1  0].
@@ -55,7 +59,7 @@ Thus `t₁` consumes one token from `p₁` and produces one in `p₂`, while `t�
 consumes two tokens from `p₂` and produces one in `p₁`. The incidence matrix `C`
 is
 
-```
+```text
 C = Post - Pre =
        t₁  t₂
  p₁  [-1   1]
@@ -73,17 +77,22 @@ C = Post - Pre =
 
 namespace PetriNet
 
+/-! ## Incidence matrix -/
+
 /-- The place-by-transition incidence matrix `Post - Pre`, with integer
 entries. -/
 def WeightedNet.incidence {P T : Type*} (net : WeightedNet P T) :
     Matrix P T ℤ :=
   fun p t => (net.post p t : ℤ) - (net.pre p t : ℤ)
 
+/-! ## One-step state equation -/
+
 /-- The integer one-step state equation: firing `t` from `m` to `m'` changes
 the token count at each place by the corresponding signed incidence entry.
 
-The proof unfolds `WeightedNet.Fires` and `WeightedNet.incidence`, then uses
-integer arithmetic with coercions from natural numbers. -/
+The proof rewrites the target using `WeightedNet.firingResult`, unfolds the
+incidence matrix, and then uses integer arithmetic with coercions from natural
+numbers. -/
 theorem WeightedNet.Fires.int_state_equation {P T : Type*}
     {net : WeightedNet P T}
     {m m' : Marking P} {t : T} (h : net.Fires m t m') :
