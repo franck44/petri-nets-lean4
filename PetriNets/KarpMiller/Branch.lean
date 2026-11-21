@@ -87,6 +87,35 @@ section FinitePlaces
 
 variable [FinEnum P]
 
+/-- The prefix of `branch` up to the first occurrence of its final marking.
+
+If the final marking does not appear among the ancestors, the branch is
+already a first occurrence and is retained unchanged. Otherwise, the ancestor
+list is truncated immediately before the first occurrence of the final
+marking. Note that `List.idxOf` returns the length of the list if the element
+is not found. -/
+def canonicalFirstOccurrence (branch : Branch P) : Branch P where
+  marking := branch.marking
+  ancestors := branch.ancestors.take
+    (branch.ancestors.idxOf branch.marking)
+
+/-- The canonical first occurrence retains the final marking. -/
+@[simp]
+theorem canonicalFirstOccurrence_marking (branch : Branch P) :
+    branch.canonicalFirstOccurrence.marking = branch.marking :=
+  rfl
+
+/-- The canonical representative branch is always a first occurrence branch. -/
+theorem canonicalFirstOccurrence_isFirstOccurrence (branch : Branch P) :
+    branch.canonicalFirstOccurrence.IsFirstOccurrence := by
+  change branch.marking ∉
+    branch.ancestors.take (branch.ancestors.idxOf branch.marking)
+  intro hmem
+  have hmemAncestors : branch.marking ∈ branch.ancestors :=
+    List.mem_of_mem_take hmem
+  rw [List.mem_take_iff_idxOf_lt hmemAncestors] at hmem
+  exact Nat.lt_irrefl _ hmem
+
 /-- The places accelerated when the Karp–Miller algorithm expands `branch`.
 
 Expanding a branch first fires a transition and produces a successor
