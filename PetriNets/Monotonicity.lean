@@ -84,6 +84,10 @@ theorem WeightedNet.FiresSequence.add {src tgt : Marking P} {ts : List T}
 /-- A firing sequence can be replayed from any pointwise larger source. The
 target is shifted by the additional marking `largerSrc - src`.
 
+This follows directly from `WeightedNet.FiresSequence.add`: apply it with the
+additional marking `largerSrc - src`, and use
+`src + (largerSrc - src) = largerSrc`.
+
 ```text
 src       ──ts──▶ tgt
 │                   │
