@@ -90,26 +90,34 @@ theorem firingCount_weighted_sum_cons {T : Type*} [Fintype T] [DecidableEq T]
   simp_rw [firingCount_weighted_sum]
   simp
 
-/-- The natural-number token-balance equation for a firing sequence.
+/-! ## State equations -/
 
-The transition type `T` is finite so that the total tokens consumed and
-produced at a place can be expressed as finite sums over all transitions.
-Decidable equality is needed to compute the firing-count vector. -/
-theorem WeightedNet.FiresSequence.balance {P T : Type*} [Fintype T]
-    [DecidableEq T] {net : WeightedNet P T} {src tgt : Marking P}
-    {ts : List T} (h : net.FiresSequence src ts tgt) :
-    ∀ p,
-      tgt p + ∑ t, firingCount ts t * net.pre p t =
-      src p + ∑ t, firingCount ts t * net.post p t := by
+private theorem firingCount_int_weighted_sum {T : Type*} [Fintype T]
+    [DecidableEq T] (ts : List T) (f : T → ℤ) :
+    (∑ t, (firingCount ts t : ℤ) * f t) = (ts.map f).sum := by
+  calc
+    _ = ∑ t ∈ ts.toFinset, (firingCount ts t : ℤ) * f t := by
+      symm
+      apply Finset.sum_subset (Finset.subset_univ _)
+      intro t ht hnot
+      have hnotmem : t ∉ ts := by simpa using hnot
+      simp [firingCount, List.count_eq_zero.mpr hnotmem]
+    _ = (ts.map f).sum := by
+      simpa [firingCount] using (Finset.sum_list_map_count ts f).symm
+
+private theorem WeightedNet.FiresSequence.int_effect_sum {P T : Type*}
+    {net : WeightedNet P T} {src tgt : Marking P} {ts : List T}
+    (h : net.FiresSequence src ts tgt) :
+    ∀ p, (tgt p : ℤ) = (src p : ℤ) + (ts.map (net.incidence p)).sum := by
   induction h with
   | nil m =>
       intro p
       simp
   | cons head tail ih =>
       intro p
-      have hhead := head.balance p
+      have hhead := head.int_state_equation p
       have htail := ih p
-      simp_rw [firingCount_weighted_sum_cons]
+      simp only [List.map_cons, List.sum_cons]
       omega
 
 /-- The integer state equation for a firing sequence. At every place, the
@@ -125,16 +133,8 @@ theorem WeightedNet.FiresSequence.int_state_equation {P T : Type*} [Fintype T]
       (tgt p : ℤ) = (src p : ℤ) +
         ∑ t, (firingCount ts t : ℤ) * net.incidence p t := by
   intro p
-  have hbalance :
-      (tgt p : ℤ) +
-          ∑ t, (firingCount ts t : ℤ) * (net.pre p t : ℤ) =
-        (src p : ℤ) +
-          ∑ t, (firingCount ts t : ℤ) * (net.post p t : ℤ) := by
-    exact_mod_cast h.balance p
-  simp only [WeightedNet.incidence]
-  simp only [mul_sub]
-  simp only [Finset.sum_sub_distrib]
-  omega
+  rw [firingCount_int_weighted_sum]
+  exact h.int_effect_sum p
 
 /-- A marking `tgt` is reachable from `src` only if there is a nonnegative
 firing-count vector whose incidence contribution transforms `src` into `tgt`.

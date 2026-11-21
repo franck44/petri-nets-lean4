@@ -487,7 +487,24 @@ theorem exists_concrete_growth_path_of_branch_witness
           ∑ u, firingCount labels u * net.pre q u =
         (ancestor.marking q).toNat +
           ∑ u, firingCount labels u * net.post q u := by
-    have hconcrete := hsequence.balance q
+    have hconcreteInt := hsequence.int_state_equation q
+    change (concreteEnd q : ℤ) =
+      (concreteSrc q : ℤ) +
+        ∑ u, (firingCount labels u : ℤ) * net.incidence q u at hconcreteInt
+    have hconcrete :
+        concreteEnd q +
+            ∑ u, firingCount labels u * net.pre q u =
+          concreteSrc q +
+            ∑ u, firingCount labels u * net.post q u := by
+      have hcast :
+          (concreteEnd q : ℤ) +
+              ∑ u, (firingCount labels u : ℤ) * (net.pre q u : ℤ) =
+            (concreteSrc q : ℤ) +
+              ∑ u, (firingCount labels u : ℤ) * (net.post q u : ℤ) := by
+        simp only [WeightedNet.incidence, mul_sub,
+          Finset.sum_sub_distrib] at hconcreteInt
+        omega
+      exact_mod_cast hcast
     have hsrcFinite := hsrcFinite_of_raw hraw
     have hsegmentBalance :=
       dfsMTr_balance_at_of_ne_top (net := net) hsegment hsrcFinite

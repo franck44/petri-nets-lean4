@@ -149,19 +149,6 @@ theorem WeightedNet.Fires.eq_firingResult {P T : Type*}
   funext p
   exact h.right p
 
-/-- The subtraction-free one-step token-balance equation. At each place, the
-tokens after firing plus the tokens consumed equal the tokens before firing
-plus the tokens produced. All quantities in this equation are natural
-numbers. -/
-theorem WeightedNet.Fires.balance {P T : Type*} {net : WeightedNet P T}
-    {m m' : Marking P} {t : T} (h : net.Fires m t m') :
-    ∀ p, m' p + net.pre p t = m p + net.post p t := by
-  intro p
-  have hfire : m' p = m p - net.pre p t + net.post p t := by
-    simpa using h.right p
-  have henabled := h.left p
-  omega
-
 /-- A transition is enabled at a marking exactly when it can fire to some
 target marking. -/
 theorem WeightedNet.enabled_iff_exists_fires {P T : Type*}
