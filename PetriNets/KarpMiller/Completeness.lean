@@ -11,18 +11,29 @@ public import PetriNets.KarpMiller
 /-!
 # Completeness of the Karp–Miller construction
 
-This module proves that the finite Karp–Miller tree over-approximates every
-execution of the net:
+This module proves that the finite Karp–Miller tree over-approximates (covers) every
+execution of the net. The proof follows this chain of results:
 
-Every reachable marking `m` in the net is dominated by an ω-marking
-occurring in the tree, i.e. there exists an ω-marking `mω` in the tree
-such that `m ≤ mω`.
+- `dfsLTS_covers_of_fires`: coverage is preserved by one firing.
+- `dfsLTS_covers_of_firesSequence`: coverage is preserved by a firing
+  sequence.
+- `dfsLTS_covers_of_reachable`: every marking reachable in the net is covered
+  by a reachable DFS branch marking.
+- `karpMillerDFS_covers_of_reachable`: every reachable marking is covered by marking of a node in the finite Karp–Miller tree.
 
-The proof first lifts one firing to the DFS transition system. A
-first-occurrence branch follows its computed successor; a repeated branch redirects to an earlier
-first occurrence with the same marking. Induction extends this simulation to
-firing sequences, and `karpMillerDFS_hasNode_of_mTr` transfers the resulting
-DFS branch to the finite tree.
+```text
+dfsLTS_covers_of_fires
+        │
+        ▼
+dfsLTS_covers_of_firesSequence
+        │
+        ▼
+dfsLTS_covers_of_reachable
+        │
+        ▼
+karpMillerDFS_covers_of_reachable
+```
+
 -/
 
 @[expose] public section
@@ -33,85 +44,59 @@ variable {P T : Type*}
 variable [FinEnum P] [FinEnum T]
 variable (net : WeightedNet P T)
 
-/-- Lift one concrete firing from a first-occurrence covering branch reachable in
-`dfsLTS`. The target branch is the computed successor of `src`, reached by
-appending the same transition `t` to the DFS path. -/
-theorem lift_fires_to_dfsMTr_of_first_occurrence
-    {m₀ m m' : Marking P}
-    {src : Branch P} {labels : List T} {t : T}
-    (hexec : (dfsLTS net).MTr (Branch.initial m₀) labels src)
-    (hfirst : src.IsFirstOccurrence) (hcover : m ≤ src.marking)
-    (hfires : net.Fires m t m') :
-    ∃ nextLabels tgt,
-      (dfsLTS net).MTr (Branch.initial m₀) nextLabels tgt ∧
-      m' ≤ tgt.marking := by
-  obtain ⟨henabled, hle⟩ := fires_le_succBranch hcover hfires
-  let tgt := succBranch net src t
-  have hstep : (dfsLTS net).Tr src t tgt :=
-    mem_dfsSuccessors_iff.mpr ⟨hfirst, henabled, rfl⟩
-  exact ⟨labels ++ [t], tgt,
-    Cslib.LTS.MTr.stepR (dfsLTS net) hexec hstep, hle⟩
+/-- The DFS rooted at `m₀` covers a concrete marking `m` when some reachable
+branch has an ω-marking greater than or equal to `m`. -/
+def DFSCovers (m₀ m : Marking P) : Prop :=
+  ∃ branch,
+    (dfsLTS net).CanReach (Branch.initial m₀) branch ∧
+    m ≤ branch.marking
 
-/-- Lift one concrete firing from a repeated covering branch reachable in
-`dfsLTS`. The proof redirects to an earlier first-occurrence branch with the same
-marking, then follows its computed successor. -/
-theorem lift_fires_to_dfsMTr_of_not_first_occurrence
-    {m₀ m m' : Marking P}
-    {src : Branch P} {labels : List T} {t : T}
-    (hexec : (dfsLTS net).MTr (Branch.initial m₀) labels src)
-    (hnotfirst : ¬ src.IsFirstOccurrence) (hcover : m ≤ src.marking)
-    (hfires : net.Fires m t m') :
-    ∃ nextLabels tgt,
-      (dfsLTS net).MTr (Branch.initial m₀) nextLabels tgt ∧
-      m' ≤ tgt.marking := by
-  obtain ⟨pre, ancestor, hpre, hancestorFirst, hmarking⟩ :=
-    exists_first_occurrence_predecessor_of_not_first_occurrence hexec hnotfirst
-  have hcoverAncestor : m ≤ ancestor.marking := by
+/-- Lift coverage by an arbitrary reachable DFS branch across one concrete
+firing.
+
+If a reachable branch covers `m` and `m` fires `t` to `m'`, then some
+reachable branch covers `m'`:
+
+```text
+                         m ──t──▶ m'
+                         │        │
+                         ≤        ≤
+                         ▼        ▼
+Branch.initial m₀ ──*──▶ branch    next
+              └──────────*─────────▲
+```
+The proof first replaces the covering branch by a reachable first occurrence
+with the same marking. `dfsLTS_tr_cover_of_fires` then supplies the covering
+successor edge, which extends the path reaching that first occurrence.
+-/
+theorem dfsLTS_covers_of_fires
+    {m₀ m m' : Marking P} {t : T}
+    (hcover : DFSCovers net m₀ m) (hfires : net.Fires m t m') :
+    DFSCovers net m₀ m' := by
+  obtain ⟨branch, hreach, hcovered⟩ := hcover
+  obtain ⟨first, hreachFirst, hfirst, hmarking⟩ :=
+    exists_first_occurrence_of_canReach hreach
+  have hcoverFirst : m ≤ first.marking := by
     rw [hmarking]
-    exact hcover
-  obtain ⟨henabled, hle⟩ :=
-    fires_le_succBranch hcoverAncestor hfires
-  let tgt := succBranch net ancestor t
-  have hstep : (dfsLTS net).Tr ancestor t tgt :=
-    mem_dfsSuccessors_iff.mpr ⟨hancestorFirst, henabled, rfl⟩
-  exact ⟨pre ++ [t], tgt,
-    Cslib.LTS.MTr.stepR (dfsLTS net) hpre hstep, hle⟩
+    exact hcovered
+  obtain ⟨hstep, hcoverNext⟩ :=
+    dfsLTS_tr_cover_of_fires hfirst hcoverFirst hfires
+  exact ⟨succBranch net first t,
+    Cslib.LTS.CanReach.stepR hreachFirst hstep, hcoverNext⟩
 
-/-- Lift one concrete firing while maintaining a covering branch reachable
-in `dfsLTS` from the initial branch. The proof dispatches to the ordinary
-successor lemma when the current branch is a first occurrence and to the redirection lemma
-when it is not. -/
-theorem lift_fires_to_dfsMTr
-    {m₀ m m' : Marking P}
-    {src : Branch P} {labels : List T} {t : T}
-    (hexec : (dfsLTS net).MTr (Branch.initial m₀) labels src)
-    (hcover : m ≤ src.marking) (hfires : net.Fires m t m') :
-    ∃ nextLabels tgt,
-      (dfsLTS net).MTr (Branch.initial m₀) nextLabels tgt ∧
-      m' ≤ tgt.marking := by
-  by_cases hfirst : src.IsFirstOccurrence
-  · exact lift_fires_to_dfsMTr_of_first_occurrence net hexec hfirst hcover hfires
-  · exact lift_fires_to_dfsMTr_of_not_first_occurrence net hexec hfirst hcover hfires
+/-- Lift DFS coverage along a concrete firing sequence.
 
-/-- Lift a concrete firing sequence to a reachable branch of `dfsLTS` whose
-ω-marking covers the concrete target. At each step the proof uses either the
-first-occurrence successor case or redirects a duplicate branch to an earlier first-occurrence
-occurrence with the same marking. -/
-theorem lift_firesSequence_to_dfsMTr
-    {m₀ src tgt : Marking P}
-    {branch : Branch P} {labels : List T} {ts : List T}
-    (hexec : (dfsLTS net).MTr (Branch.initial m₀) labels branch)
-    (hcover : src ≤ branch.marking)
+Coverage is preserved one firing at a time by `dfsLTS_covers_of_fires`; the
+proof iterates that result along the sequence. -/
+theorem dfsLTS_covers_of_firesSequence
+    {m₀ src tgt : Marking P} {ts : List T}
+    (hcover : DFSCovers net m₀ src)
     (hseq : net.FiresSequence src ts tgt) :
-    ∃ nextLabels next,
-      (dfsLTS net).MTr (Branch.initial m₀) nextLabels next ∧
-      tgt ≤ next.marking := by
-  induction hseq generalizing branch labels with
-  | nil => exact ⟨labels, branch, hexec, hcover⟩
+    DFSCovers net m₀ tgt := by
+  induction hseq with
+  | nil => exact hcover
   | cons head tail ih =>
-      obtain ⟨nextLabels, next, hnext, hcoverNext⟩ :=
-        lift_fires_to_dfsMTr net hexec hcover head
-      exact ih hnext hcoverNext
+      exact ih (dfsLTS_covers_of_fires net hcover head)
 
 /-- **Karp–Miller DFS over-approximation for reachability.** Every marking
 `tgt` reachable from `m₀` is covered by the marking of some branch reachable
@@ -130,28 +115,26 @@ tree result below follows by transferring the reachable branch to a tree
 node. -/
 theorem dfsLTS_covers_of_reachable
     {m₀ tgt : Marking P} (hreach : net.Reachable m₀ tgt) :
-    ∃ labels branch,
-      (dfsLTS net).MTr (Branch.initial m₀) labels branch ∧
-      tgt ≤ branch.marking := by
+    DFSCovers net m₀ tgt := by
   obtain ⟨ts, hseq⟩ := hreach
-  exact lift_firesSequence_to_dfsMTr net
-    Cslib.LTS.MTr.refl le_rfl hseq
+  exact dfsLTS_covers_of_firesSequence net
+    ⟨Branch.initial m₀,
+      Cslib.LTS.CanReach.refl (dfsLTS net) (Branch.initial m₀), le_rfl⟩
+    hseq
 
 /-- **Karp–Miller over-approximation for reachability.** For every marking
 `tgt` reachable from `m₀`, there exists an ω-marking `mω` occurring in the
 finite Karp–Miller tree such that `tgt ≤ mω`.
 
-Reachability supplies a firing sequence from `m₀` to `tgt`.
-`lift_firesSequence_to_dfsMTr` produces a reachable DFS branch covering
-`tgt`, and `karpMillerDFS_hasNode_of_mTr` places its ω-marking in the finite
-tree. -/
+`dfsLTS_covers_of_reachable` produces a reachable DFS branch covering `tgt`,
+and `karpMillerDFS_hasNode_of_mTr` places its ω-marking in the finite tree. -/
 theorem karpMillerDFS_covers_of_reachable
     {m₀ tgt : Marking P}
     (hreach : net.Reachable m₀ tgt) :
     ∃ mω,
       (karpMillerDFS net (Branch.initial m₀)).HasNode mω ∧
       tgt ≤ mω := by
-  obtain ⟨labels, branch, hexec, hcover⟩ :=
+  obtain ⟨branch, ⟨labels, hexec⟩, hcover⟩ :=
     dfsLTS_covers_of_reachable net hreach
   exact ⟨branch.marking, karpMillerDFS_hasNode_of_mTr net hexec, hcover⟩
 

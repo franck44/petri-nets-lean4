@@ -231,12 +231,10 @@ theorem exists_branch_growth_witness_of_new_omegaPlace
   rw [Branch.history, List.mem_append, List.mem_singleton] at ha
   rcases ha with ha | rfl
   · rcases ancestor_eq_predecessor_of_mTr hprefix ha with hroot |
-        ⟨before, ancestor, u, next, after, _, hbefore, hstep,
-          hafter, hmarking⟩
+        ⟨before, ancestor, segment, _, hbefore, hsegment, _, hmarking⟩
     · simp [Branch.initial, Branch.root] at hroot
     · subst a
-      exact ⟨ancestor, before, u :: after, hbefore,
-        hafter.stepL hstep, hle, hlt⟩
+      exact ⟨ancestor, before, segment, hbefore, hsegment, hle, hlt⟩
   · exact ⟨src, labels, [], hprefix, Cslib.LTS.MTr.refl, hle, hlt⟩
 
 /-- The finite set of places which are `ω` in `tgt` but not in `src`.

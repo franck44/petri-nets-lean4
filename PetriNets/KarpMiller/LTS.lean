@@ -95,6 +95,31 @@ theorem dfsLTS_tr_iff {src tgt : Branch P} {t : T} :
     (dfsLTS net).Tr src t tgt ↔ (t, tgt) ∈ dfsSuccessors net src :=
   Iff.rfl
 
+/-- Simulate one concrete firing from a covering first-occurrence branch.
+
+If `branch.marking` covers `m` and `m` fires `t` to `m'`, monotonicity makes
+`t` enabled at the omega marking of `branch`. Since the branch is a first
+occurrence, its computed successor is a DFS transition and covers `m'`:
+
+```text
+              m ──t──▶ m'
+              │        │
+              ≤        ≤
+              ▼        ▼
+branch.marking ──t──▶ (succBranch net branch t).marking
+```
+-/
+theorem dfsLTS_tr_cover_of_fires
+    {branch : Branch P} {m m' : Marking P} {t : T}
+    (hfirst : branch.IsFirstOccurrence)
+    (hcover : m ≤ branch.marking)
+    (hfires : net.Fires m t m') :
+    (dfsLTS net).Tr branch t (succBranch net branch t) ∧
+      m' ≤ (succBranch net branch t).marking := by
+  obtain ⟨henabled, hcoverNext⟩ := fires_le_succBranch hcover hfires
+  exact ⟨mem_dfsSuccessors_iff.mpr ⟨hfirst, henabled, rfl⟩,
+    hcoverNext⟩
+
 /-- Along a DFS edge, the set of places equal to `ω` can only grow. -/
 theorem omegaPlaces_mono_of_tr {src tgt : Branch P} {t : T}
     (htr : (dfsLTS net).Tr src t tgt) :
@@ -266,13 +291,14 @@ For a marking `a ∈ tgt.ancestors`, there are two possibilities:
 ```text
 (1)  a ∈ src.ancestors
 
-(2)  src ──pre──▶ mid ──t──▶ next ──post──▶ tgt
+(2)  src ──pre──▶ mid ──rest──▶ tgt
                     mid.marking = a
+                    mid.IsFirstOccurrence
 ```
 
 In the second case, `mid` is an actual earlier branch of the execution and
-has an outgoing DFS edge. The theorem splits the labels as
-`labels = pre ++ t :: post` and retains both the prefix and the suffix.
+has an outgoing DFS edge, so it is a first occurrence. The theorem splits the
+labels as `labels = pre ++ rest` and retains the prefix and suffix executions.
 
 This is stronger than merely knowing that `a` belongs to the stored history:
 the outgoing edge proves that `mid` was a first occurrence. It is the key
@@ -283,65 +309,50 @@ theorem ancestor_eq_predecessor_of_mTr
     (hexec : (dfsLTS net).MTr src labels tgt)
     (ha : a ∈ tgt.ancestors) :
     a ∈ src.ancestors ∨
-      ∃ pre mid t next post,
-        labels = pre ++ t :: post ∧
+      ∃ pre mid rest,
+        labels = pre ++ rest ∧
         (dfsLTS net).MTr src pre mid ∧
-        (dfsLTS net).Tr mid t next ∧
-        (dfsLTS net).MTr next post tgt ∧
+        (dfsLTS net).MTr mid rest tgt ∧
+        mid.IsFirstOccurrence ∧
         mid.marking = a := by
   induction hexec with
   | refl => exact Or.inl ha
   | @stepL src t next labels tgt htr htail ih =>
-      rcases ih ha with hsrc | ⟨pre, mid, u, after, post, hlabels,
-          hpre, hstep, hpost, hmarking⟩
+      rcases ih ha with hsrc | ⟨pre, mid, rest, hlabels,
+          hpre, hrest, hfirst, hmarking⟩
       · rw [show next.ancestors = src.history by
           obtain ⟨_, _, rfl⟩ := mem_dfsSuccessors_iff.mp htr
           rfl] at hsrc
         rw [Branch.history, List.mem_append, List.mem_singleton] at hsrc
         rcases hsrc with hancestor | hcurrent
         · exact Or.inl hancestor
-        · exact Or.inr ⟨[], src, t, next, labels, rfl,
-            Cslib.LTS.MTr.refl, htr, htail, hcurrent.symm⟩
-      · exact Or.inr ⟨t :: pre, mid, u, after, post,
-          by simp [hlabels], hpre.stepL htr, hstep, hpost, hmarking⟩
+        · exact Or.inr ⟨[], src, t :: labels, rfl,
+            Cslib.LTS.MTr.refl, htail.stepL htr,
+            (mem_dfsSuccessors_iff.mp htr).1, hcurrent.symm⟩
+      · exact Or.inr ⟨t :: pre, mid, rest,
+          by simp [hlabels], hpre.stepL htr, hrest, hfirst, hmarking⟩
 
-/-- A repeated branch reached from an initial branch repeats the marking of
-an earlier first-occurrence branch on the same DFS execution.
+/-- Every reachable DFS branch has a reachable first-occurrence branch with
+the same marking.
 
-```text
-Branch.initial m₀ ----pre----> ancestor ---- ... ----> src
-                              |                 |
-                              |                 |
-                              +--- marking -----+
-                                   equality
-
-                         ancestor.IsFirstOccurrence       ¬ src.IsFirstOccurrence
-```
-
-The marking of `src` occurs in `src.ancestors`. By
-`ancestor_eq_predecessor_of_mTr`, this stored marking corresponds to an
-actual earlier branch `ancestor` on the DFS execution. The theorem retains
-the prefix `pre` reaching that branch; the remaining suffix to `src` is not
-needed by its conclusion.
-
-The earlier branch is a first occurrence because it is the source of a DFS
-edge. A duplicate branch has no successor and therefore cannot occur in that
-position. -/
-theorem exists_first_occurrence_predecessor_of_not_first_occurrence
-    {m₀ : Marking P} {src : Branch P} {labels : List T}
-    (hexec : (dfsLTS net).MTr (Branch.initial m₀) labels src)
-    (hnotfirst : ¬ src.IsFirstOccurrence) :
-    ∃ pre ancestor,
-      (dfsLTS net).MTr (Branch.initial m₀) pre ancestor ∧
-      ancestor.IsFirstOccurrence ∧ ancestor.marking = src.marking := by
-  have hmem : src.marking ∈ src.ancestors := by
-    simpa [Branch.IsFirstOccurrence] using hnotfirst
-  rcases ancestor_eq_predecessor_of_mTr hexec hmem with hroot |
-      ⟨pre, ancestor, t, next, post, hlabels, hpre, hstep, hpost,
-        hmarking⟩
-  · simp [Branch.initial, Branch.root] at hroot
-  · exact ⟨pre, ancestor, hpre,
-      (mem_dfsSuccessors_iff.mp hstep).1, hmarking⟩
+If `src` is already a first occurrence, it is its own witness. Otherwise,
+`ancestor_eq_predecessor_of_mTr` locates an earlier branch with the same
+marking. Its outgoing edge proves that it is a first occurrence. -/
+theorem exists_first_occurrence_of_canReach
+    {m₀ : Marking P} {src : Branch P}
+    (hreach : (dfsLTS net).CanReach (Branch.initial m₀) src) :
+    ∃ first,
+      (dfsLTS net).CanReach (Branch.initial m₀) first ∧
+      first.IsFirstOccurrence ∧ first.marking = src.marking := by
+  by_cases hfirst : src.IsFirstOccurrence
+  · exact ⟨src, hreach, hfirst, rfl⟩
+  · obtain ⟨labels, hexec⟩ := hreach
+    have hmem : src.marking ∈ src.ancestors := by
+      simpa [Branch.IsFirstOccurrence] using hfirst
+    rcases ancestor_eq_predecessor_of_mTr hexec hmem with hroot |
+        ⟨pre, first, _, _, hpre, _, hfirst, hmarking⟩
+    · simp [Branch.initial, Branch.root] at hroot
+    · exact ⟨first, ⟨pre, hpre⟩, hfirst, hmarking⟩
 
 /-- If the initial marking of a finite execution is below a prospective raw
 successor marking `m`, and is strictly smaller at place `p`, then `p` is
@@ -414,4 +425,3 @@ end FinitePlaces
 end KarpMiller
 
 end PetriNet
-
