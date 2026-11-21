@@ -9,25 +9,65 @@ module
 public import Mathlib
 
 /-!
-# Weighted place/transition nets
+# Weighted P/T nets
 
-This module uses the matrix-oriented presentation of a weighted P/T net
+Provides basic definitions for a weighted place/transition net (weighted P/T
+net for short)
 
 `N = (P, T, Pre, Post)`,
 
-where `P` and `T` are the types of places and transitions and
-`Pre, Post : P → T → ℕ` are the pre- and post-incidence matrices.
+where `P` and `T` are the types of places and transitions, and
+`Pre, Post : P → T → ℕ` are the pre- and post-incidence functions.
 
-For a place `p` and transition `t`, a positive value `Pre p t` is the weight of
-the arc from `p` to `t`, and a positive value `Post p t` is the weight of the
-arc from `t` to `p`. A zero matrix entry denotes that the corresponding arc is
-absent; it does not represent an existing arc of weight zero.
+A state of the net is given by a *marking*, which assigns a natural number of
+tokens to each place, i.e. a function `P → ℕ`.
 
-This presentation is equivalent to the flow-relation presentation
-`(P, T, F, W)`, in which `F` contains the arcs and `W` assigns a positive
-weight to each arc: membership in `F` corresponds precisely to a positive
-entry in `Pre` or `Post`. The matrix presentation is convenient for defining
-the incidence matrix `Post - Pre`, state equations, and invariants.
+The state of the net changes by *firing* transitions.
+Firing a transition `t` consumes `Pre p t` tokens from each place `p` and
+produces `Post p t` tokens in each place `p`.
+
+If a marking contains at least `Pre p t` tokens in each place `p`, then the
+transition `t` is *enabled* and can fire.
+
+The result of firing a transition `t` at a marking `M` is the marking `M'`
+given by
+
+```text
+M' p = M p - Pre p t + Post p t.
+```
+
+A zero value of `Pre` or `Post` denotes the absence of the corresponding arc;
+it does not represent an existing arc of weight zero.
+
+## Example
+
+A net is usually depicted as a bipartite graph with places (circles) and
+transitions (rectangles), and arcs connecting them with associated weights.
+Consider a net with two places `p₁`, `p₂` and one transition `t`:
+
+```text
+               2          1
+       ( p₁ ) ───▶ [ t ] ───▶ ( p₂ )
+```
+
+The transition `t` consumes two tokens from `p₁` and produces one token in
+`p₂`. It is enabled in any marking `(x, y)` with `x ≥ 2`, and firing it
+produces the marking `(x - 2, y + 1)`. It is not enabled at `(1, 0)`, because
+`p₁` does not contain enough tokens.
+
+This net corresponds to the tuple `(P, T, Pre, Post)` with:
+
+- `P = {p₁, p₂}`
+- `T = {t}`
+- `Pre` and `Post` given by
+
+```text
+Pre p₁ t = 2      Post p₁ t = 0
+Pre p₂ t = 0      Post p₂ t = 1.
+```
+
+This module contains only the local, one-step semantics of a net. Firing
+sequences and reachability are defined in `PetriNets.Reachability`.
 
 ## References
 
@@ -44,11 +84,12 @@ the incidence matrix `Post - Pre`, state equations, and invariants.
 
 namespace PetriNet
 
-/-- A weighted place/transition net represented by its pre- and post-incidence
-matrices.
+/-! ## Nets and markings -/
+
+/-- A weighted P/T net represented by its pre- and post-incidence functions.
 
 `pre p t` is the number of tokens consumed from place `p` when transition `t`
-fires. `post p t` is the number of tokens produced in `p`. In either matrix,
+fires. `post p t` is the number of tokens produced in `p`. In either function,
 zero denotes the absence of an arc.
 -/
 structure WeightedNet (P : Type*) (T : Type*) where
@@ -60,8 +101,11 @@ structure WeightedNet (P : Type*) (T : Type*) where
 It is the state of a net: the distribution of tokens across its places. -/
 abbrev Marking (P : Type*) := P → ℕ
 
+/-! ## Enabledness and firing -/
+
 /-- A transition is enabled when every place contains at least the number of
-tokens specified by its pre-incidence entry. -/
+tokens that the transition consumes there. Equivalently, the transition's
+pre-incidence function is pointwise below the marking. -/
 def WeightedNet.Enabled {P T : Type*} (net : WeightedNet P T)
     (m : Marking P) (t : T) : Prop :=
   ∀ p, net.pre p t ≤ m p
@@ -69,9 +113,10 @@ def WeightedNet.Enabled {P T : Type*} (net : WeightedNet P T)
 /-- The marking obtained by applying the token update of transition `t` to
 `src`.
 
-This is a total function: it computes `src - pre(t) + post(t)` even when `t`
-is not enabled. The relation `net.Fires src t tgt` additionally requires
-enabledness and states that `tgt = net.firingResult src t`. -/
+This is a total function. If `t` is not enabled, natural-number subtraction
+may truncate values to zero, so the result does not represent a valid firing.
+The relation `net.Fires src t tgt` additionally requires enabledness, in which
+case no truncation occurs. -/
 def WeightedNet.firingResult {P T : Type*} (net : WeightedNet P T)
     (src : Marking P) (t : T) : Marking P := fun p =>
   src p - net.pre p t + net.post p t
@@ -87,8 +132,10 @@ def WeightedNet.IsDead {P T : Type*} (net : WeightedNet P T)
     (m : Marking P) : Prop :=
   ∀ t, ¬net.Enabled m t
 
-/-- `net.Fires m t m'` means that `t` is enabled at `m` and that firing it
-produces `m'`. -/
+/-- The one-step firing relation of the `net`.
+
+`net.Fires m t m'` means that `t` is enabled at `m` and that consuming its
+pre-incidence tokens and producing its post-incidence tokens yields `m'`. -/
 def WeightedNet.Fires {P T : Type*} (net : WeightedNet P T)
     (m : Marking P) (t : T) (m' : Marking P) : Prop :=
   net.Enabled m t ∧
@@ -113,7 +160,7 @@ theorem WeightedNet.enabled_iff_exists_fires {P T : Type*}
   · rintro ⟨_, hfires⟩
     exact hfires.1
 
-/-- Firing a fixed transition from a fixed marking has a unique result. -/
+/-- Firing a transition from a marking has a unique result. -/
 theorem WeightedNet.fires_is_deterministic {P T : Type*} {net : WeightedNet P T}
     {m m₁ m₂ : Marking P} {t : T}
     (h₁ : net.Fires m t m₁)
