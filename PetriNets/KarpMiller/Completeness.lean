@@ -51,24 +51,13 @@ def DFSCovers (m₀ m : Marking P) : Prop :=
     (dfsLTS net).CanReach (Branch.initial m₀) branch ∧
     m ≤ branch.marking
 
-/-- Lift coverage by an arbitrary reachable DFS branch across one concrete
-firing.
+/-- Coverage is preserved across one concrete firing.
 
-If a reachable branch covers `m` and `m` fires `t` to `m'`, then some
-reachable branch covers `m'`:
+If the dfsLTS rooted at `m₀` covers `m` and `m` fires `t` to `m'`, it also covers `m'`:
 
-```text
-                         m ──t──▶ m'
-                         │        │
-                         ≤        ≤
-                         ▼        ▼
-Branch.initial m₀ ──*──▶ branch    next
-              └──────────*─────────▲
-```
-The proof first replaces the covering branch by a reachable first occurrence
-with the same marking. `dfsLTS_tr_cover_of_fires` then supplies the covering
-successor edge, which extends the path reaching that first occurrence.
--/
+The proof first gets a witness covering first occurrence branch for `m`,
+then applies the theorem `dfsLTS_tr_cover_of_fires` that supplies the covering
+successor edge, which extends the path reaching that first occurrence. -/
 theorem dfsLTS_covers_of_fires
     {m₀ m m' : Marking P} {t : T}
     (hcover : DFSCovers net m₀ m) (hfires : net.Fires m t m') :
@@ -84,7 +73,7 @@ theorem dfsLTS_covers_of_fires
   exact ⟨succBranch net first t,
     Cslib.LTS.CanReach.stepR hreachFirst hstep, hcoverNext⟩
 
-/-- Lift DFS coverage along a concrete firing sequence.
+/-- Coverage is preserved along a firing sequence.
 
 Coverage is preserved one firing at a time by `dfsLTS_covers_of_fires`; the
 proof iterates that result along the sequence. -/
@@ -98,9 +87,9 @@ theorem dfsLTS_covers_of_firesSequence
   | cons head tail ih =>
       exact ih (dfsLTS_covers_of_fires net hcover head)
 
-/-- **Karp–Miller DFS over-approximation for reachability.** Every marking
-`tgt` reachable from `m₀` is covered by the marking of some branch reachable
-in `dfsLTS` from the initial branch.
+/-- **Karp–Miller DFS over-approximation for reachability.**
+Every marking `tgt` reachable from `m₀` is covered by a reachable
+marking of `dfsLTS` from the initial branch.
 
 ```text
 m₀ ──concrete firing sequence──▶ tgt
@@ -110,9 +99,7 @@ Branch.initial m₀ ──DFS path──▶ branch
                                       │ tgt ≤ branch.marking
 ```
 
-This is the transition-system form of Karp–Miller completeness. The finite
-tree result below follows by transferring the reachable branch to a tree
-node. -/
+This is the transition-system form of Karp–Miller completeness. -/
 theorem dfsLTS_covers_of_reachable
     {m₀ tgt : Marking P} (hreach : net.Reachable m₀ tgt) :
     DFSCovers net m₀ tgt := by
@@ -122,12 +109,11 @@ theorem dfsLTS_covers_of_reachable
       Cslib.LTS.CanReach.refl (dfsLTS net) (Branch.initial m₀), le_rfl⟩
     hseq
 
-/-- **Karp–Miller over-approximation for reachability.** For every marking
-`tgt` reachable from `m₀`, there exists an ω-marking `mω` occurring in the
-finite Karp–Miller tree such that `tgt ≤ mω`.
+/-- **Karp–Miller over-approximation for reachability.**
 
-`dfsLTS_covers_of_reachable` produces a reachable DFS branch covering `tgt`,
-and `karpMillerDFS_hasNode_of_mTr` places its ω-marking in the finite tree. -/
+For every marking `tgt` reachable from `m₀`, there exists an ω-marking `mω` occurring in the
+finite Karp–Miller tree such that `tgt ≤ mω`.
+This follows directly from the fact that the dfsLTS covers all reachable markings. -/
 theorem karpMillerDFS_covers_of_reachable
     {m₀ tgt : Marking P}
     (hreach : net.Reachable m₀ tgt) :
