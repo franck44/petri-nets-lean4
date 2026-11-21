@@ -90,11 +90,6 @@ theorem mem_dfsSuccessors_iff {src tgt : Branch P} {t : T} :
 def dfsLTS (net : WeightedNet P T) : Cslib.LTS (Branch P) T where
   Tr src t tgt := (t, tgt) ∈ dfsSuccessors net src
 
-/-- A DFS edge is exactly membership in the computed successor list. -/
-theorem dfsLTS_tr_iff {src tgt : Branch P} {t : T} :
-    (dfsLTS net).Tr src t tgt ↔ (t, tgt) ∈ dfsSuccessors net src :=
-  Iff.rfl
-
 /-- Simulate one concrete firing from a covering first-occurrence branch.
 
 If `branch.marking` covers `m` and `m` fires `t` to `m'`, monotonicity makes
@@ -151,20 +146,6 @@ theorem omegaPlaces_mono_of_mTr {src tgt : Branch P} {labels : List T}
   | refl => exact Finset.Subset.rfl
   | stepL htr _ ih =>
       exact (omegaPlaces_mono_of_tr htr).trans ih
-
-/-- A place which is finite at the end of a finite Karp–Miller execution was
-already finite at its source.
-
-This is the contrapositive, at one place, of
-`omegaPlaces_mono_of_mTr`: once a component becomes `ω`, no later DFS step can
-make it finite again. -/
-theorem not_mem_omegaPlaces_of_mTr
-    {src tgt : Branch P} {labels : List T} {p : P}
-    (hexec : (dfsLTS net).MTr src labels tgt)
-    (hp : p ∉ OmegaMarking.omegaPlaces tgt.marking) :
-    p ∉ OmegaMarking.omegaPlaces src.marking := by
-  intro hpSrc
-  exact hp (omegaPlaces_mono_of_mTr hexec hpSrc)
 
 /-- If the source and target of a finite Karp–Miller execution have the same
 set of `ω`-places, then every intermediate branch has that same set.
@@ -259,28 +240,6 @@ theorem marking_mem_history_of_mTr {src tgt : Branch P} {labels : List T}
       rw [Branch.history, List.mem_append]
       exact Or.inl (ancestors_mono_of_mTr htail
         (marking_mem_ancestors_of_tr htr))
-
-/-- A Karp–Miller DFS edge preserves the invariant that the ancestor list has
-no duplicates. -/
-theorem ancestors_nodup_of_tr {src tgt : Branch P} {t : T}
-    (htr : (dfsLTS net).Tr src t tgt) (hsrc : src.ancestors.Nodup) :
-    tgt.ancestors.Nodup := by
-  obtain ⟨hfirst, _, rfl⟩ := mem_dfsSuccessors_iff.mp htr
-  simpa [succBranch] using src.history_nodup hsrc hfirst
-
-/-- Every node reachable from the initial Karp–Miller node has a
-duplicate-free list of ancestors. -/
-theorem reachable_ancestors_nodup {m₀ : Marking P} {node : Branch P}
-    (hreach : (dfsLTS net).CanReach (Branch.initial m₀) node) :
-    node.ancestors.Nodup := by
-  obtain ⟨labels, hmtr⟩ := hreach
-  have preserve {src tgt : Branch P} {labels : List T}
-      (h : (dfsLTS net).MTr src labels tgt) (hsrc : src.ancestors.Nodup) :
-      tgt.ancestors.Nodup := by
-    induction h with
-    | refl => exact hsrc
-    | stepL htr _ ih => exact ih (ancestors_nodup_of_tr htr hsrc)
-  exact preserve hmtr (by simp [Branch.initial, Branch.root])
 
 /-- A marking stored among the ancestors of the target of a finite DFS
 execution either was already an ancestor of the source, or is the marking of
@@ -386,20 +345,6 @@ theorem marking_mem_ancestors_of_omegaExecution
     exact marking_mem_ancestors_of_tr (hexec i)
   exact ancestors_mono_of_omegaExecution hexec hij hnext
 
-/-- Every marking is contained in the complete history of every node at the
-same or a later position of an infinite Karp–Miller execution. -/
-theorem marking_mem_history_of_omegaExecution
-    {nodes : Cslib.ωSequence (Branch P)}
-    {labels : Cslib.ωSequence T}
-    (hexec : (dfsLTS net).OmegaExecution nodes labels)
-    {i j : ℕ} (hij : i ≤ j) :
-    (nodes i).marking ∈ (nodes j).history := by
-  rcases Nat.eq_or_lt_of_le hij with (rfl | hij')
-  · simp [Branch.history]
-  · rw [Branch.history, List.mem_append]
-    exact Or.inl
-      (marking_mem_ancestors_of_omegaExecution hexec hij')
-
 /-- The Karp–Miller DFS LTS is deterministic. Registering this fact as an
 instance allows CSLib results for deterministic LTSs to apply directly. -/
 instance (net : WeightedNet P T) :
@@ -410,15 +355,6 @@ instance (net : WeightedNet P T) :
   change (t, tgt₂) ∈ dfsSuccessors net src at h₂
   rw [mem_dfsSuccessors_iff] at h₁ h₂
   exact h₁.2.2.symm.trans h₂.2.2
-
-/-- A branch has no DFS successor exactly when it is not a first occurrence
-or its current marking enables no transition. -/
-theorem no_tr_iff_not_first_occurrence_or_terminal {src : Branch P} :
-    (∀ t tgt, ¬ (dfsLTS net).Tr src t tgt) ↔
-      ¬ src.IsFirstOccurrence ∨ ∀ t, ¬ net.OmegaEnabled src.marking t := by
-  classical
-  by_cases hfirst : src.IsFirstOccurrence <;>
-    simp [dfsLTS, mem_dfsSuccessors_iff, hfirst]
 
 end FinitePlaces
 
