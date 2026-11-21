@@ -7,7 +7,6 @@ Authors: Franck Cassez
 module
 
 public import Mathlib
-public import Cslib
 
 /-!
 # Weighted place/transition nets
@@ -58,9 +57,7 @@ structure WeightedNet (P : Type*) (T : Type*) where
 
 /-- A marking assigns a token count to each place.
 
-It defines the state of the net, as the distribution of tokens across the places.
-
--/
+It is the state of a net: the distribution of tokens across its places. -/
 abbrev Marking (P : Type*) := P → ℕ
 
 /-- A transition is enabled when every place contains at least the number of
@@ -85,31 +82,6 @@ theorem WeightedNet.firingResult_apply {P T : Type*}
     net.firingResult src t p = src p - net.pre p t + net.post p t :=
   rfl
 
-/-- The marking obtained by applying the token updates of a transition list
-from left to right.
-
-Like `firingResult`, this is a total function: it computes a marking even if
-some transition in the list is not enabled. A proof of `FiresSequence`
-additionally establishes that every transition is enabled when it is applied.
--/
-def WeightedNet.firingSequenceResult {P T : Type*}
-    (net : WeightedNet P T) (src : Marking P) : List T → Marking P
-  | [] => src
-  | t :: ts => net.firingSequenceResult (net.firingResult src t) ts
-
-@[simp]
-theorem WeightedNet.firingSequenceResult_nil {P T : Type*}
-    (net : WeightedNet P T) (src : Marking P) :
-    net.firingSequenceResult src [] = src :=
-  rfl
-
-@[simp]
-theorem WeightedNet.firingSequenceResult_cons {P T : Type*}
-    (net : WeightedNet P T) (src : Marking P) (t : T) (ts : List T) :
-    net.firingSequenceResult src (t :: ts) =
-      net.firingSequenceResult (net.firingResult src t) ts :=
-  rfl
-
 /-- A marking is terminal when it enables no transition. This is a local
 property of a marking, distinct from termination of all runs of a net. -/
 def WeightedNet.IsTerminal {P T : Type*} (net : WeightedNet P T)
@@ -131,17 +103,16 @@ theorem WeightedNet.enabled_iff_exists_fires {P T : Type*}
     net.Enabled m t ↔ ∃ m', net.Fires m t m' := by
   constructor
   · intro henabled
-    use fun p => m p - net.pre p t + net.post p t
-    exact ⟨henabled, fun _ => rfl⟩
+    exact ⟨net.firingResult m t, henabled, fun _ => rfl⟩
   · rintro ⟨_, hfires⟩
     exact hfires.1
 
-/-- Firing a fixed transition from a fixed marking has a unique result i.e. is deterministic. -/
+/-- Firing a fixed transition from a fixed marking has a unique result. -/
 theorem WeightedNet.fires_is_deterministic {P T : Type*} {net : WeightedNet P T}
     {m m₁ m₂ : Marking P} {t : T}
     (h₁ : net.Fires m t m₁)
     (h₂ : net.Fires m t m₂) : m₁ = m₂ := by
-  -- It suffices to show that for each place `p`, the token count in `m₁` equals the token count in `m₂`. We use the extensionality of functions to introduce an arbitrary place.
+  -- Markings are functions, so it suffices to compare every place.
   funext p
   exact (h₁.right p).trans (h₂.right p).symm
 

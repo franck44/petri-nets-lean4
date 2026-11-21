@@ -29,19 +29,42 @@ reachability relation for weighted P/T nets.
 
 namespace PetriNet
 
-
-/-- `net.FiresSequence src transitions tgt` builds a proof that firing the sequence of transitions `transitions` starting from marking `src` leads to marking `tgt`.
-In other words, it shows that executing the  transitions in order takes the net state from `src` to `tgt`. -/
+/-- `net.FiresSequence src ts tgt` means that firing the transitions in `ts`
+from left to right takes marking `src` to marking `tgt`. -/
 inductive WeightedNet.FiresSequence {P T : Type*} (net : WeightedNet P T) :
     Marking P → List T → Marking P → Prop where
-    /- `src` is the initial marking, `tgt` is the final marking -/
-    /- the empty sequence is valid if it leaves the marking unchanged -/
+  /-- The empty sequence leaves a marking unchanged. -/
   | nil (m) : net.FiresSequence m [] m
-  /- a non-empty sequence is valid if the first transition fires and the remaining sequence is valid -/
-  | cons {ts: List T} {src i tgt : Marking P} {t : T}
+  /-- A nonempty sequence fires its head transition, then its tail. -/
+  | cons {ts : List T} {src i tgt : Marking P} {t : T}
       (head : net.Fires src t i)
       (tail : net.FiresSequence i ts tgt) :
       net.FiresSequence src (t :: ts) tgt
+
+/-- The marking obtained by applying the token updates of a transition list
+from left to right.
+
+Like `firingResult`, this is a total function: it computes a marking even if
+some transition in the list is not enabled. A proof of `FiresSequence`
+additionally establishes that every transition is enabled when it is applied.
+-/
+def WeightedNet.firingSequenceResult {P T : Type*}
+    (net : WeightedNet P T) (src : Marking P) : List T → Marking P
+  | [] => src
+  | t :: ts => net.firingSequenceResult (net.firingResult src t) ts
+
+@[simp]
+theorem WeightedNet.firingSequenceResult_nil {P T : Type*}
+    (net : WeightedNet P T) (src : Marking P) :
+    net.firingSequenceResult src [] = src :=
+  rfl
+
+@[simp]
+theorem WeightedNet.firingSequenceResult_cons {P T : Type*}
+    (net : WeightedNet P T) (src : Marking P) (t : T) (ts : List T) :
+    net.firingSequenceResult src (t :: ts) =
+      net.firingSequenceResult (net.firingResult src t) ts :=
+  rfl
 
 /-- Lift a standard firing to a singleton firing sequence. -/
 theorem WeightedNet.FiresSequence.singleton {P T : Type*}
@@ -49,8 +72,7 @@ theorem WeightedNet.FiresSequence.singleton {P T : Type*}
     (h : net.Fires src t tgt) : net.FiresSequence src [t] tgt := by
   exact WeightedNet.FiresSequence.cons h (WeightedNet.FiresSequence.nil tgt)
 
-/-- A firing sequence h_1 ending at a marking `i` can be extended by another firing
-sequence h_2 starting at `i`. The resulting proof uses the fact that the transition list is the concatenation of the two sequences. -/
+/-- Concatenate two firing sequences whose intermediate markings agree. -/
 theorem WeightedNet.FiresSequence.append {P T : Type*}
     {net : WeightedNet P T} {src i tgt : Marking P} {ts₁ ts₂ : List T}
     (h₁ : net.FiresSequence src ts₁ i)
@@ -59,16 +81,14 @@ theorem WeightedNet.FiresSequence.append {P T : Type*}
   induction h₁ with
   | nil => exact h₂
   | cons head tail ih =>
-  /- h1 is head :: tail and the induction hypothesis holds for tail and h2 -/
       exact WeightedNet.FiresSequence.cons head (ih h₂)
 
 /-- A transition sequence has a unique target marking when fired from a
- source marking. -/
+source marking. -/
 theorem WeightedNet.FiresSequence.deterministic {P T : Type*}
     {net : WeightedNet P T} {src tgt₁ tgt₂ : Marking P} {ts : List T}
     (h₁ : net.FiresSequence src ts tgt₁)
     (h₂ : net.FiresSequence src ts tgt₂) : tgt₁ = tgt₂ := by
-    /- induction on h₁ treating tgt₂ as arbitrary -/
   induction h₁ generalizing tgt₂ with
   | nil =>
       cases h₂
@@ -77,12 +97,11 @@ theorem WeightedNet.FiresSequence.deterministic {P T : Type*}
       cases h₂ with
       | cons head₂ tail₂ =>
           cases WeightedNet.fires_is_deterministic head₁ head₂
-          /- the two target after head₁ and head₂ must be the same -/
           exact ih tail₂
 
 /-- A marking is reachable from another marking when some transition sequence
 takes the first marking to the second. -/
-def WeightedNet.Reachable {P T : Type*} (net : PetriNet.WeightedNet P T)
+def WeightedNet.Reachable {P T : Type*} (net : WeightedNet P T)
     (m m' : Marking P) : Prop :=
   ∃ ts : List T, net.FiresSequence m ts m'
 
