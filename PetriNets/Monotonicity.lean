@@ -11,8 +11,13 @@ public import PetriNets.Reachability
 /-!
 # Monotonicity of weighted P/T nets
 
-This module develops monotonicity properties with respect to the pointwise
-order on markings. In particular, adding tokens to a place cannot disable a transition.
+Provides monotonicity results for enabled transitions, firings, firing
+sequences, and reachability with respect to the pointwise order on markings.
+
+For two markings, `m₁ ≤ m₂` means that `m₁ p ≤ m₂ p` for every place `p`.
+Adding tokens cannot disable a transition. Consequently, an executable firing
+sequence remains executable after adding the same marking to its source and
+target.
 -/
 
 @[expose] public section
@@ -21,19 +26,29 @@ namespace PetriNet
 
 variable {P T : Type*} {net : WeightedNet P T}
 
-/-- A transition enabled at a marking remains enabled at any (point-wise) larger marking.
-The proof is to unfold the definition of `Enabled` and use the point-wise order on markings.
--/
+/-! ## One-step monotonicity -/
+
+/-- A transition enabled at a marking remains enabled at any pointwise larger
+marking. -/
 theorem WeightedNet.Enabled.mono {m₁ m₂ : Marking P} {t : T}
     (h : net.Enabled m₁ t) (hle : m₁ ≤ m₂) :
     net.Enabled m₂ t := by
   intro p
   exact (h p).trans (hle p)
 
-/-- If `t` fires from `m` to `m'`, then for any additional marking `d`, `t`
-also fires from `m + d` to `m' + d`.
-The proof splits the two conditions of `Fires`: first, the transition must be enabled at the new marking `m + d`, which follows from monotonicity; second, the resulting marking `m' + d` must satisfy the firing equation, which is verified by simple arithmetic.
--/
+/-- If `t` fires from `m` to `m'`, then for any additional marking, or token
+reserve, `d`, the transition also fires from `m + d` to `m' + d`.
+
+```text
+m   ──t──▶ m'
+│          │
++ d        + d
+▼          ▼
+m+d ──t──▶ m'+d
+```
+
+The proof uses enabledness monotonicity and checks the firing equation
+pointwise. -/
 theorem WeightedNet.Fires.add {m m' : Marking P} {t : T}
     (h : net.Fires m t m') (d : Marking P) :
     net.Fires (m + d) t (m' + d) := by
@@ -44,16 +59,19 @@ theorem WeightedNet.Fires.add {m m' : Marking P} {t : T}
     have hfire : m' p = m p - net.pre p t + net.post p t := by
       simpa using h.right p
     have henabled := h.left p
-    /- use point-wise addition (m' + d) p = m' p + d p and (m + d) p = m p + d p -/
+    /- Use pointwise addition at `p`. -/
     change m' p + d p = (m p + d p) - net.pre p t + net.post p t
     omega
+
+/-! ## Firing-sequence monotonicity -/
 
 /-- Extend `WeightedNet.Fires.add` to firing sequences: if `ts` fires from
 `src` to `tgt`, then for any additional marking `d`, `ts` also fires from
 `src + d` to `tgt + d`.
 
-The proof is: nil case, it must the case that tgt = src, and adding d to both sides preserves the equality; cons case, apply `WeightedNet.Fires.add` to the head and use the induction hypothesis on the tail.
--/
+The empty case is immediate. In the nonempty case, apply
+`WeightedNet.Fires.add` to the first firing and the induction hypothesis to
+the remaining sequence. -/
 theorem WeightedNet.FiresSequence.add {src tgt : Marking P} {ts : List T}
     (h : net.FiresSequence src ts tgt) (d : Marking P) :
     net.FiresSequence (src + d) ts (tgt + d) := by
@@ -62,6 +80,8 @@ theorem WeightedNet.FiresSequence.add {src tgt : Marking P} {ts : List T}
       exact WeightedNet.FiresSequence.nil (src + d)
   | cons head tail ih =>
       exact WeightedNet.FiresSequence.cons (WeightedNet.Fires.add head d) ih
+
+/-! ## Repeating and combining firing sequences -/
 
 /-- Combine two firing sequences by supplying each with the marking required
 by the other.
@@ -230,10 +250,10 @@ identity which joins the first firing to the remaining repetitions:
 tgt + (n+1)·loss = (src + n·loss) + gain.
 ```
 
-Unlike `FiresSequence.pump`, no hypothesis `src ≤ tgt` is required. The price
-is that the repeated execution starts at `src + n • loss`, not at `src`
-itself. A later application must separately show that this enlarged source is
-available or covered by a reachable marking. -/
+No hypothesis `src ≤ tgt` is required. The repeated execution instead starts
+at `src + n • loss`, rather than at `src` itself. An application must
+separately show that this enlarged source is available or covered by a
+reachable marking. -/
 theorem WeightedNet.FiresSequence.repeat_with_reserve
     {src tgt : Marking P} {ts : List T}
     (hseq : net.FiresSequence src ts tgt) (n : ℕ) :
