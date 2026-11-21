@@ -22,7 +22,7 @@ only the static net structure. It does not include an initial marking.
 
 ## Main definitions
 
-* `WeightedNet.IsTerminal`: a marking that enables no transition.
+* `WeightedNet.IsDead`: a marking that enables no transition.
 * `WeightedNet.DeadlockFreeFrom`: every reachable marking enables a
   transition.
 * `WeightedNet.LiveFrom`: every transition can eventually become enabled from
@@ -36,8 +36,8 @@ only the static net structure. It does not include an initial marking.
 
 ## Main results
 
-* `WeightedNet.isTerminal_iff_markingGraph_isTerminal`: terminal markings are
-  exactly the terminal states of the marking graph.
+* `WeightedNet.isDead_iff_markingGraph_isTerminal`: dead markings are exactly
+  the terminal states of the marking graph.
 * `WeightedNet.deadlockFreeFrom_iff_markingGraph_has_outgoing`: a net is
   deadlock-free from its initial marking exactly when every state of its
   marking graph has an outgoing edge.

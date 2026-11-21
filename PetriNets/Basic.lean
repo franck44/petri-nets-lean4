@@ -82,9 +82,8 @@ theorem WeightedNet.firingResult_apply {P T : Type*}
     net.firingResult src t p = src p - net.pre p t + net.post p t :=
   rfl
 
-/-- A marking is terminal when it enables no transition. This is a local
-property of a marking, distinct from termination of all runs of a net. -/
-def WeightedNet.IsTerminal {P T : Type*} (net : WeightedNet P T)
+/-- A marking `m` is dead when no transition is enabled in `m`. -/
+def WeightedNet.IsDead {P T : Type*} (net : WeightedNet P T)
     (m : Marking P) : Prop :=
   ∀ t, ¬net.Enabled m t
 

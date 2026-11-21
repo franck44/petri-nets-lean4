@@ -91,11 +91,11 @@ theorem WeightedNet.markingLTS_canReach_iff {P T : Type*}
   · rintro ⟨ts, hts⟩
     exact ⟨ts, net.markingLTS_mTr_iff.mpr hts⟩
 
-/-- A marking is terminal in the Petri net exactly when it is terminal in the
+/-- A marking is dead in the Petri net exactly when it is terminal in the
 marking LTS. -/
-theorem WeightedNet.isTerminal_iff_markingLTS_isTerminal {P T : Type*}
+theorem WeightedNet.isDead_iff_markingLTS_isTerminal {P T : Type*}
     (net : WeightedNet P T) (m : Marking P) :
-    net.IsTerminal m ↔ net.markingLTS.IsTerminal m := by
+    net.IsDead m ↔ net.markingLTS.IsTerminal m := by
   constructor
   · intro hterminal t m' hfires
     exact hterminal t hfires.1
@@ -213,11 +213,11 @@ theorem WeightedNet.markingGraph_canReach_iff {P T : Type*}
     exact ⟨ts, (net.markingGraph_mTr_iff src tgt).mpr hseq⟩
 
 /-- A state of the marking graph is terminal exactly when its underlying
-marking is terminal in the Petri net. -/
-theorem WeightedNet.isTerminal_iff_markingGraph_isTerminal {P T : Type*}
+marking is dead in the Petri net. -/
+theorem WeightedNet.isDead_iff_markingGraph_isTerminal {P T : Type*}
     {net : WeightedNet P T} {m₀ : Marking P}
     (m : {m : Marking P // net.markingLTS.CanReach m₀ m}) :
-    net.IsTerminal m.1 ↔ (net.markingGraph m₀).IsTerminal m := by
+    net.IsDead m.1 ↔ (net.markingGraph m₀).IsTerminal m := by
   constructor
   · intro hterminal t m' htr
     exact hterminal t ((net.markingGraph_enabled_iff_exists_tr m t).mpr ⟨m', htr⟩)
