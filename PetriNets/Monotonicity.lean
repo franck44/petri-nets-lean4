@@ -270,6 +270,48 @@ theorem WeightedNet.FiresSequence.repeat_with_budget_ge_on_each
     exact Finset.single_le_sum (fun q _ => Nat.zero_le (bound q)) hp
   exact hle.trans (hbound p hp)
 
+/-- Shift a growing firing sequence to a larger target marking.
+
+Suppose `ts` fires from `src` to `tgt`, the sequence is nondecreasing, and it
+strictly increases place `p`. If `tgt ≤ base`, add the marking
+`d = base - tgt` to both ends of the execution:
+
+```text
+src          ──ts──▶ tgt
+│                       │
++ d                     + d
+▼                       ▼
+shiftedSrc   ──ts──▶ base
+
+shiftedSrc = src + d       base = tgt + d
+```
+
+Adding the same marking to both ends preserves `shiftedSrc ≤ base` and the
+strict inequality `shiftedSrc p < base p`. -/
+private theorem WeightedNet.FiresSequence.shift_growth_to
+    {src tgt base : Marking P} {ts : List T} {p : P}
+    (hseq : net.FiresSequence src ts tgt)
+    (hle : src ≤ tgt) (hlt : src p < tgt p) (htgt : tgt ≤ base) :
+    ∃ shiftedSrc,
+      net.FiresSequence shiftedSrc ts base ∧
+      shiftedSrc ≤ base ∧ shiftedSrc p < base p := by
+  /- Add precisely the difference between the old and new targets. -/
+  let d : Marking P := base - tgt
+  /- Since `tgt ≤ base`, this difference shifts `tgt` exactly to `base`. -/
+  have htgtEq : tgt + d = base := by
+    exact add_tsub_cancel_of_le htgt
+  /- now use the additive property of firing sequences starting from `src + d`. -/
+  refine ⟨src + d, ?_, ?_, ?_⟩
+  /- Shift the original firing sequence by `d`. -/
+  · rw [← htgtEq]
+    exact hseq.add d
+  /- Adding the same marking preserves the non-strict inequality. -/
+  · rw [← htgtEq]
+    simpa [add_comm] using add_le_add_right hle d
+  /- Adding the same number at `p` also preserves strict growth. -/
+  · rw [← htgtEq]
+    exact Nat.add_lt_add_right hlt (d p)
+
 /-- **Shift finitely many growth paths to a common endpoint.**
 
 Suppose every `p ∈ A` has a firing sequence with its own source and endpoint,
@@ -319,34 +361,16 @@ theorem WeightedNet.FiresSequence.exists_common_endpoint_growth
       let base : Marking P := endP ⊔ baseA
       have hendP : endP ≤ base := le_sup_left
       have hbaseA_le : baseA ≤ base := le_sup_right
-      have shift {q : P} {src end_ : Marking P} {ts : List T}
-          (hseq : net.FiresSequence src ts end_)
-          (hle : src ≤ end_) (hlt : src q < end_ q)
-          (hend : end_ ≤ base) :
-          ∃ shiftedSrc,
-            net.FiresSequence shiftedSrc ts base ∧
-            shiftedSrc ≤ base ∧ shiftedSrc q < base q := by
-        let d : Marking P := base - end_
-        have hendEq : end_ + d = base := by
-          funext r
-          exact Nat.add_sub_of_le (hend r)
-        refine ⟨src + d, ?_, ?_, ?_⟩
-        · rw [← hendEq]
-          exact hseq.add d
-        · rw [← hendEq]
-          exact fun r => Nat.add_le_add_right (hle r) (d r)
-        · rw [← hendEq]
-          exact Nat.add_lt_add_right hlt (d q)
       refine ⟨base, ?_⟩
       intro q hq
       rw [Finset.mem_insert] at hq
       rcases hq with rfl | hq
       · obtain ⟨shiftedSrc, hseq, hle, hlt⟩ :=
-          shift hseqP hleP hltP hendP
+          hseqP.shift_growth_to hleP hltP hendP
         exact ⟨shiftedSrc, tsP, hseq, hle, hlt⟩
       · obtain ⟨srcQ, tsQ, hseqQ, hleQ, hltQ⟩ := hbaseA q hq
         obtain ⟨shiftedSrc, hseq, hle, hlt⟩ :=
-          shift hseqQ hleQ hltQ hbaseA_le
+          hseqQ.shift_growth_to hleQ hltQ hbaseA_le
         exact ⟨shiftedSrc, tsQ, hseq, hle, hlt⟩
 
 /-- Combine finitely many pumpable segments ending at the same marking.
