@@ -7,6 +7,7 @@ Authors: Franck Cassez
 module
 
 public import PetriNets.KarpMiller.Successor
+public import PetriNets.LTS.Basic
 
 /-!
 # The Karp–Miller DFS transition system
@@ -19,20 +20,6 @@ status and enabledness have a single executable source of truth.
 
 @[expose] public section
 
-namespace Cslib.LTS.CanReach
-
-/-- Extend reachability by one transition on the right.
-
-TODO: this generic result should eventually move to CSLib's LTS library. -/
-theorem stepR {State Label : Type*} {lts : Cslib.LTS State Label}
-    {src mid tgt : State} {label : Label}
-    (hreach : lts.CanReach src mid) (hstep : lts.Tr mid label tgt) :
-    lts.CanReach src tgt := by
-  obtain ⟨labels, hexec⟩ := hreach
-  exact ⟨labels ++ [label], Cslib.LTS.MTr.stepR lts hexec hstep⟩
-
-end Cslib.LTS.CanReach
-
 namespace PetriNet
 
 namespace KarpMiller
@@ -43,6 +30,8 @@ variable {net : WeightedNet P T}
 section FinitePlaces
 
 variable [FinEnum P] [FinEnum T]
+
+/-! ## Executable DFS transitions -/
 
 /-- Compute the labelled successor branches explored by the Karp–Miller DFS.
 
@@ -90,6 +79,17 @@ theorem mem_dfsSuccessors_iff {src tgt : Branch P} {t : T} :
 def dfsLTS (net : WeightedNet P T) : Cslib.LTS (Branch P) T where
   Tr src t tgt := (t, tgt) ∈ dfsSuccessors net src
 
+/-- The Karp–Miller DFS LTS is deterministic. Registering this fact as an
+instance allows CSLib results for deterministic LTSs to apply directly. -/
+instance (net : WeightedNet P T) :
+    (dfsLTS net).Deterministic := by
+  constructor
+  intro src t tgt₁ tgt₂ h₁ h₂
+  change (t, tgt₁) ∈ dfsSuccessors net src at h₁
+  change (t, tgt₂) ∈ dfsSuccessors net src at h₂
+  rw [mem_dfsSuccessors_iff] at h₁ h₂
+  exact h₁.2.2.symm.trans h₂.2.2
+
 /-- Simulate one concrete firing from a covering first-occurrence branch.
 
 If `branch.marking` covers `m` and `m` fires `t` to `m'`, monotonicity makes
@@ -115,6 +115,8 @@ theorem dfsLTS_tr_cover_of_fires
   exact ⟨mem_dfsSuccessors_iff.mpr ⟨hfirst, henabled, rfl⟩,
     hcoverNext⟩
 
+/-! ## Marking and ω-place behaviour -/
+
 /-- Along a DFS edge, the set of places equal to `ω` can only grow. -/
 theorem omegaPlaces_mono_of_tr {src tgt : Branch P} {t : T}
     (htr : (dfsLTS net).Tr src t tgt) :
@@ -124,16 +126,6 @@ theorem omegaPlaces_mono_of_tr {src tgt : Branch P} {t : T}
   rw [mem_dfsSuccessors_iff] at htr
   rw [← htr.2.2]
   exact omegaPlaces_mono_of_succBranch src t
-
-/-- At a place which is finite after a DFS step, the target component is the
-raw firing result. Acceleration can only replace a component by `ω`, so it
-cannot have affected this place. -/
-theorem marking_apply_eq_succMarking_of_tr_of_ne_top
-    {src tgt : Branch P} {t : T} {p : P}
-    (htr : (dfsLTS net).Tr src t tgt) (hp : tgt.marking p ≠ ⊤) :
-    tgt.marking p = succMarking net src.marking t p := by
-  obtain ⟨_, _, rfl⟩ := mem_dfsSuccessors_iff.mp htr
-  exact succBranch_marking_apply_eq_succMarking_of_ne_top src t hp
 
 /-- Along a finite Karp–Miller execution, the set of places equal to `ω` can
 only grow. This extends `omegaPlaces_mono_of_tr` from one transition to a
@@ -190,6 +182,8 @@ theorem marking_eq_succMarking_of_tr_of_omegaPlaces_eq
   obtain ⟨_, _, rfl⟩ := mem_dfsSuccessors_iff.mp htr
   exact succBranch_marking_eq_succMarking_of_omegaPlaces_eq src t homega
 
+/-! ## Branch histories -/
+
 /-- A Karp–Miller DFS step preserves every existing ancestor of the source
 branch in the target branch. -/
 theorem ancestors_mono_of_tr {src tgt : Branch P} {t : T}
@@ -229,6 +223,22 @@ theorem marking_mem_ancestors_of_tr {src tgt : Branch P} {t : T}
   obtain ⟨_, _, rfl⟩ := mem_dfsSuccessors_iff.mp htr
   simp [succBranch, Branch.history]
 
+/-- Every marking occurring earlier on an infinite Karp–Miller execution is
+stored in the ancestor list of every later node.
+
+For consecutive nodes this follows because a step places the source marking
+at the head of the target history. For a more distant node, the existing
+ancestor membership is carried forward by each subsequent step. -/
+theorem marking_mem_ancestors_of_omegaExecution
+    {nodes : Cslib.ωSequence (Branch P)}
+    {labels : Cslib.ωSequence T}
+    (hexec : (dfsLTS net).OmegaExecution nodes labels)
+    {i j : ℕ} (hij : i < j) :
+    (nodes i).marking ∈ (nodes j).ancestors := by
+  have hnext : (nodes i).marking ∈ (nodes (i + 1)).ancestors := by
+    exact marking_mem_ancestors_of_tr (hexec i)
+  exact ancestors_mono_of_omegaExecution hexec hij hnext
+
 /-- The initial marking of a finite Karp–Miller execution belongs to the
 complete history of its final branch. -/
 theorem marking_mem_history_of_mTr {src tgt : Branch P} {labels : List T}
@@ -240,6 +250,22 @@ theorem marking_mem_history_of_mTr {src tgt : Branch P} {labels : List T}
       rw [Branch.history, List.mem_append]
       exact Or.inl (ancestors_mono_of_mTr htail
         (marking_mem_ancestors_of_tr htr))
+
+/-- If the initial marking of a finite execution is below a prospective raw
+successor marking `m`, and is strictly smaller at place `p`, then `p` is
+selected for acceleration.
+
+The execution makes `src.marking` an already-seen marking in `pred.history`.
+The remaining two hypotheses are exactly the non-strict and strict parts of
+the Karp–Miller acceleration criterion. In particular, strictness implies that
+`p` was not already equal to `ω` in `src.marking`. -/
+theorem mem_acceleratedPlaces_of_mTr
+    {src pred : Branch P} {labels : List T} {m : OmegaMarking P} {p : P}
+    (hexec : (dfsLTS net).MTr src labels pred)
+    (hle : src.marking ≤ m) (hlt : src.marking p < m p) :
+    p ∈ Branch.acceleratedPlaces m pred := by
+  exact Branch.mem_acceleratedPlaces
+    (marking_mem_history_of_mTr hexec) hle hlt
 
 /-- A marking stored among the ancestors of the target of a finite DFS
 execution either was already an ancestor of the source, or is the marking of
@@ -312,49 +338,6 @@ theorem exists_first_occurrence_of_canReach
         ⟨pre, first, _, _, hpre, _, hfirst, hmarking⟩
     · simp [Branch.initial, Branch.root] at hroot
     · exact ⟨first, ⟨pre, hpre⟩, hfirst, hmarking⟩
-
-/-- If the initial marking of a finite execution is below a prospective raw
-successor marking `m`, and is strictly smaller at place `p`, then `p` is
-selected for acceleration.
-
-The execution makes `src.marking` an already-seen marking in `pred.history`.
-The remaining two hypotheses are exactly the non-strict and strict parts of
-the Karp–Miller acceleration criterion. In particular, strictness implies that
-`p` was not already equal to `ω` in `src.marking`. -/
-theorem mem_acceleratedPlaces_of_mTr
-    {src pred : Branch P} {labels : List T} {m : OmegaMarking P} {p : P}
-    (hexec : (dfsLTS net).MTr src labels pred)
-    (hle : src.marking ≤ m) (hlt : src.marking p < m p) :
-    p ∈ Branch.acceleratedPlaces m pred := by
-  exact Branch.mem_acceleratedPlaces
-    (marking_mem_history_of_mTr hexec) hle hlt
-
-/-- Every marking occurring earlier on an infinite Karp–Miller execution is
-stored in the ancestor list of every later node.
-
-For consecutive nodes this follows because a step places the source marking
-at the head of the target history. For a more distant node, the existing
-ancestor membership is carried forward by each subsequent step. -/
-theorem marking_mem_ancestors_of_omegaExecution
-    {nodes : Cslib.ωSequence (Branch P)}
-    {labels : Cslib.ωSequence T}
-    (hexec : (dfsLTS net).OmegaExecution nodes labels)
-    {i j : ℕ} (hij : i < j) :
-    (nodes i).marking ∈ (nodes j).ancestors := by
-  have hnext : (nodes i).marking ∈ (nodes (i + 1)).ancestors := by
-    exact marking_mem_ancestors_of_tr (hexec i)
-  exact ancestors_mono_of_omegaExecution hexec hij hnext
-
-/-- The Karp–Miller DFS LTS is deterministic. Registering this fact as an
-instance allows CSLib results for deterministic LTSs to apply directly. -/
-instance (net : WeightedNet P T) :
-    (dfsLTS net).Deterministic := by
-  constructor
-  intro src t tgt₁ tgt₂ h₁ h₂
-  change (t, tgt₁) ∈ dfsSuccessors net src at h₁
-  change (t, tgt₂) ∈ dfsSuccessors net src at h₂
-  rw [mem_dfsSuccessors_iff] at h₁ h₂
-  exact h₁.2.2.symm.trans h₂.2.2
 
 end FinitePlaces
 

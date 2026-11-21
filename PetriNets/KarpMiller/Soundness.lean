@@ -34,6 +34,16 @@ namespace KarpMiller
 
 variable {P T : Type*} {net : WeightedNet P T}
 
+/-- At a place which is finite after a DFS step, the target component is the
+raw firing result. Acceleration can only replace a component by `ω`, so it
+cannot have affected this place. -/
+private theorem marking_apply_eq_succMarking_of_tr_of_ne_top
+    [FinEnum P] [FinEnum T] {src tgt : Branch P} {t : T} {p : P}
+    (htr : (dfsLTS net).Tr src t tgt) (hp : tgt.marking p ≠ ⊤) :
+    tgt.marking p = succMarking net src.marking t p := by
+  obtain ⟨_, _, rfl⟩ := mem_dfsSuccessors_iff.mp htr
+  exact succBranch_marking_apply_eq_succMarking_of_ne_top src t hp
+
 /-- A Karp–Miller DFS edge whose target contains no `ω` is a
 concrete firing between the corresponding markings.
 
