@@ -407,7 +407,7 @@ concreteSrc(p) < concreteEnd(p)
 ```
 
 The endpoint remains below `raw`. The path may lose tokens at places which
-were already `ω`; those losses will later be paid for by reserve-backed
+were already `ω`; those losses will later be paid for by budget-backed
 repetition. -/
 theorem exists_concrete_growth_path_of_branch_witness
     [FinEnum P] [FinEnum T]
@@ -571,10 +571,10 @@ theorem exists_concrete_growth_path_of_branch_witness
 
 The initial base has the exact value of `raw` at every finite component. At
 an `omega` component it accumulates the sources of the paths still to be
-executed, which acts as their reserve. Consequently every path can be shifted
+executed, which acts as their budget. Consequently every path can be shifted
 to the current endpoint and appended. -/
 private theorem exists_combined_growth_below_omega
-    {A : Finset P} {raw : OmegaMarking P} (reserve : Marking P)
+    {A : Finset P} {raw : OmegaMarking P} (budget : Marking P)
     (hAfin : ∀ p ∈ A, raw p ≠ ⊤)
     (hpaths : ∀ p ∈ A, ∃ src tgt ts,
       net.FiresSequence src ts tgt ∧
@@ -585,7 +585,7 @@ private theorem exists_combined_growth_below_omega
       net.FiresSequence base ts tgt ∧
       (∀ q, raw q ≠ ⊤ → base q ≤ tgt q) ∧
       (∀ q, raw q ≠ ⊤ → base q = (raw q).toNat) ∧
-      (∀ q, raw q = ⊤ → reserve q ≤ tgt q) ∧
+      (∀ q, raw q = ⊤ → budget q ≤ tgt q) ∧
       ∀ p ∈ A, base p < tgt p := by
   classical
   have combine : ∀ I : Finset P, I ⊆ A →
@@ -594,13 +594,13 @@ private theorem exists_combined_growth_below_omega
         net.FiresSequence base ts tgt ∧
         (∀ q, raw q ≠ ⊤ → base q ≤ tgt q) ∧
         (∀ q, raw q ≠ ⊤ → base q = (raw q).toNat) ∧
-        (∀ q, raw q = ⊤ → reserve q ≤ tgt q) ∧
+        (∀ q, raw q = ⊤ → budget q ≤ tgt q) ∧
         ∀ p ∈ I, base p < tgt p := by
     intro I hIA
     induction I using Finset.induction with
     | empty =>
-        let base := raw.finiteApprox reserve
-        refine ⟨base, base, [], raw.finiteApprox_toOmega_le reserve,
+        let base := raw.finiteApprox budget
+        refine ⟨base, base, [], raw.finiteApprox_toOmega_le budget,
           WeightedNet.FiresSequence.nil base, by simp, ?_, ?_, by simp⟩
         · intro q hq
           simp [base, OmegaMarking.finiteApprox, hq]
@@ -610,7 +610,7 @@ private theorem exists_combined_growth_below_omega
         have hpA : p ∈ A := hIA (by simp)
         have hIA' : I ⊆ A := fun q hq => hIA (by simp [hq])
         obtain ⟨base, end_, before, hbaseRaw, hbefore, hmono,
-          hbaseFinite, hreserveEnd, hgrows⟩ := ih hIA'
+          hbaseFinite, hbudgetEnd, hgrows⟩ := ih hIA'
         obtain ⟨srcP, tgtP, path, hpath, hpathMono, hpGrowth,
           htgtRaw⟩ := hpaths p hpA
         let extra : Marking P := fun q => if raw q = ⊤ then srcP q else 0
@@ -664,11 +664,11 @@ private theorem exists_combined_growth_below_omega
         refine ⟨newBase, newEnd, before ++ path, hnewBaseRaw, hcombined,
           hnewMono, hnewBaseFinite, ?_, ?_⟩
         · intro q hq
-          have hreserve := hreserveEnd q hq
+          have hbudget := hbudgetEnd q hq
           have hd : d q = end_ q := by
             simp [d, mid, extra, hq]
           simp [newEnd, hd]
-          exact hreserve.trans (Nat.le_add_left _ _)
+          exact hbudget.trans (Nat.le_add_left _ _)
         intro q hq
         rw [Finset.mem_insert] at hq
         rcases hq with rfl | hq
@@ -827,11 +827,11 @@ prescribed finite demand.
 
 The combined path is nondecreasing at every finite component of `raw` and
 strictly increasing at every newly accelerated place. Possible losses occur
-only at existing `ω` components. `repeat_with_reserve_ge_on` pays for those
+only at existing `ω` components. `repeat_with_budget_ge_on` pays for those
 losses in the source, which therefore still embeds below `raw`.
 
 ```text
-concreteSrc ──combined witnesses, repeated with reserve──▶ reached
+concreteSrc ──combined witnesses, repeated with a budget──▶ reached
      │                                                          ▲
      └── toOmega ≤ raw                              demand ≤ ─┘
 ```
@@ -875,10 +875,10 @@ theorem exists_concrete_growth_execution
     simpa [raw] using exists_concrete_growth_path_of_branch_witness
       hsegment htr hp hle hlt
   obtain ⟨base, grown, combined, hbaseRaw, hcombined, hmono,
-    hbaseFinite, hreserveGrown, hgrows⟩ :=
+    hbaseFinite, hbudgetGrown, hgrows⟩ :=
     exists_combined_growth_below_omega (net := net) demand hAfin hpaths
   obtain ⟨hrepeated, hgrownReached, hbounds⟩ :=
-    hcombined.repeat_with_reserve_ge_on A demand hgrows
+    hcombined.repeat_with_budget_ge_on_each A demand hgrows
   let n := ∑ p ∈ A, demand p
   let concreteSrc := base + n • (base - grown)
   let reached := grown + n • (grown - base)
@@ -899,7 +899,7 @@ theorem exists_concrete_growth_execution
     by_cases hqA : q ∈ A
     · simpa [reached, n] using hbounds q hqA
     · by_cases hq : raw q = ⊤
-      · exact (hreserveGrown q hq).trans (hgrownReached q)
+      · exact (hbudgetGrown q hq).trans (hgrownReached q)
       · have hdemandBase : demand q ≤ base q := by
           have := demand_le_finiteApprox_raw_of_not_mem_newOmegaPlaces
             htr hdemand hqA
@@ -913,7 +913,7 @@ accelerated place.
 The hypotheses provide, for each `p ∈ newOmegaPlaces src tgt`, an earlier
 branch whose marking is below the raw successor and is strictly smaller at
 `p`. The intended proof concretises these abstract branch segments with
-sufficient reserves at the already-`ω` places, combines their positive
+sufficient budgets at the already-`ω` places, combines their positive
 effects using `FiresSequence.exists_combined_growth`, and repeats the combined
 sequence until all components of `demand` are covered.
 
@@ -969,8 +969,8 @@ For an arbitrary finite demand below `tgt.marking`, the intended proof:
 1. extracts from `hprefix` the historical segments witnessing each newly
    accelerated place;
 2. chooses enough repetitions to meet the demand at those places;
-3. propagates backwards the reserve required at already-`ω` places;
-4. uses `hsound` to obtain a reachable concrete source with that reserve; and
+3. propagates backwards the budget required at already-`ω` places;
+4. uses `hsound` to obtain a reachable concrete source with that budget; and
 5. executes the final transition and pumping segments forwards.
 
 The abstract prefix provides, for each newly accelerated place `p`, an earlier
@@ -986,7 +986,7 @@ Branch.initial m₀ ──pre──▶ ⋯ ──▶ ancestorₚ ──suffixₚ
 raw ──accelerate new ω-places──▶ tgt.marking
 ```
 
-After combining the growing segments and calculating the required reserve,
+After combining the growing segments and calculating the required budget,
 the concrete witness execution has the form:
 
 ```text
