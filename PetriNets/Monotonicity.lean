@@ -18,6 +18,9 @@ For two markings, `m₁ ≤ m₂` means that `m₁ p ≤ m₂ p` for every place
 Adding tokens cannot disable a transition. Consequently, an executable firing
 sequence remains executable after adding the same marking to its source and
 target.
+
+We provide formal statements and proofs of these monotonicity properties
+for weighted P/T nets as well results that combine and repeat firing sequences while preserving monotonicity.
 -/
 
 @[expose] public section
@@ -199,7 +202,7 @@ theorem WeightedNet.FiresSequence.repeat_with_budget
       · funext p
         simp [gain, Pi.add_apply, Nat.add_mul, Nat.add_assoc]
 
-/-- **Meet a common bound by budget-backed repetition.** Suppose `ts` strictly
+/-- **Cover a common bound by budget-backed repetition.** Suppose `ts` strictly
 increases every place in the finite set `A`. Repeating it with `bound` copies
 of the loss as a budget produces a marking containing at least `bound` tokens
 at every place in `A`.
@@ -222,9 +225,7 @@ tgt + bound·(tgt - src) = reached
 ```
 
 As with `repeat_with_budget`, this theorem constructs a firing sequence from
-an enlarged source; it does not by itself prove that this source is reachable.
-In the Karp–Miller soundness proof, omega coverability will supply a reachable
-marking covering the required budget. -/
+an enlarged source; it does not by itself prove that this source is reachable. -/
 theorem WeightedNet.FiresSequence.repeat_with_budget_ge_on
     {src tgt : Marking P} {ts : List T}
     (A : Finset P) (bound : ℕ)
@@ -244,7 +245,7 @@ theorem WeightedNet.FiresSequence.repeat_with_budget_ge_on
   exact (Nat.le_mul_of_pos_right bound hgain).trans
     (Nat.le_add_left (bound * (tgt p - src p)) (tgt p))
 
-/-- Meet a separate bound at each place by choosing their sum as a common
+/-- Cover a separate bound at each place by choosing their sum as a common
 bound and applying `repeat_with_budget_ge_on`. -/
 theorem WeightedNet.FiresSequence.repeat_with_budget_ge_on_each
     {src tgt : Marking P} {ts : List T}
