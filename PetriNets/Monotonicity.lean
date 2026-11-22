@@ -29,6 +29,21 @@ namespace PetriNet
 
 variable {P T : Type*} {net : WeightedNet P T}
 
+/-! ## Strict growth at a place -/
+
+/-- `src <[p] tgt` means that `tgt` is pointwise at least `src` and is
+strictly larger at place `p`.
+
+The value type is polymorphic, so the relation applies to any pointwise
+ordered indexed family. In particular, it can be used with ordinary markings,
+ω-markings, vectors represented by `Fin n → α`, and matrix rows. -/
+def Marking.GrowsAt {α : Type*} [LE α] [LT α]
+    (src tgt : P → α) (p : P) : Prop :=
+  src ≤ tgt ∧ src p < tgt p
+
+/-- Pointwise growth which is strict at the specified place. -/
+notation:50 src " <[" p "] " tgt => Marking.GrowsAt src tgt p
+
 /-! ## One-step monotonicity -/
 
 /-- A transition enabled at a marking remains enabled at any pointwise larger
