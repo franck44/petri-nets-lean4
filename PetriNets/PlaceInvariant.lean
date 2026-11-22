@@ -12,22 +12,26 @@ public import PetriNets.Reachability
 /-!
 # Place invariants of weighted P/T nets
 
-A place invariant of a net consists of a coefficient function `y : P → ℤ` and
-a proof that every transition has zero weighted incidence contribution. With our
-place-by-transition incidence matrix `C`, this is the equation `yᵀ C = 0`,
-stated componentwise for each transition.
+Provides place invariants for weighted P/T nets, their values at markings,
+preservation under firing and reachability, and the resulting non reachability
+of markings not satisfying an invariant.
 
-Being a place invariant is a structural property of a particular net: the
-proof depends on the net's incidence matrix, but not on an initial
-marking. The invariant's value is defined at every marking and is preserved by
-firing, hence equal on markings related by reachability. The converse does not
-hold in general: having the same invariant value does not imply that one
-marking is reachable from the other.
+A place invariant consists of a coefficient function `y : P → ℤ` and a proof
+that every transition preserves its value. With our
+place-by-transition incidence matrix `C`, this structural condition is the
+equation `yᵀ C = 0` that corresponds to the preservation of the invariant by every transition.
 
-The place type `P` is finite because both the invariant condition and the
-value of an invariant at a marking sum over all places. No finiteness
-assumption on transitions is needed: the invariant condition is checked one
-transition at a time.
+The property of being a place invariant depends on the net, but not on an initial marking.
+
+Once an initial marking `m₀` is fixed, a place invariant induces the marking
+predicate
+
+```text
+inv.value m = inv.value m₀.
+```
+
+This predicate holds at `m₀` and is preserved by every firing, so it holds
+at every marking reachable from `m₀`.
 
 ## References
 
