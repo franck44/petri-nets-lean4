@@ -11,6 +11,9 @@ public import PetriNets.PlaceInvariant
 /-!
 # Boundedness from place invariants
 
+Provides explicit token bounds derived from nonnegative place invariants and
+uses them to prove place and net boundedness from an initial marking.
+
 A place invariant is positive for a place `p` when its coefficient at `p` is
 strictly positive and all its coefficients are nonnegative. Since the
 invariant value is preserved along reachability, such an invariant gives an
@@ -36,6 +39,8 @@ through the invariant value at that marking.
 
 namespace PetriNet
 
+/-! ## Positivity and boundedness -/
+
 /-- `inv` is positive for `p` when the coefficient at `p` is strictly positive
 and every coefficient is nonnegative. This is Reisig's place-relative notion
 of a positive invariant. -/
@@ -58,6 +63,8 @@ reachable from `m₀`. -/
 def WeightedNet.BoundedFrom {P T : Type*} (net : WeightedNet P T)
     (m₀ : Marking P) : Prop :=
   ∃ B : ℕ, ∀ m, net.Reachable m₀ m → ∀ p, m p ≤ B
+
+/-! ## Bounds from nonnegative coefficients -/
 
 /-- An invariant with nonnegative coefficients has a nonnegative value at
 every marking. -/
@@ -114,6 +121,8 @@ theorem WeightedNet.PlaceInvariant.tokens_le_value_div_of_positiveAt
     exact_mod_cast hweighted_cast
   apply (Nat.le_div_iff_mul_le hk_pos).mpr
   simpa [Nat.mul_comm] using hweighted_nat
+
+/-! ## Place and net boundedness -/
 
 /-- A place `p` with a positive invariant is bounded from every initial
 marking `m₀`, with bound `Inv(m₀) / inv.coeff p`. The invariant and its
