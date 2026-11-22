@@ -11,12 +11,13 @@ public import PetriNets.PlaceInvariant
 /-!
 # Example: mutual exclusion
 
-This module formalises the mutual-exclusion example from Reisig's symbolic
-net in Fig. 3.8. Its places are labelled `A` through `G`, and its transitions
-are labelled `a` through `f`:
+Provides a formalisation of Reisig's mutual-exclusion net and proves that its
+two processes cannot be in their critical sections simultaneously. The
+places are labelled `A` through `G`, and the transitions `a` through `f`.
 
-The two process are simple cycles  entering and exiting their critical sections.
-Entering and exiting their critical sections, the processes must acquire and release the lock, represented by place `D`:
+Each process follows a cycle through its local, waiting, and critical states.
+To enter its critical section, a process must acquire the single lock token
+stored in place `D`; leaving the critical section returns that token.
 
 ```text
 left:   (A •) ─▶ [a] ─▶ (B) ─▶ [b] ─▶ (C*) ─▶ [c] ─▶ (A) ...
@@ -32,19 +33,19 @@ right:  (E •) ─▶ [d] ─▶ (F) ─▶ [e] ─▶ (G*) ─▶ [f] ─▶ (
         * critical state       • initial token
 ```
 
-Transitions `b` and `e` enter the critical section by acquiring the single token in `D`, which represents the lock to the critical section. Transitions `c` and `f`  exit the critical section by releasing the lock. The bullet • indicates a token.
-The initial marking contains one token in each of `A`, `D`, and `E`.
+Transitions `b` and `e` acquire the token in `D`, while transitions `c` and
+`f` release it. The bullet `•` indicates an initial token, so the initial
+marking contains one token in each of `A`, `D`, and `E`.
 
-To prove that the mutual exclusion property holds, we can identify a place invariant that captures this property:
-`C + G ≤ 1`
+The place invariant
 
-To illustrate how we can use the algebra on invariants to derive the mutual exclusion property, consider the following place invariant.
+```text
+C + D + G = 1
+```
 
-`C + D + G = 1`
-
-at every reachable marking. Since a marking contains a nonnegative number of
-tokens in `D`, it follows that `C + G ≤ 1`: the left and right processes
-cannot both be in their critical states.
+holds at every reachable marking. Since `D` contains a nonnegative number of
+tokens, it implies `C + G ≤ 1`; hence the left and right processes cannot both
+be in their critical sections at the same time.
 
 ## References
 
@@ -56,6 +57,8 @@ cannot both be in their critical states.
 @[expose] public section
 
 namespace PetriNet.MutualExclusion
+
+/-! ## The mutual-exclusion net -/
 
 /-- The seven places `A`, `B`, `C`, `D`, `E`, `F`, and `G`. -/
 abbrev P := Fin 7
@@ -78,7 +81,7 @@ def td : T := 3
 def te : T := 4
 def tf : T := 5
 
-/-- Reisig's mutual-exclusion net. Transitions `tb` and `te` acquire the key
+/-- Reisig's mutual-exclusion net. Transitions `tb` and `te` acquire the lock
 in `pD`; transitions `tc` and `tf` return it. -/
 def net : WeightedNet P T where
   pre p t :=
@@ -92,10 +95,12 @@ def net : WeightedNet P T where
     | 5, 3 | 6, 4 | 4, 5 | 3, 5 => 1
     | _, _ => 0
 
-/-- The initial marking `ADE`: both processes are local and the key is
+/-- The initial marking `ADE`: both processes are local and the lock is
 available. -/
 def initial : Marking P := fun p =>
   if p = pA ∨ p = pD ∨ p = pE then 1 else 0
+
+/-! ## The critical-section invariant -/
 
 /-- The invariant with coefficient vector `(0, 0, 1, 1, 0, 0, 1)`, which
 counts the two critical places and the available lock. -/
@@ -128,6 +133,8 @@ theorem critical_lock_eq_one {m : Marking P}
     Fin.sum_univ_succ] at hvalue
   change m 2 + m 3 + m 6 = 1
   omega
+
+/-! ## Mutual exclusion -/
 
 /-- Mutual exclusion: in every reachable marking, at most one of the two
 critical places `C` and `G` contains a token. This is Reisig's inequality
