@@ -12,10 +12,14 @@ public import Mathlib.LinearAlgebra.Matrix.ToLin
 /-!
 # Synthesis of place invariants
 
-A place coefficient function `y : P → ℤ` is a place invariant exactly when
-its product with the incidence matrix is zero. This module expresses that
-condition as the kernel of an integer-linear map, providing the algebraic
-foundation for synthesising place invariants.
+Provides an integer-linear map whose kernel consists exactly of the place
+invariant coefficient functions of a weighted P/T net, together with a linear
+equivalence between that kernel and `PlaceInvariant net`.
+
+A place coefficient function `y : P → ℤ` defines a place invariant exactly
+when its product with the incidence matrix is zero. Expressing this condition
+as a kernel provides the algebraic foundation for synthesising place
+invariants.
 
 The purpose of this map is to test arbitrary candidate coefficient functions,
 not only coefficient functions already known to define place invariants. Given
@@ -75,6 +79,8 @@ preserved.
 
 namespace PetriNet
 
+/-! ## The candidate coefficient map -/
+
 /-- The integer-linear map that sends a place coefficient function `y` to its
 row-vector product with the incidence matrix `C`.
 
@@ -96,6 +102,8 @@ multiplying that vector to the incidence matrix. -/
 theorem WeightedNet.placeInvariantMap_apply {P T : Type*} [Fintype P]
     (net : WeightedNet P T) (y : P → ℤ) :
     net.placeInvariantMap y = Matrix.vecMul y net.incidence := rfl
+
+/-! ## Equivalence with the kernel -/
 
 /-- The place invariants of `net` are linearly equivalent to the kernel of
 `placeInvariantMap`. This identifies the type of place invariants precisely
