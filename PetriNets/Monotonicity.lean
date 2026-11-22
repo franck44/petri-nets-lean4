@@ -461,20 +461,9 @@ theorem WeightedNet.FiresSequence.exists_combined_growth
         intro q hq
         exact hsegments q (by simp [hq]))
       let d : Marking P := base - src
-      have hpAgain : net.FiresSequence base ts (base + d) := by
-        exact hseq.fire_again hle
-      have hcombinedShifted :
-          net.FiresSequence (base + d) combined (tgt + d) := by
-        exact hcombined.add d
-      have hpGrowth : base p < (tgt + d) p := by
-        have hdp : 0 < d p := Nat.sub_pos_of_lt hpLt
-        change base p < tgt p + d p
-        exact (Nat.lt_add_of_pos_right hdp).trans_le
-          (Nat.add_le_add_right (hbaseTgt p) (d p))
-      refine ⟨ts ++ combined, tgt + d, hpAgain.append hcombinedShifted,
-        ?_, ?_⟩
-      · intro q
-        exact (hbaseTgt q).trans (by simp)
+      obtain ⟨hseqAll, hbaseFinal, hpGrowth⟩ :=
+        hseq.prepend_growth hle hpLt hcombined hbaseTgt
+      refine ⟨ts ++ combined, tgt + d, hseqAll, hbaseFinal, ?_⟩
       · intro q hq
         rw [Finset.mem_insert] at hq
         rcases hq with rfl | hq
