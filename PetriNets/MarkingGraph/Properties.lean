@@ -11,11 +11,10 @@ public import PetriNets.MarkingGraph
 /-!
 # Behavioural properties represented by marking graphs
 
-This module defines standard behavioural properties of a weighted P/T net
-relative to an initial marking: deadlock freedom, liveness, weak liveness,
-dead transitions, and reversibility. It then relates these Petri-net
-properties to properties of the marking graph, following Reisig's
-characterisations.
+Provides standard behavioural properties of a weighted P/T net relative to an
+initial marking—deadlock freedom, liveness, weak liveness, dead transitions,
+and reversibility—and relates them to properties of the marking graph,
+following Reisig's characterisations.
 
 The initial marking is an explicit parameter because `WeightedNet` describes
 only the static net structure. It does not include an initial marking.
@@ -70,6 +69,8 @@ types.
 
 namespace PetriNet
 
+/-! ## Behavioural properties -/
+
 /-- A net is deadlock-free from `m₀` when every marking reachable from `m₀`
 enables at least one transition. -/
 def WeightedNet.DeadlockFreeFrom {P T : Type*} (net : WeightedNet P T)
@@ -100,6 +101,8 @@ def WeightedNet.ReversibleFrom {P T : Type*} (net : WeightedNet P T)
     (m₀ : Marking P) : Prop :=
   ∀ m, net.Reachable m₀ m → net.Reachable m m₀
 
+/-! ## Relations between liveness properties -/
+
 /-- Every net that is live from `m₀` is weakly live from `m₀`. Apply
 liveness at `m₀`, which is reachable from itself by the empty firing
 sequence. -/
@@ -122,6 +125,8 @@ theorem WeightedNet.weaklyLiveFrom_iff_no_dead_transition
     net.WeaklyLiveFrom m₀ ↔ ∀ t, ¬ net.TransitionDeadFrom m₀ t := by
   classical
   simp [WeightedNet.WeaklyLiveFrom, WeightedNet.TransitionDeadFrom]
+
+/-! ## Deadlock freedom -/
 
 /-- A net is deadlock-free from `m₀` if and only if every state of its
 marking graph has an outgoing edge. This is Reisig's marking-graph
@@ -158,6 +163,8 @@ theorem WeightedNet.deadlockFreeFrom_iff_markingGraph_no_terminal
     by_contra hnoOutgoing
     push Not at hnoOutgoing
     exact hnoTerminal m hnoOutgoing
+
+/-! ## Liveness -/
 
 /-- A net is live from `m₀` if and only if, from every state of its marking
 graph and for every transition `t`, there is a finite path to a state with an
@@ -206,6 +213,8 @@ theorem WeightedNet.weaklyLiveFrom_iff_markingGraph_has_label
     obtain ⟨src, tgt, htr⟩ := hlabel t
     exact ⟨src.1, WeightedNet.markingGraph_state_reachable src,
       (net.markingGraph_enabled_iff_exists_tr src t).mpr ⟨tgt, htr⟩⟩
+
+/-! ## Reversibility -/
 
 /-- A net is reversible from `m₀` if and only if every state of its marking
 graph can reach `net.markingGraphInitial m₀`, the state representing `m₀`. -/
