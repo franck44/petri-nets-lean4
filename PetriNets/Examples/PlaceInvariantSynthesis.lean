@@ -12,11 +12,12 @@ public import Mathlib.Data.Fin.VecNotation
 /-!
 # Example: synthesising a place invariant
 
-This module uses `placeInvariantEquivKer` to synthesise a place invariant for
-a three-place, two-transition net:
+Provides a concrete use of `placeInvariantEquivKer` to synthesise a place
+invariant for a three-place, two-transition net and characterises all place
+invariants of that net.
 
 ```text
-p0 ──t0──▶ p1 ──t1──▶ p2
+(p0) ──▶ [t0] ──▶ (p1) ──▶ [t1] ──▶ (p2)
 ```
 
 The coefficient vector `(1, 1, 1)` belongs to the kernel of
@@ -28,6 +29,8 @@ tokens.
 @[expose] public section
 
 namespace PetriNet.ThreePlaceNet
+
+/-! ## The three-place net -/
 
 /-- The three places of the net, p0, p1, and p2. -/
 abbrev P := Fin 3
@@ -58,6 +61,8 @@ def net : WeightedNet P T where
     | 2, 1 => 1
     | _, _ => 0
 
+/-! ## Synthesising the token-count invariant -/
+
 /-- The candidate coefficient vector that counts every token with weight one. -/
 def tokenCountCoeffs : P → ℤ := ![1, 1, 1]
 
@@ -85,6 +90,8 @@ invariant. -/
 theorem tokenCountInvariant_coeff :
     tokenCountInvariant.coeff = tokenCountCoeffs := by
   simp [tokenCountInvariant, tokenCountKernelElement]
+
+/-! ## Characterising all invariants -/
 
 /-- If `inv` is a place invariant of this net, then its coefficient vector is
 of the form `(k, k, k)` for some integer `k`. -/
