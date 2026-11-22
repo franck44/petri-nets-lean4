@@ -11,8 +11,12 @@ public import PetriNets.PlaceInvariant
 /-!
 # Algebra of place invariants
 
-Place invariants of a weighted P/T net are closed under zero, pointwise addition,
-negation, and multiplication by an integer.
+Provides the algebraic operations on place invariants of a weighted P/T net
+and their additive commutative group structure.
+
+Place invariants are closed under zero, pointwise addition, negation, and
+multiplication by an integer. Each operation constructs a coefficient function
+together with a proof that it satisfies the place-invariant condition.
 
 These closure properties are registered as Lean typeclass instances. This
 allows the standard notation `0`, `+`, unary `-`, and `•` to be used for place
@@ -32,6 +36,8 @@ place invariants as the integer kernel of the net's incidence matrix.
 @[expose] public section
 
 namespace PetriNet
+
+/-! ## Extensionality -/
 
 /-- Two place invariants are equal when their coefficient functions are equal. -/
 @[ext]
@@ -53,6 +59,8 @@ theorem WeightedNet.PlaceInvariant.coeff_injective
       (fun inv : WeightedNet.PlaceInvariant net => inv.coeff) := by
   intro inv₁ inv₂ h
   exact WeightedNet.PlaceInvariant.ext h
+
+/-! ## Algebraic operations -/
 
 /-- The place invariant whose coefficient is zero at every place. -/
 instance WeightedNet.PlaceInvariant.instZero {P T : Type*} [Fintype P]
@@ -104,6 +112,8 @@ instance WeightedNet.PlaceInvariant.instSMul {P T : Type*} [Fintype P]
         simp_rw [mul_assoc]
         rw [← Finset.mul_sum, inv.condition t, mul_zero] }
 
+/-! ## Coefficient lemmas -/
+
 /-- The zero invariant has coefficient zero at every place. -/
 @[simp]
 theorem WeightedNet.PlaceInvariant.coeff_zero {P T : Type*} [Fintype P]
@@ -154,6 +164,8 @@ theorem WeightedNet.PlaceInvariant.coeff_smul {P T : Type*} [Fintype P]
       funext p
       change k * inv.coeff p = (k • inv.coeff) p
       simp
+
+/-! ## Additive commutative group structure -/
 
 /-- Place invariants of a net form an additive commutative group under
 their pointwise operations. -/
