@@ -407,6 +407,49 @@ theorem WeightedNet.FiresSequence.exists_common_endpoint_growth
   /- The shifted paths now end at the common endpoint `base`. -/
   exact ⟨base, fun p hp => hshifted ⟨p, hp⟩⟩
 
+/-- **Prepend one growth segment to a nondecreasing firing sequence.**
+
+Suppose `ts` grows place `p` while taking `src` to `base`, and `tail`
+takes `base` to a larger marking `tgt`:
+
+```text
+src ──ts──▶ base ──tail──▶ tgt
+
+src ≤ base       src(p) < base(p)       base ≤ tgt
+```
+
+Let `d = base - src`. Since `src ≤ base`, `ts` can be fired again from
+`base`, where it adds the same difference `d`. Adding `d` to the second
+execution then makes the two sequences join:
+
+```text
+base ──ts──▶ base + d ──tail──▶ tgt + d
+```
+
+Consequently, `ts ++ tail` takes `base` to `tgt + d`. This final marking
+is at least `base`; moreover, `d p > 0`, so it is strictly larger than `base`
+at place `p`. -/
+private theorem WeightedNet.FiresSequence.prepend_growth_segment
+    {src base tgt : Marking P} {ts tail : List T} {p : P}
+    (hseq : net.FiresSequence src ts base)
+    (hsrc : src ≤ base) (hp : src p < base p)
+    (htail : net.FiresSequence base tail tgt)
+    (hbaseTgt : base ≤ tgt) :
+    net.FiresSequence base (ts ++ tail) (tgt + (base - src)) ∧
+      base ≤ tgt + (base - src) ∧
+      base p < (tgt + (base - src)) p := by
+  let d : Marking P := base - src
+  /- Replay the growth segment from `base`. -/
+  have hfirst : net.FiresSequence base ts (base + d) := hseq.fire_again hsrc
+  /- Shift the tail by the same marking so that it starts where `ts` ends. -/
+  have htailShifted : net.FiresSequence (base + d) tail (tgt + d) :=
+    htail.add d
+  /- Append the compatible executions and establish growth of their target. -/
+  refine ⟨hfirst.append htailShifted, ?_, ?_⟩
+  · exact hbaseTgt.trans (by simp)
+  · have hdp : 0 < d p := Nat.sub_pos_of_lt hp
+    change base p < tgt p + d p
+    exact (hbaseTgt p).trans_lt (Nat.lt_add_of_pos_right hdp)
 
 /-- Combine finitely many pumpable segments ending at the same marking.
 
@@ -462,7 +505,7 @@ theorem WeightedNet.FiresSequence.exists_combined_growth
         exact hsegments q (by simp [hq]))
       let d : Marking P := base - src
       obtain ⟨hseqAll, hbaseFinal, hpGrowth⟩ :=
-        hseq.prepend_growth hle hpLt hcombined hbaseTgt
+        hseq.prepend_growth_segment hle hpLt hcombined hbaseTgt
       refine ⟨ts ++ combined, tgt + d, hseqAll, hbaseFinal, ?_⟩
       · intro q hq
         rw [Finset.mem_insert] at hq
