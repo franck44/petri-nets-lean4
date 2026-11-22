@@ -10,11 +10,12 @@ public import PetriNets.PlaceInvariant.Algebra
 public import Mathlib.Data.Fin.VecNotation
 
 /-!
-# Examples of place-invariant operations
+# Place-invariant examples
 
-This module illustrates the notation provided by the algebraic typeclass
-instances for place invariants. The examples are checked by Lean but do not
-introduce declarations into the library API.
+Provides generic examples of the algebraic notation for place invariants and
+a concrete two-place net illustrating preservation and a non-reachability
+proof. The examples are checked by Lean but do not introduce declarations
+into the library API.
 
 The fact that each expression below can be constructed with type
 `WeightedNet.PlaceInvariant net` means that its coefficient function satisfies
@@ -25,6 +26,8 @@ the new coefficient function and the proof of this condition.
 @[expose] public section
 
 namespace PetriNet
+
+/-! ## Generic algebraic operations -/
 
 section Generic
 
@@ -62,8 +65,8 @@ namespace TwoPlaceNet
 
 Consider a minimal net with two places and one transition:
 
-```
-p₁ ──▶ t ──▶ p₂
+```text
+(p₁) ──▶ [t] ──▶ (p₂)
 ```
 
 The transition consumes one token from `p₁` and produces one token in `p₂`.
