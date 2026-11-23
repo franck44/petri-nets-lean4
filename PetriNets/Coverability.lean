@@ -445,6 +445,8 @@ theorem WeightedNet.exists_finite_firing_cover_of_omegaFires
     net.fires_firingResult_cover_of_weakestPreMarking_le t demand le_rfl
   exact ⟨finiteSrc, hsrcBelow, hfiniteFires, hdemandBelow⟩
 
+/-! ## Coverability -/
+
 /-- A marking `m` is coverable from `m₀` when there is a marking `m'`
 reachable from `m₀` such that `m ≤ m'`. The order on markings is pointwise:
 `m ≤ m'` means that `m p ≤ m' p` for every place `p`. -/
@@ -452,10 +454,10 @@ def WeightedNet.CoverableFrom {P T : Type*} (net : WeightedNet P T)
     (m₀ m : Marking P) : Prop :=
   ∃ m', net.Reachable m₀ m' ∧ m ≤ m'
 
-/-- An ω-marking `mω` is omega coverable from `m₀` when every ordinary
+/-- An ω-marking `mω` is ω-coverable from `m₀` when every concrete
 marking below `mω` is coverable from `m₀`.
 
-Equivalently, the downward closure of `mω` among ordinary markings is
+Equivalently, the downward closure of `mω` among concrete markings is
 contained in the downward closure of the reachable markings from `m₀`:
 
 ```text
@@ -475,15 +477,17 @@ is below `mω`, the definition of `OmegaCoverableFrom` supplies a reachable
 marking `reached` which covers it:
 
 ```text
-                         mω
-                          ▲
-                          │ toOmega ≤
-                          │
-mω.concretise reserve ≤ reached
-                              ▲
-                              │ Reachable from m₀
-                              │
-                             m₀
+                mω
+                 ▲
+                 │ ≤
+ mω.concretise reserve
+                 │ ≤
+                 ▼
+              reached
+                 ▲
+                 │ Reachable
+                 │
+                m₀
 ```
 
 Equivalently, the resulting reachable marking satisfies:
@@ -502,7 +506,7 @@ theorem WeightedNet.OmegaCoverableFrom.coverable_concretise
     net.CoverableFrom m₀ (mω.concretise reserve) := by
   exact h (mω.concretise reserve) (mω.concretise_toOmega_le reserve)
 
-/-- The initial marking embedded as an ω-marking is omega coverable from
+/-- The initial marking embedded as an ω-marking is ω-coverable from
 itself. Every concrete marking below `m₀` is covered by the reachable
 marking `m₀`. -/
 theorem WeightedNet.omegaCoverableFrom_initial
@@ -513,42 +517,42 @@ theorem WeightedNet.omegaCoverableFrom_initial
   intro p
   exact ENat.natCast_le_natCast.mp (hle p)
 
-/- Transport a finite firing cover through soundness of its abstract source.
+/- Transport a concrete firing cover through soundness of its abstract source.
 
 ```text
-finiteSrc ──t──▶ finiteTgt
+concreteSrc ──t──▶ concreteTgt
     │                 │
     ≤                 ≤
     │                 │
 reachableSrc ──t──▶ reachableTgt
 
-demand ≤ finiteTgt
+demand ≤ concreteTgt
 ```
 
 Source soundness supplies `reachableSrc`; firing monotonicity supplies
 `reachableTgt`, which covers `demand`. -/
-private theorem coverableFrom_of_finite_firing_cover
+private theorem coverableFrom_of_concrete_firing_cover
     {P T : Type*} {net : WeightedNet P T}
-    {m₀ finiteSrc finiteTgt demand : Marking P}
+    {m₀ concreteSrc concreteTgt demand : Marking P}
     {src : OmegaMarking P} {t : T}
     (hsound : net.OmegaCoverableFrom m₀ src)
-    (hsrcBelow : finiteSrc ≤ src)
-    (hfires : net.Fires finiteSrc t finiteTgt)
-    (hdemandBelow : demand ≤ finiteTgt) :
+    (hsrcBelow : concreteSrc ≤ src)
+    (hfires : net.Fires concreteSrc t concreteTgt)
+    (hdemandBelow : demand ≤ concreteTgt) :
     net.CoverableFrom m₀ demand := by
-  obtain ⟨reachableSrc, hreachableSrc, hfiniteSrcBelow⟩ :=
-    hsound finiteSrc hsrcBelow
-  have hfiniteReachable : net.Reachable finiteSrc finiteTgt :=
+  obtain ⟨reachableSrc, hreachableSrc, hconcreteSrcBelow⟩ :=
+    hsound concreteSrc hsrcBelow
+  have hconcreteReachable : net.Reachable concreteSrc concreteTgt :=
     ⟨[t], WeightedNet.FiresSequence.singleton hfires⟩
-  obtain ⟨reachableTgt, hreachableTgt, hfiniteTgtBelow⟩ :=
-    hfiniteReachable.mono hfiniteSrcBelow
+  obtain ⟨reachableTgt, hreachableTgt, hconcreteTgtBelow⟩ :=
+    hconcreteReachable.mono hconcreteSrcBelow
   exact ⟨reachableTgt, hreachableSrc.trans hreachableTgt,
-    hdemandBelow.trans hfiniteTgtBelow⟩
+    hdemandBelow.trans hconcreteTgtBelow⟩
 
-/-- Omega coverability is preserved by an ω-firing.
+/-- ω-coverability is preserved by an ω-firing.
 
-For every finite demand below `omegaTgt`, the firing determines a sufficient
-finite demand below `omegaSrc`. Source omega coverability supplies a reachable
+For every concrete demand below `omegaTgt`, the firing determines a sufficient
+concrete demand below `omegaSrc`. Source ω-coverability supplies a reachable
 marking covering that demand, and firing monotonicity produces a reachable
 marking covering the original target demand.
 
@@ -566,9 +570,9 @@ theorem WeightedNet.omegaCoverableFrom_of_omegaFires
     (hfires : net.OmegaFires omegaSrc t omegaTgt) :
     net.OmegaCoverableFrom m₀ omegaTgt := by
   intro demand hdemand
-  obtain ⟨finiteSrc, hsrcBelow, hfiniteFires, hdemandBelow⟩ :=
+  obtain ⟨concreteSrc, hsrcBelow, hconcreteFires, hdemandBelow⟩ :=
     net.exists_finite_firing_cover_of_omegaFires hfires hdemand
-  exact coverableFrom_of_finite_firing_cover
-    hsound hsrcBelow hfiniteFires hdemandBelow
+  exact coverableFrom_of_concrete_firing_cover
+    hsound hsrcBelow hconcreteFires hdemandBelow
 
 end PetriNet
