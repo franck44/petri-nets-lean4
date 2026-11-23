@@ -119,6 +119,8 @@ theorem OmegaMarking.concretise_apply_of_ne_top {P : Type*}
   simp only [OmegaMarking.concretise, hp, ↓reduceIte]
   exact ENat.natCast_toNat hp
 
+/-! ## ω-firing semantics -/
+
 /-- A transition is enabled at an ω-marking when every place contains at
 least its finite pre-incidence weight. A place labelled `ω` satisfies every
 finite pre-incidence requirement, so it never prevents a transition from
@@ -184,7 +186,7 @@ theorem WeightedNet.omegaEnabled_iff_exists_omegaFires {P T : Type*}
   · rintro ⟨_, hfires⟩
     exact hfires.1
 
-/-- Firing a transition from a ω-marking has a unique result. -/
+/-- Firing a transition from an ω-marking has a unique result. -/
 theorem WeightedNet.omegaFires_is_deterministic {P T : Type*}
     {net : WeightedNet P T} {m m₁ m₂ : OmegaMarking P} {t : T}
     (h₁ : net.OmegaFires m t m₁) (h₂ : net.OmegaFires m t m₂) : m₁ = m₂ := by
