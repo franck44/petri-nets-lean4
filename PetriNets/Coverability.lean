@@ -192,6 +192,8 @@ theorem WeightedNet.omegaFires_is_deterministic {P T : Type*}
   funext p
   exact (h₁.2 p).trans (h₂.2 p).symm
 
+/-! ## ω-marking transition system -/
+
 /-- The ω-marking semantics of `net` as a labelled transition
 system. Its states are all ω-markings, its labels are the transitions of the
 weighted P/T net, and its transition relation is ω-firing. -/
@@ -214,7 +216,9 @@ theorem WeightedNet.omegaMarkingLTS_enabled_iff_exists_tr {P T : Type*}
     net.OmegaEnabled m t ↔ ∃ m', net.omegaMarkingLTS.Tr m t m' :=
   net.omegaEnabled_iff_exists_omegaFires m t
 
-/-- Embedding an ordinary marking into the ω-markings preserves and reflects
+/-! ## Relation with concrete firing semantics -/
+
+/-- Embedding a concrete marking into the ω-markings preserves and reflects
 enabledness. Mathematically this is immediate: `toOmega` changes only the
 codomain from `ℕ` to `ℕ∞` and preserves every finite token count. -/
 theorem WeightedNet.enabled_iff_omegaEnabled_toOmega {P T : Type*}
@@ -222,8 +226,8 @@ theorem WeightedNet.enabled_iff_omegaEnabled_toOmega {P T : Type*}
     net.Enabled m t ↔ net.OmegaEnabled m.toOmega t := by
   simp [WeightedNet.Enabled, WeightedNet.OmegaEnabled, Marking.toOmega]
 
-/-- Embedding ordinary source and target markings into the ω-markings
-preserves and reflects firing. Thus ordinary firing is represented exactly by
+/-- Embedding concrete source and target markings into the ω-markings
+preserves and reflects firing. Thus concrete firing is represented exactly by
 ω-firing between markings whose components are all finite. -/
 theorem WeightedNet.fires_iff_omegaFires_toOmega {P T : Type*}
     (net : WeightedNet P T) (m m' : Marking P) (t : T) :
