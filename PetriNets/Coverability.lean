@@ -166,6 +166,23 @@ def WeightedNet.OmegaFires {P T : Type*} (net : WeightedNet P T)
     ∀ p,
       m' p = m p - net.pre p t + net.post p t
 
+/-- Adding the same ω-marking to the source and target preserves a firing. -/
+theorem WeightedNet.OmegaFires.add {P T : Type*}
+    {net : WeightedNet P T} {src tgt : OmegaMarking P} {t : T}
+    (hfires : net.OmegaFires src t tgt) (d : OmegaMarking P) :
+    net.OmegaFires (src + d) t (tgt + d) := by
+  constructor
+  · exact hfires.1.mono (by simp)
+  · intro p
+    change tgt p + d p =
+      (src p + d p) - net.pre p t + net.post p t
+    rw [hfires.2 p]
+    rw [add_assoc, add_comm (net.post p t : ℕ∞) (d p), ← add_assoc]
+    exact congrArg (· + (net.post p t : ℕ∞))
+      ((ENat.addLECancellable_of_ne_top
+        (ENat.natCast_ne_top (net.pre p t))).tsub_add_eq_add_tsub
+          (hfires.1 p))
+
 /-- The weakest ω-marking from which firing `t` can cover `target`.
 
 It is the ω-marking analogue of `weakestPreMarking`: at every place it
@@ -373,6 +390,19 @@ theorem WeightedNet.omegaMTr_mono
         exact hfirst'.2 p
       rw [WeightedNet.omegaFiringSequenceResult, ← hmid]
       exact ⟨Cslib.LTS.MTr.stepL hfirst' htail', htgtLe⟩
+
+/-- Adding the same ω-marking to both endpoints preserves an executable
+ω-firing sequence. -/
+theorem WeightedNet.omegaMTr_add
+    {P T : Type*} {net : WeightedNet P T}
+    {src tgt : OmegaMarking P} {labels : List T}
+    (hexec : net.omegaMarkingLTS.MTr src labels tgt)
+    (d : OmegaMarking P) :
+    net.omegaMarkingLTS.MTr (src + d) labels (tgt + d) := by
+  induction hexec with
+  | refl => exact Cslib.LTS.MTr.refl
+  | stepL hfirst _ ih =>
+      exact Cslib.LTS.MTr.stepL (hfirst.add d) ih
 
 /-- Any ω-marking above the weakest predecessor of a transition sequence can
 execute that sequence, and the resulting ω-marking covers `target`.
