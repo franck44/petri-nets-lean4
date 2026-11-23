@@ -213,9 +213,12 @@ theorem not_omegaExecution
     OmegaMarking.exists_eq_pair_of_omegaPlaces_mono
       (fun n => (nodes n).marking)
       (fun hij => omegaPlaces_mono_of_omegaExecution hexec hij)
-      (fun hij hle homega hne =>
-        exists_new_omegaPlace_of_lt_omegaExecution
-          hexec hij (lt_of_le_of_ne hle hne))
+      (fun hij hle homega => by
+        by_contra hne
+        obtain ⟨p, hpOld, hpNew⟩ :=
+          exists_new_omegaPlace_of_lt_omegaExecution
+            hexec hij (lt_of_le_of_ne hle hne)
+        exact hpOld (homega.symm ▸ hpNew))
   /- At this point, we have found two positions `i < j` with equal markings. -/
 
   /- The marking at position `i` is among the ancestors of the branch at
