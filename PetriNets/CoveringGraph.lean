@@ -14,42 +14,55 @@ public import Mathlib.Order.WellQuasiOrder
 /-!
 # Covering graphs
 
-This module defines the path properties that characterise a covering graph.
-A candidate graph is an LTS whose states are ω-markings and whose labels are
-Petri-net transitions. It may contain loops. A covering tree can later be
-obtained by unfolding its executions from the initial marking.
+Provides covering graphs for weighted P/T nets. A covering graph state
+is an ω-marking. A transition is an ω-firing step possibly combined with
+*acceleration*. Acceleration detects unbounded growth of a place along a path and
+introduces `ω` to represent the possible token counts at this place.
 
-The construction has two levels:
+This module proves three principal properties:
 
-* `WeightedNet.coverStepLTS` contains every ω-firing followed by every possible
-  choice of places to accelerate;
-* a covering graph retains paths for which the chosen accelerated places are
-  exactly those justified by growth over an earlier marking on the path.
+1. When the place and transition types are finite, only finitely many
+   covering-graph states are reachable.
+2. Every concrete firing sequence can be lifted to a covering-graph path
+   ending in an ω-marking that covers its concrete target.
+3. Every concrete infinite execution can likewise be lifted to an infinite
+   covering-graph execution.
 
-An execution records the successive states of a path. This is necessary
-because acceleration depends on earlier states, rather than only on the
-source of the current edge.
+## Purpose and acceleration
+
+A covering graph is intended to give a finite representation of potentially
+infinite behaviour in the marking graph. An ordinary natural-number component
+records a concrete token count, while `ω` records that arbitrarily large token
+counts can be accumulated at that place. The graph can therefore represent
+unbounded growth without enumerating every concrete marking along it.
+
+Acceleration detects such growth along a path. Suppose the current marking is
+`m`, and an earlier marking `a` on the same path satisfies `a ≤ m`. If the
+inequality is strict at a place `p`, then the path segment from `a` to `m` has
+increased the token count at `p` without decreasing any component overall.
+Monotonicity allows that segment to be repeated, so `p` can accumulate
+arbitrarily many tokens. The successor of `m` therefore records `ω` at `p`.
+
+Acceleration is path-dependent: the same ω-marking may justify different
+accelerations when reached along different paths. This is why the definition
+uses executions and their preceding states rather than only a local transition
+relation.
 
 ## Two-stage construction
 
-First, `WeightedNet.coverStepLTS` augments the ordinary ω-firing semantics of
-`WeightedNet.omegaMarkingLTS` with every possible acceleration choice. Each
-edge consists of an ω-firing followed by replacing an arbitrary subset of
-places by `ω`. The firing and acceleration are combined in one edge carrying
-the original Petri-net transition; acceleration does not introduce a separate
-silent transition.
+A covering graph is defined in two steps.
 
-Second, the covering-graph properties impose constraints on paths of
-`coverStepLTS`. These constraints use preceding states on each path to select
-exactly the accelerations justified by earlier markings. Thus `coverStepLTS`
-supplies all candidate edges, while the path constraints characterise the
-edges of a covering graph.
+First, `coverStepLTS` contains all candidate steps: fire a transition, then
+replace any chosen set of places by `ω`. This deliberately includes more
+accelerations than a covering graph should retain.
+
+Second, the covering-graph conditions retain only the accelerations justified
+by growth from an earlier marking on the current path.
 
 ## Candidate acceleration steps
 
 Suppose a net has three places and an ω-firing produces the raw marking
-`(1, 3, 4)`. Candidate accelerations include all possible ways of accelerating
-a subset of places to `ω`:
+`(1, 3, 4)`. Possible accelerations of this marking are:
 
 * `(1, 3, 4)`, when no place is accelerated;
 * `(ω, 3, 4)`, when only the first place is accelerated;
@@ -79,8 +92,11 @@ namespace PetriNet
 
 namespace OmegaMarking
 
-/-- **Dickson's lemma for ω-markings.** If the type of places is finite, every
-infinite sequence of ω-markings m₀, m₁, m₂, … contains two markings mᵢ and mⱼ with i < j such that mᵢ ≤ mⱼ. -/
+/-! ## Properties of ω-markings -/
+
+/-- **Dickson's lemma for ω-marking sequences.** If the type of places is
+finite, every infinite sequence of ω-markings `m₀, m₁, m₂, …` contains two
+markings `mᵢ` and `mⱼ`, with `i < j`, such that `mᵢ ≤ mⱼ`. -/
 theorem exists_le_pair {P : Type*} [Finite P]
     (markings : ℕ → OmegaMarking P) :
     ∃ i j, i < j ∧ markings i ≤ markings j := by
@@ -103,7 +119,6 @@ by filtering the finite set of all places. -/
 noncomputable def omegaPlaces {P : Type*} [Fintype P]
     (m : OmegaMarking P) : Finset P := by
   classical
-  /- collect the elements that satisfy `m p = ⊤`.-/
   exact Finset.univ.filter fun p => m p = ⊤
 
 /-- A place belongs to `omegaPlaces m` exactly when its value in `m` is `ω`.
