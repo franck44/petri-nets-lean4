@@ -454,6 +454,21 @@ def WeightedNet.CoverableFrom {P T : Type*} (net : WeightedNet P T)
     (m₀ m : Marking P) : Prop :=
   ∃ m', net.Reachable m₀ m' ∧ m ≤ m'
 
+/-- If the weakest predecessor of `target` through `t` is coverable, then
+`target` is coverable. A reachable marking covering the predecessor enables
+`t`, and its firing result covers `target`. -/
+theorem WeightedNet.coverableFrom_of_weakestPreMarking
+    {P T : Type*} {net : WeightedNet P T}
+    {m₀ target : Marking P} {t : T}
+    (hpre : net.CoverableFrom m₀ (net.weakestPreMarking t target)) :
+    net.CoverableFrom m₀ target := by
+  obtain ⟨src, hreachable, hle⟩ := hpre
+  obtain ⟨hfires, htarget⟩ :=
+    net.fires_firingResult_cover_of_weakestPreMarking_le t target hle
+  exact ⟨net.firingResult src t,
+    hreachable.trans ⟨[t], WeightedNet.FiresSequence.singleton hfires⟩,
+    htarget⟩
+
 /-- An ω-marking `mω` is ω-coverable from `m₀` when every concrete
 marking below `mω` is coverable from `m₀`.
 
@@ -505,6 +520,42 @@ theorem WeightedNet.OmegaCoverableFrom.coverable_concretise
     (h : net.OmegaCoverableFrom m₀ mω) (reserve : Marking P) :
     net.CoverableFrom m₀ (mω.concretise reserve) := by
   exact h (mω.concretise reserve) (mω.concretise_toOmega_le reserve)
+
+/-- An ω-marking `mω` is `K`-coverable from `m₀` when its concretisation with
+`K` tokens at every `ω`-place is coverable from `m₀`. Its finite components
+retain their exact values. -/
+def WeightedNet.KCoverableFrom {P T : Type*} (net : WeightedNet P T)
+    (m₀ : Marking P) (mω : OmegaMarking P) (K : ℕ) : Prop :=
+  net.CoverableFrom m₀ (mω.concretise fun _ => K)
+
+/-- For finitely many places, ω-coverability is equivalent to `K`-coverability
+for every `K`.
+
+Thus it suffices to show that, for every `K`, one reachable marking covers the
+finite components of `mω` and has at least `K` tokens at every `ω`-place. -/
+theorem WeightedNet.omegaCoverableFrom_iff_forall_kCoverableFrom
+    {P T : Type*} [Fintype P] {net : WeightedNet P T}
+    {m₀ : Marking P} {mω : OmegaMarking P} :
+    net.OmegaCoverableFrom m₀ mω ↔
+      ∀ K, net.KCoverableFrom m₀ mω K := by
+  classical
+  constructor
+  · intro hsound K
+    exact hsound.coverable_concretise (fun _ => K)
+  · intro hrealise demand hdemand
+    let K := ∑ p, demand p
+    obtain ⟨reached, hreachable, hcover⟩ := hrealise K
+    refine ⟨reached, hreachable, fun p => ?_⟩
+    apply (show demand p ≤ mω.concretise (fun _ => K) p by
+      by_cases hp : mω p = ⊤
+      · simp only [OmegaMarking.concretise, hp, ↓reduceIte]
+        exact Finset.single_le_sum
+          (fun q _ => Nat.zero_le (demand q)) (Finset.mem_univ p)
+      · simp only [OmegaMarking.concretise, hp, ↓reduceIte]
+        apply ENat.natCast_le_natCast.mp
+        rw [ENat.natCast_toNat hp]
+        exact hdemand p).trans
+    exact hcover p
 
 /-- The initial marking embedded as an ω-marking is ω-coverable from
 itself. Every concrete marking below `m₀` is covered by the reachable

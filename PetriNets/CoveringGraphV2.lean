@@ -8,6 +8,7 @@ module
 
 public import PetriNets.CoveringGraphV2.Finiteness
 public import PetriNets.CoveringGraphV2.Completeness
+public import PetriNets.CoveringGraphV2.Soundness
 
 /-!
 # Covering graphs, version 2

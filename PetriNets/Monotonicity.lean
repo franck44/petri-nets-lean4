@@ -365,6 +365,40 @@ private theorem WeightedNet.FiresSequence.shift_growth_paths_to
     hseq.shift_growth_to hgrows (htgt p)
   exact ⟨shiftedSrc, ts p, hshifted, hshiftedGrowth⟩
 
+/-- **Rebase finitely many growth paths to a supplied common endpoint.**
+
+For every `p ∈ A`, suppose there is a firing sequence which grows `p` and
+whose target is below `base`:
+
+```text
+srcₚ ──tsₚ──▶ tgtₚ ──≤──▶ base
+srcₚ <[p] tgtₚ
+```
+
+The path can be shifted by `base - tgtₚ`, producing a path with the same
+labels that ends exactly at `base` and still grows `p`:
+
+```text
+shiftedSrcₚ ──tsₚ──▶ base
+shiftedSrcₚ <[p] base
+```
+
+Unlike `exists_common_endpoint_growth`, this theorem does not choose the
+common endpoint. The caller supplies it, so additional properties of `base`
+—for example, lying below an abstract `ω`-marking or covering a finite
+demand—are retained unchanged. -/
+theorem WeightedNet.FiresSequence.rebase_growth_paths_to
+    (A : Finset P) (base : Marking P)
+    (hpaths : ∀ p ∈ A, ∃ src tgt ts,
+      net.FiresSequence src ts tgt ∧ (src <[p] tgt) ∧ tgt ≤ base) :
+    ∀ p ∈ A, ∃ src ts,
+      net.FiresSequence src ts base ∧ (src <[p] base) := by
+  intro p hp
+  obtain ⟨src, tgt, ts, hseq, hgrows, htgt⟩ := hpaths p hp
+  obtain ⟨shiftedSrc, hshifted, hshiftedGrowth⟩ :=
+    hseq.shift_growth_to hgrows htgt
+  exact ⟨shiftedSrc, ts, hshifted, hshiftedGrowth⟩
+
 /-- **Give finitely many growth paths a common endpoint.**
 
 For every place `p ∈ A`, assume there is firing sequence

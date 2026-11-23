@@ -107,6 +107,18 @@ theorem marking_eq_top_of_tr {src tgt : Node P} {t : T} {p : P}
   rw [htr.2.2]
   exact successor_preserves_top src t hp
 
+/-- If a covering-LTS edge introduces no new `ω`-place, its target marking is
+the unaccelerated firing result. -/
+theorem marking_eq_rawSuccessor_of_tr_of_omegaPlaces_eq
+    {src tgt : Node P} {t : T}
+    (htr : (coveringLTS net).Tr src t tgt)
+    (homega : OmegaMarking.omegaPlaces src.marking =
+      OmegaMarking.omegaPlaces tgt.marking) :
+    tgt.marking = rawSuccessor net src.marking t := by
+  rw [htr.2.2]
+  apply successor_marking_eq_rawSuccessor_of_omegaPlaces_eq
+  rwa [← htr.2.2]
+
 /-- Coverage is preserved across one concrete firing from a first-occurrence
 node.
 
