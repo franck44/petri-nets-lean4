@@ -353,6 +353,27 @@ theorem WeightedNet.omegaMTr_eq_omegaFiringSequenceResult
       rw [WeightedNet.omegaFiringSequenceResult, ← hmid]
       exact ih
 
+/-- An executable ω-firing sequence can be replayed from any larger source.
+Its deterministic result covers the original target. -/
+theorem WeightedNet.omegaMTr_mono
+    {P T : Type*} {net : WeightedNet P T}
+    {src tgt largerSrc : OmegaMarking P} {labels : List T}
+    (hexec : net.omegaMarkingLTS.MTr src labels tgt)
+    (hle : src ≤ largerSrc) :
+    net.omegaMarkingLTS.MTr largerSrc labels
+        (net.omegaFiringSequenceResult largerSrc labels) ∧
+      tgt ≤ net.omegaFiringSequenceResult largerSrc labels := by
+  induction hexec generalizing largerSrc with
+  | refl => exact ⟨Cslib.LTS.MTr.refl, hle⟩
+  | @stepL src t mid labels tgt hfirst _ ih =>
+      obtain ⟨largerMid, hfirst', hmidLe⟩ := hfirst.mono hle
+      obtain ⟨htail', htgtLe⟩ := ih hmidLe
+      have hmid : largerMid = net.omegaFiringResult largerSrc t := by
+        funext p
+        exact hfirst'.2 p
+      rw [WeightedNet.omegaFiringSequenceResult, ← hmid]
+      exact ⟨Cslib.LTS.MTr.stepL hfirst' htail', htgtLe⟩
+
 /-- Any ω-marking above the weakest predecessor of a transition sequence can
 execute that sequence, and the resulting ω-marking covers `target`.
 
