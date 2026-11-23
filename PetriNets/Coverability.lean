@@ -138,6 +138,25 @@ theorem WeightedNet.OmegaEnabled.mono {P T : Type*}
   intro p
   exact (h p).trans (hleq p)
 
+/-- The ω-marking obtained by applying the token update of `t` to `m`.
+
+As for `firingResult`, this function is defined whether or not `t` is
+enabled; `OmegaFires` additionally requires enabledness. -/
+def WeightedNet.omegaFiringResult {P T : Type*} (net : WeightedNet P T)
+    (m : OmegaMarking P) (t : T) : OmegaMarking P :=
+  fun p => m p - net.pre p t + net.post p t
+
+/-- Apply a transition sequence successively to an ω-marking.
+
+This is the deterministic ω-marking analogue of `firingSequenceResult`. It
+computes a marking for every list; an `omegaMarkingLTS.MTr` proof separately
+establishes that every transition was enabled. -/
+def WeightedNet.omegaFiringSequenceResult {P T : Type*}
+    (net : WeightedNet P T) : OmegaMarking P → List T → OmegaMarking P
+  | m, [] => m
+  | m, t :: ts =>
+      net.omegaFiringSequenceResult (net.omegaFiringResult m t) ts
+
 /-- `net.OmegaFires m t m'` means that `t` is enabled at the ω-marking `m`
 and firing it produces `m'`. Subtraction and addition are those of `ℕ∞`, so a
 component equal to `ω` remains equal to `ω`. -/
