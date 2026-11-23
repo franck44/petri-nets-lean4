@@ -147,8 +147,7 @@ def WeightedNet.OmegaFires {P T : Type*} (net : WeightedNet P T)
     ∀ p,
       m' p = m p - net.pre p t + net.post p t
 
-/-- Firing preserves every component already equal to `ω`. Arc weights are
-finite, so consuming and producing tokens cannot change `ω`. -/
+/-- Firing preserves every component already equal to `ω`. -/
 theorem WeightedNet.OmegaFires.preserves_top {P T : Type*}
     {net : WeightedNet P T} {src tgt : OmegaMarking P} {t : T}
     (hfires : net.OmegaFires src t tgt) {p : P} (hp : src p = ⊤) :
@@ -193,11 +192,9 @@ theorem WeightedNet.omegaFires_is_deterministic {P T : Type*}
   funext p
   exact (h₁.2 p).trans (h₂.2 p).symm
 
-/-- The unrestricted ω-marking semantics of `net` as a labelled transition
+/-- The ω-marking semantics of `net` as a labelled transition
 system. Its states are all ω-markings, its labels are the transitions of the
-net, and its transition relation is ω-firing. It does not perform
-acceleration; acceleration will be imposed separately along paths of the
-covering graph. -/
+weighted P/T net, and its transition relation is ω-firing. -/
 def WeightedNet.omegaMarkingLTS {P T : Type*} (net : WeightedNet P T) :
     Cslib.LTS (OmegaMarking P) T where
   Tr := net.OmegaFires
