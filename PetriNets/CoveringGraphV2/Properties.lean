@@ -158,4 +158,68 @@ theorem marking_mem_history_of_mTr {src tgt : Node P} {labels : List T}
       rw [Node.history, List.mem_append]
       exact Or.inl (marking_mem_ancestors_of_mTr_cons hexec)
 
+/-! ## First occurrences -/
+
+/-- An ancestor of the target of a finite covering-LTS execution is either
+already an ancestor of the source or is the marking of an earlier
+first-occurrence node on that execution.
+
+In the second case the labels split around that earlier node:
+
+```text
+src ──pre──▶ mid ──rest──▶ tgt
+              mid.marking = a
+              mid.IsFirstOccurrence
+```
+
+The first-occurrence property follows from the outgoing edge that originally
+extended `mid`. -/
+theorem ancestor_eq_predecessor_of_mTr
+    {src tgt : Node P} {labels : List T} {a : OmegaMarking P}
+    (hexec : (coveringLTS net).MTr src labels tgt)
+    (ha : a ∈ tgt.ancestors) :
+    a ∈ src.ancestors ∨
+      ∃ pre mid rest,
+        labels = pre ++ rest ∧
+        (coveringLTS net).MTr src pre mid ∧
+        (coveringLTS net).MTr mid rest tgt ∧
+        mid.IsFirstOccurrence ∧
+        mid.marking = a := by
+  induction hexec with
+  | refl => exact Or.inl ha
+  | @stepL src t next labels tgt htr htail ih =>
+      rcases ih ha with hsrc | ⟨pre, mid, rest, hlabels,
+          hpre, hrest, hfirst, hmarking⟩
+      · rw [ancestors_eq_history_of_tr htr] at hsrc
+        rw [Node.history, List.mem_append, List.mem_singleton] at hsrc
+        rcases hsrc with hancestor | hcurrent
+        · exact Or.inl hancestor
+        · exact Or.inr ⟨[], src, t :: labels, rfl,
+            Cslib.LTS.MTr.refl, htail.stepL htr,
+            htr.1, hcurrent.symm⟩
+      · exact Or.inr ⟨t :: pre, mid, rest,
+          by simp [hlabels], hpre.stepL htr, hrest, hfirst, hmarking⟩
+
+/-- Every node reachable from an initial node has a reachable
+first-occurrence node carrying the same marking.
+
+If the node is already a first occurrence, it is its own witness. Otherwise,
+its marking occurs among its ancestors, and
+`ancestor_eq_predecessor_of_mTr` locates the earlier first occurrence. -/
+theorem exists_first_occurrence_of_canReach
+    {m₀ : Marking P} {src : Node P}
+    (hreach : (coveringLTS net).CanReach (Node.initial m₀) src) :
+    ∃ first,
+      (coveringLTS net).CanReach (Node.initial m₀) first ∧
+      first.IsFirstOccurrence ∧ first.marking = src.marking := by
+  by_cases hfirst : src.IsFirstOccurrence
+  · exact ⟨src, hreach, hfirst, rfl⟩
+  · obtain ⟨labels, hexec⟩ := hreach
+    have hmem : src.marking ∈ src.ancestors := by
+      simpa [Node.IsFirstOccurrence] using hfirst
+    rcases ancestor_eq_predecessor_of_mTr hexec hmem with hroot |
+        ⟨pre, first, _, _, hpre, _, hfirst, hmarking⟩
+    · simp [Node.initial, Node.root] at hroot
+    · exact ⟨first, ⟨pre, hpre⟩, hfirst, hmarking⟩
+
 end PetriNet.CoveringGraphV2

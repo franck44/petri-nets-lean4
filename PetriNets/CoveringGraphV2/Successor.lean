@@ -113,6 +113,44 @@ theorem successor_eq_top_of_mem_acceleratedPlaces [FinEnum P]
     (successor net src t).marking p = ⊤ := by
   simp [successor, OmegaMarking.accelerateFinset, hp]
 
+/-- A covering successor over-approximates an ordinary firing step.
+
+If `src.marking` covers the concrete marking `m` and `m` fires `t` to `m'`,
+then `t` is enabled at `src.marking` and the accelerated successor covers
+`m'`:
+
+```text
+          Fires t
+    m --------------> m'
+    |                  |
+    | ≤                | ≤
+    v                  v
+src.marking ----t----> successor.marking
+```
+-/
+theorem fires_le_successor [FinEnum P]
+    {m m' : Marking P} {src : Node P} {t : T}
+    (hcover : m.toOmega ≤ src.marking) (hfires : net.Fires m t m') :
+    net.OmegaEnabled src.marking t ∧
+      m'.toOmega ≤ (successor net src t).marking := by
+  have homegaFires : net.OmegaFires m.toOmega t m'.toOmega :=
+    (net.fires_iff_omegaFires_toOmega m m' t).mp hfires
+  obtain ⟨tgt, htgt, hle⟩ := homegaFires.mono hcover
+  have htgtEq : tgt = rawSuccessor net src.marking t := by
+    funext p
+    exact htgt.2 p
+  constructor
+  · exact htgt.1
+  · calc
+      m'.toOmega ≤ tgt := hle
+      _ = rawSuccessor net src.marking t := htgtEq
+      _ ≤ (successor net src t).marking := by
+        intro p
+        by_cases hp : p ∈ Node.acceleratedPlaces
+            (rawSuccessor net src.marking t) src
+        · simp [successor, OmegaMarking.accelerateFinset, hp]
+        · simp [successor, OmegaMarking.accelerateFinset, hp]
+
 /-- If a successor introduces no new `ω`-place, acceleration did not change
 the raw firing result. -/
 theorem successor_marking_eq_rawSuccessor_of_omegaPlaces_eq [FinEnum P]

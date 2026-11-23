@@ -107,6 +107,22 @@ theorem marking_eq_top_of_tr {src tgt : Node P} {t : T} {p : P}
   rw [htr.2.2]
   exact successor_preserves_top src t hp
 
+/-- Coverage is preserved across one concrete firing from a first-occurrence
+node.
+
+If `src.marking` covers `m` and `m` fires `t` to `m'`, the covering LTS has
+the corresponding edge to `successor net src t`, whose marking covers `m'`.
+-/
+theorem coveringLTS_tr_cover_of_fires
+    {src : Node P} {m m' : Marking P} {t : T}
+    (hfirst : src.IsFirstOccurrence)
+    (hcover : m ≤ src.marking)
+    (hfires : net.Fires m t m') :
+    (coveringLTS net).Tr src t (successor net src t) ∧
+      m' ≤ (successor net src t).marking := by
+  obtain ⟨henabled, hcoverNext⟩ := fires_le_successor hcover hfires
+  exact ⟨⟨hfirst, henabled, rfl⟩, hcoverNext⟩
+
 /-! ## Rooted covering graph -/
 
 /-- The covering graph generated from (concrete) initial marking `m₀`. Its
