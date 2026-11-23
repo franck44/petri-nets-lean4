@@ -14,7 +14,7 @@ import PetriNets.Monotonicity
 # Coverability
 
 Provides coverability for weighted P/T nets, including ω-markings,
-ω-firing semantics, concretisations, and backward predecessor demands.
+ω-firing semantics, and concretisations.
 
 A marking `m` is coverable from an initial marking `m₀` when some marking
 reachable from `m₀` contains at least as many tokens as `m` at every place.
@@ -147,6 +147,41 @@ def WeightedNet.OmegaFires {P T : Type*} (net : WeightedNet P T)
     ∀ p,
       m' p = m p - net.pre p t + net.post p t
 
+/-- The weakest ω-marking from which firing `t` can cover `target`.
+
+It is the ω-marking analogue of `weakestPreMarking`: at every place it
+contains the finite pre-incidence weight, together with the part of the target
+demand not supplied by the post-incidence weight. -/
+def WeightedNet.weakestPreOmegaMarking {P T : Type*}
+    (net : WeightedNet P T) (t : T) (target : OmegaMarking P) :
+    OmegaMarking P := fun p =>
+  net.pre p t + (target p - net.post p t)
+
+/-- Propagate an ω-marking target backwards through a transition sequence.
+The transitions are processed from right to left, as for
+`weakestPreMarkingSequence`. -/
+def WeightedNet.weakestPreOmegaMarkingSequence {P T : Type*}
+    (net : WeightedNet P T) : List T → OmegaMarking P → OmegaMarking P
+  | [], target => target
+  | t :: ts, target =>
+      net.weakestPreOmegaMarking t
+        (net.weakestPreOmegaMarkingSequence ts target)
+
+/-- Weakest ω-predecessors distribute over concatenation: first propagate
+the target through the suffix, then through the prefix. -/
+theorem WeightedNet.weakestPreOmegaMarkingSequence_append {P T : Type*}
+    (net : WeightedNet P T) (ts₁ ts₂ : List T)
+    (target : OmegaMarking P) :
+    net.weakestPreOmegaMarkingSequence (ts₁ ++ ts₂) target =
+      net.weakestPreOmegaMarkingSequence ts₁
+        (net.weakestPreOmegaMarkingSequence ts₂ target) := by
+  induction ts₁ with
+  | nil => rfl
+  | cons t ts ih =>
+      simp only [List.cons_append,
+        WeightedNet.weakestPreOmegaMarkingSequence]
+      rw [ih]
+
 /-- Firing preserves every component already equal to `ω`. -/
 theorem WeightedNet.OmegaFires.preserves_top {P T : Type*}
     {net : WeightedNet P T} {src tgt : OmegaMarking P} {t : T}
@@ -192,6 +227,80 @@ theorem WeightedNet.omegaFires_is_deterministic {P T : Type*}
   funext p
   exact (h₁.2 p).trans (h₂.2 p).symm
 
+/-- Any ω-marking above `weakestPreOmegaMarking t target` enables `t`.
+Firing `t` from it produces an ω-marking covering `target`. -/
+theorem WeightedNet.exists_omegaFires_cover_of_weakestPreOmegaMarking_le
+    {P T : Type*} (net : WeightedNet P T) (t : T)
+    (target : OmegaMarking P) {src : OmegaMarking P}
+    (hsrc : net.weakestPreOmegaMarking t target ≤ src) :
+    ∃ tgt, net.OmegaFires src t tgt ∧ target ≤ tgt := by
+  let tgt : OmegaMarking P :=
+    fun p => src p - net.pre p t + net.post p t
+  have henabled : net.OmegaEnabled src t := by
+    intro p
+    calc
+      (net.pre p t : ℕ∞) ≤ net.weakestPreOmegaMarking t target p := by
+        simp [WeightedNet.weakestPreOmegaMarking]
+      _ ≤ src p := hsrc p
+  have hfires : net.OmegaFires src t tgt :=
+    ⟨henabled, fun _ => rfl⟩
+  refine ⟨tgt, hfires, ?_⟩
+  intro p
+  have hremaining : target p - net.post p t ≤
+      src p - net.pre p t :=
+    ENat.le_sub_of_add_le_left (by simp) (hsrc p)
+  calc
+    target p ≤ target p - net.post p t + net.post p t := le_tsub_add
+    _ ≤ src p - net.pre p t + net.post p t :=
+      add_le_add hremaining le_rfl
+    _ = tgt p := rfl
+
+/-- The ω-valued and concrete weakest predecessor constructions agree on
+concrete target markings. -/
+theorem WeightedNet.weakestPreOmegaMarking_coe {P T : Type*}
+    (net : WeightedNet P T) (t : T) (target : Marking P) :
+    net.weakestPreOmegaMarking t target = net.weakestPreMarking t target := by
+  funext p
+  simp [WeightedNet.weakestPreOmegaMarking, WeightedNet.weakestPreMarking]
+
+/-- The ω-valued and concrete weakest predecessor sequence constructions
+agree on concrete target markings. -/
+theorem WeightedNet.weakestPreOmegaMarkingSequence_coe {P T : Type*}
+    (net : WeightedNet P T) (ts : List T) (target : Marking P) :
+    net.weakestPreOmegaMarkingSequence ts target =
+      net.weakestPreMarkingSequence ts target := by
+  induction ts with
+  | nil => rfl
+  | cons t ts ih =>
+      simp only [WeightedNet.weakestPreOmegaMarkingSequence,
+        WeightedNet.weakestPreMarkingSequence]
+      rw [ih, net.weakestPreOmegaMarking_coe]
+
+/-- Propagate an ω-marking target backwards across an ω-firing.
+
+If `t` fires from `src` to `tgt` and `target ≤ tgt`, then the weakest
+ω-marking sufficient to cover `target` lies below `src`. -/
+theorem WeightedNet.weakestPreOmegaMarking_le_of_omegaFires
+    {P T : Type*} {net : WeightedNet P T}
+    {src tgt target : OmegaMarking P} {t : T}
+    (hfires : net.OmegaFires src t tgt) (htarget : target ≤ tgt) :
+    net.weakestPreOmegaMarking t target ≤ src := by
+  intro p
+  have hremaining : target p - net.post p t ≤
+      src p - net.pre p t := by
+    calc
+      target p - net.post p t ≤ tgt p - net.post p t :=
+        tsub_le_tsub_right (htarget p) _
+      _ = (src p - net.pre p t + net.post p t) - net.post p t := by
+        rw [hfires.2 p]
+      _ ≤ src p - net.pre p t := add_tsub_le_right
+  change (net.pre p t : ℕ∞) + (target p - net.post p t) ≤ src p
+  calc
+    (net.pre p t : ℕ∞) + (target p - net.post p t) ≤
+        net.pre p t + (src p - net.pre p t) :=
+      add_le_add le_rfl hremaining
+    _ = src p := add_tsub_cancel_of_le (hfires.1 p)
+
 /-! ## ω-marking transition system -/
 
 /-- The ω-marking semantics of `net` as a labelled transition
@@ -209,6 +318,32 @@ theorem WeightedNet.omegaMarkingLTS_tr_iff {P T : Type*}
     net.omegaMarkingLTS.Tr src t tgt ↔ net.OmegaFires src t tgt :=
   Iff.rfl
 
+/-- Any ω-marking above the weakest predecessor of a transition sequence can
+execute that sequence, and the resulting ω-marking covers `target`.
+
+```text
+weakestPreOmegaMarkingSequence ts target ≤ src
+
+src ────────────ts─────────────▶ tgt
+                                  ▲
+                                  │ target ≤ tgt
+```
+-/
+theorem WeightedNet.exists_omegaMTr_cover_of_weakestPreOmegaMarkingSequence_le
+    {P T : Type*} (net : WeightedNet P T) (ts : List T)
+    (target : OmegaMarking P) {src : OmegaMarking P}
+    (hsrc : net.weakestPreOmegaMarkingSequence ts target ≤ src) :
+    ∃ tgt, net.omegaMarkingLTS.MTr src ts tgt ∧ target ≤ tgt := by
+  induction ts generalizing src with
+  | nil =>
+      exact ⟨src, Cslib.LTS.MTr.refl, hsrc⟩
+  | cons t ts ih =>
+      obtain ⟨next, hfirst, htailDemand⟩ :=
+        net.exists_omegaFires_cover_of_weakestPreOmegaMarking_le t
+          (net.weakestPreOmegaMarkingSequence ts target) hsrc
+      obtain ⟨tgt, htail, htarget⟩ := ih htailDemand
+      exact ⟨tgt, Cslib.LTS.MTr.stepL hfirst htail, htarget⟩
+
 /-- A transition is enabled at an ω-marking exactly when the ω-marking LTS
 has an outgoing edge carrying that transition. -/
 theorem WeightedNet.omegaMarkingLTS_enabled_iff_exists_tr {P T : Type*}
@@ -218,20 +353,18 @@ theorem WeightedNet.omegaMarkingLTS_enabled_iff_exists_tr {P T : Type*}
 
 /-! ## Relation with concrete firing semantics -/
 
-/-- Embedding a concrete marking into the ω-markings preserves and reflects
-enabledness. Mathematically this is immediate: `toOmega` changes only the
-codomain from `ℕ` to `ℕ∞` and preserves every finite token count. -/
+/-- Lifting a concrete marking into an ω-marking preserves and reflects
+enabledness. -/
 theorem WeightedNet.enabled_iff_omegaEnabled_toOmega {P T : Type*}
     (net : WeightedNet P T) (m : Marking P) (t : T) :
-    net.Enabled m t ↔ net.OmegaEnabled m.toOmega t := by
+    net.Enabled m t ↔ net.OmegaEnabled m t := by
   simp [WeightedNet.Enabled, WeightedNet.OmegaEnabled, Marking.toOmega]
 
-/-- Embedding concrete source and target markings into the ω-markings
-preserves and reflects firing. Thus concrete firing is represented exactly by
-ω-firing between markings whose components are all finite. -/
+/-- Lifting concrete source and target markings into the ω-markings
+preserves and reflects firing. -/
 theorem WeightedNet.fires_iff_omegaFires_toOmega {P T : Type*}
     (net : WeightedNet P T) (m m' : Marking P) (t : T) :
-    net.Fires m t m' ↔ net.OmegaFires m.toOmega t m'.toOmega := by
+    net.Fires m t m' ↔ net.OmegaFires m t m' := by
   constructor
   · rintro ⟨henabled, hfires⟩
     constructor
@@ -250,158 +383,41 @@ theorem WeightedNet.fires_iff_omegaFires_toOmega {P T : Type*}
       change m' p = m p - net.pre p t + net.post p t
       exact_mod_cast hp
 
-/-- The least marking from which firing `t` can cover `target`.
-
-At each place, it contains the tokens consumed by `t`, plus the part of the
-target demand not supplied by the post-incidence of `t`:
-
-```text
-leastPreMarking(p) = pre(p,t) + (target(p) - post(p,t)).
-```
-
-This is the standard one-step predecessor construction used in backward
-coverability arguments. -/
-def WeightedNet.leastPreMarking {P T : Type*} (net : WeightedNet P T)
-    (t : T) (target : Marking P) : Marking P := fun p =>
-  net.pre p t + (target p - net.post p t)
-
-/-- Propagate a target demand backwards through a transition sequence.
-
-The construction applies `leastPreMarking` from right to left:
-
-```text
-leastPreMarkingSequence []       target = target
-leastPreMarkingSequence (t::ts)  target =
-  leastPreMarking t (leastPreMarkingSequence ts target).
-```
-
-It is the least initial demand obtained by successively propagating the final
-demand backwards across every transition in the list. -/
-def WeightedNet.leastPreMarkingSequence {P T : Type*}
-    (net : WeightedNet P T) : List T → Marking P → Marking P
-  | [], target => target
-  | t :: ts, target =>
-      net.leastPreMarking t (net.leastPreMarkingSequence ts target)
-
-/-- Propagating a demand backwards through concatenated transition lists is
-the same as first propagating it through the suffix and then through the
-prefix. -/
-theorem WeightedNet.leastPreMarkingSequence_append {P T : Type*}
-    (net : WeightedNet P T) (ts₁ ts₂ : List T) (target : Marking P) :
-    net.leastPreMarkingSequence (ts₁ ++ ts₂) target =
-      net.leastPreMarkingSequence ts₁
-        (net.leastPreMarkingSequence ts₂ target) := by
-  induction ts₁ with
-  | nil => rfl
-  | cons t ts ih =>
-      simp only [List.cons_append, WeightedNet.leastPreMarkingSequence]
-      rw [ih]
-
-/-- Any marking above `leastPreMarking` enables `t`, and its post-firing
-marking covers `target`.
-
-Thus `leastPreMarking` is a threshold for one-step backward coverability, not
-merely one particular source from which the target can be covered. -/
-theorem WeightedNet.fires_firingResult_cover_of_leastPreMarking_le
-    {P T : Type*} (net : WeightedNet P T) (t : T) (target : Marking P)
-    {src : Marking P} (hsrc : net.leastPreMarking t target ≤ src) :
-    net.Fires src t (net.firingResult src t) ∧
-      target ≤ net.firingResult src t := by
-  have henabled : net.Enabled src t := by
-    intro p
-    calc
-      net.pre p t ≤ net.leastPreMarking t target p := by
-        simp [WeightedNet.leastPreMarking]
-      _ ≤ src p := hsrc p
-  have hfires : net.Fires src t (net.firingResult src t) :=
-    ⟨henabled, fun _ => rfl⟩
-  have htarget : target ≤ net.firingResult src t := by
-    intro p
-    have hp := hsrc p
-    simp [WeightedNet.leastPreMarking] at hp ⊢
-    omega
-  exact ⟨hfires, htarget⟩
-
-/-- Any marking above the predecessor demand of a transition sequence can
-execute that sequence, and its computed result covers the requested target.
-
-```text
-leastPreMarkingSequence ts target ≤ src
-
-src ─────────────ts─────────────▶ firingSequenceResult src ts
-                                  ▲
-                                  │ target ≤ result
-```
-
-The proof follows the list from left to right. The first application of
-`fires_firingResult_cover_of_leastPreMarking_le` reaches a marking covering
-the predecessor demand of the tail; the induction hypothesis then executes
-the tail and covers the original target. -/
-theorem WeightedNet.firesSequence_cover_of_leastPreMarkingSequence_le
-    {P T : Type*} (net : WeightedNet P T) (ts : List T)
-    (target : Marking P) {src : Marking P}
-    (hsrc : net.leastPreMarkingSequence ts target ≤ src) :
-    net.FiresSequence src ts (net.firingSequenceResult src ts) ∧
-      target ≤ net.firingSequenceResult src ts := by
-  induction ts generalizing src with
-  | nil =>
-      exact ⟨WeightedNet.FiresSequence.nil src, hsrc⟩
-  | cons t ts ih =>
-      obtain ⟨hfirst, htailDemand⟩ :=
-        net.fires_firingResult_cover_of_leastPreMarking_le t
-          (net.leastPreMarkingSequence ts target) hsrc
-      obtain ⟨htail, htarget⟩ := ih htailDemand
-      exact ⟨WeightedNet.FiresSequence.cons hfirst htail, htarget⟩
+/-! ## Concrete predecessors of ω-firing -/
 
 /-- Propagate a concrete target demand backwards across an ω-firing.
 
-Assume `t` fires from `omegaSrc` to `omegaTgt`.
-Let `target` be a concrete marking
-
-Then the least ordinary marking sufficient to cover `target` after firing `t` lies below `omegaSrc`:
+Assume that `t` fires from `omegaSrc` to `omegaTgt`, and that the concrete
+marking `target` lies below `omegaTgt`. Then the least concrete marking
+sufficient to cover `target` after firing `t` lies below `omegaSrc`:
 
 ```text
           omegaSrc ─────────────t──────────────▶ omegaTgt
               ▲                                      ▲
-           toOmega ≤                              toOmega ≤
+              ≤                                      ≤
               │                                      │
-leastPreMarking t target ──t──▶ a marking covering target
+weakestPreMarking t target ──t──▶ a marking covering target
 ```
 
-At a place where `omegaSrc` is `ω`, this is immediate because
-the predecessor demand is finite. At a finite place, it follows from the
-ω-firing equation and `target.toOmega ≤ omegaTgt`.
+At a place where `omegaSrc` is `ω`, this is immediate because the
+predecessor demand is concrete. At a finite place, it follows from the
+ω-firing equation and `target ≤ omegaTgt`.
 
-This theorem is the backward step used to turn a finite demand at an abstract
-ω-successor into a finite demand at its source. -/
-theorem WeightedNet.leastPreMarking_toOmega_le_of_omegaFires
+This theorem is the backward step used to turn a concrete demand below an
+ω-successor into a concrete demand below its source. -/
+theorem WeightedNet.weakestPreMarking_le_of_omegaFires
     {P T : Type*} {net : WeightedNet P T}
     {omegaSrc omegaTgt : OmegaMarking P} {t : T} {target : Marking P}
     (hfires : net.OmegaFires omegaSrc t omegaTgt)
-    (htarget : target.toOmega ≤ omegaTgt) :
-    (net.leastPreMarking t target).toOmega ≤ omegaSrc := by
-  intro p
-  by_cases hp : omegaSrc p = ⊤
-  · simp [WeightedNet.leastPreMarking, hp]
-  · have henabledNat : net.pre p t ≤ (omegaSrc p).toNat := by
-      exact ENat.natCast_le_natCast.mp <| by
-        rw [ENat.natCast_toNat hp]
-        exact hfires.1 p
-    have htargetNat : target p ≤
-        (omegaSrc p).toNat - net.pre p t + net.post p t := by
-      have hpCover := htarget p
-      rw [hfires.2 p, ← ENat.natCast_toNat hp] at hpCover
-      exact ENat.natCast_le_natCast.mp <| by
-        simpa using hpCover
-    simp only [WeightedNet.leastPreMarking, Marking.toOmega_apply]
-    rw [← ENat.natCast_toNat hp]
-    exact_mod_cast (show net.pre p t + (target p - net.post p t) ≤
-      (omegaSrc p).toNat by omega)
+    (htarget : target ≤ omegaTgt) :
+    net.weakestPreMarking t target ≤ omegaSrc := by
+  rw [← net.weakestPreOmegaMarking_coe t target]
+  exact net.weakestPreOmegaMarking_le_of_omegaFires hfires htarget
 
-/-- Realise a finite demand below an ω-firing target by an ordinary firing.
+/-- Realise a concrete demand below an ω-firing target by an ordinary firing.
 
-Given `omegaSrc ─t→ omegaTgt` and an ordinary `demand` represented below
-`omegaTgt`, the theorem constructs a finite source below `omegaSrc`. Firing
+Given `omegaSrc ─t→ omegaTgt` and a concrete `demand` represented below
+`omegaTgt`, the theorem constructs a concrete source below `omegaSrc`. Firing
 `t` from that source produces its deterministic firing result, which covers
 `demand`:
 
@@ -417,16 +433,16 @@ theorem WeightedNet.exists_finite_firing_cover_of_omegaFires
     {P T : Type*} {net : WeightedNet P T}
     {omegaSrc omegaTgt : OmegaMarking P} {t : T} {demand : Marking P}
     (hfires : net.OmegaFires omegaSrc t omegaTgt)
-    (hdemand : demand.toOmega ≤ omegaTgt) :
-    ∃ finiteSrc,
-      finiteSrc.toOmega ≤ omegaSrc ∧
+    (hdemand : demand ≤ omegaTgt) :
+    ∃ finiteSrc : Marking P,
+      finiteSrc ≤ omegaSrc ∧
       net.Fires finiteSrc t (net.firingResult finiteSrc t) ∧
       demand ≤ net.firingResult finiteSrc t := by
-  let finiteSrc := net.leastPreMarking t demand
-  have hsrcBelow : finiteSrc.toOmega ≤ omegaSrc :=
-    net.leastPreMarking_toOmega_le_of_omegaFires hfires hdemand
+  let finiteSrc := net.weakestPreMarking t demand
+  have hsrcBelow : finiteSrc ≤ omegaSrc :=
+    net.weakestPreMarking_le_of_omegaFires hfires hdemand
   obtain ⟨hfiniteFires, hdemandBelow⟩ :=
-    net.fires_firingResult_cover_of_leastPreMarking_le t demand le_rfl
+    net.fires_firingResult_cover_of_weakestPreMarking_le t demand le_rfl
   exact ⟨finiteSrc, hsrcBelow, hfiniteFires, hdemandBelow⟩
 
 /-- A marking `m` is coverable from `m₀` when there is a marking `m'`
@@ -443,12 +459,12 @@ Equivalently, the downward closure of `mω` among ordinary markings is
 contained in the downward closure of the reachable markings from `m₀`:
 
 ```text
-∀ m, m.toOmega ≤ mω → ∃ m', Reachable m₀ m' ∧ m ≤ m'.
+∀ m, m ≤ mω → ∃ m', Reachable m₀ m' ∧ m ≤ m'.
 ```
 -/
 def WeightedNet.OmegaCoverableFrom {P T : Type*} (net : WeightedNet P T)
     (m₀ : Marking P) (mω : OmegaMarking P) : Prop :=
-  ∀ m, m.toOmega ≤ mω → net.CoverableFrom m₀ m
+  ∀ m : Marking P, m ≤ mω → net.CoverableFrom m₀ m
 
 /-- Obtain a reachable cover for a chosen concretisation of an
 ω-coverable marking.
@@ -487,11 +503,11 @@ theorem WeightedNet.OmegaCoverableFrom.coverable_concretise
   exact h (mω.concretise reserve) (mω.concretise_toOmega_le reserve)
 
 /-- The initial marking embedded as an ω-marking is omega coverable from
-itself. Every ordinary marking below `m₀.toOmega` is covered by the reachable
+itself. Every concrete marking below `m₀` is covered by the reachable
 marking `m₀`. -/
 theorem WeightedNet.omegaCoverableFrom_initial
     {P T : Type*} (net : WeightedNet P T) (m₀ : Marking P) :
-    net.OmegaCoverableFrom m₀ m₀.toOmega := by
+    net.OmegaCoverableFrom m₀ m₀ := by
   intro m hle
   refine ⟨m₀, WeightedNet.Reachable.refl net m₀, ?_⟩
   intro p
@@ -516,7 +532,7 @@ private theorem coverableFrom_of_finite_firing_cover
     {m₀ finiteSrc finiteTgt demand : Marking P}
     {src : OmegaMarking P} {t : T}
     (hsound : net.OmegaCoverableFrom m₀ src)
-    (hsrcBelow : finiteSrc.toOmega ≤ src)
+    (hsrcBelow : finiteSrc ≤ src)
     (hfires : net.Fires finiteSrc t finiteTgt)
     (hdemandBelow : demand ≤ finiteTgt) :
     net.CoverableFrom m₀ demand := by

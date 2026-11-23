@@ -339,13 +339,13 @@ a DFS execution without exceeding the token count at the abstract source.
 Accelerations at other places are irrelevant. Since the target coordinate is
 finite, it remained finite throughout the path, and every DFS edge follows
 the ordinary firing equation at that coordinate. -/
-private theorem leastPreMarkingSequence_apply_le_of_dfsMTr
+private theorem weakestPreMarkingSequence_apply_le_of_dfsMTr
     [FinEnum P] [FinEnum T] {src tgt : Branch P} {ts : List T}
     {demand : Marking P} {p : P}
     (hexec : (dfsLTS net).MTr src ts tgt)
     (htgt : tgt.marking p ≠ ⊤)
     (hdemand : (demand p : ℕ∞) ≤ tgt.marking p) :
-    net.leastPreMarkingSequence ts demand p ≤
+    net.weakestPreMarkingSequence ts demand p ≤
       (src.marking p).toNat := by
   induction hexec with
   | refl =>
@@ -365,7 +365,7 @@ private theorem leastPreMarkingSequence_apply_le_of_dfsMTr
         exact omegaPlaces_mono_of_tr htr
           (OmegaMarking.mem_omegaPlaces.mpr hp)
       have htailDemand :
-          net.leastPreMarkingSequence ts demand p ≤
+          net.weakestPreMarkingSequence ts demand p ≤
             (mid.marking p).toNat := ih htgt hdemand
       have henabled : net.pre p t ≤ (src.marking p).toNat := by
         apply ENat.natCast_le_natCast.mp
@@ -379,8 +379,8 @@ private theorem leastPreMarkingSequence_apply_le_of_dfsMTr
           (mid.marking p).toNat =
             (src.marking p).toNat - net.pre p t + net.post p t := by
         exact_mod_cast hmarking
-      simp only [WeightedNet.leastPreMarkingSequence,
-        WeightedNet.leastPreMarking]
+      simp only [WeightedNet.weakestPreMarkingSequence,
+        WeightedNet.weakestPreMarking]
       omega
 
 /-- Concretise one abstract branch-growth witness.
@@ -427,15 +427,15 @@ theorem exists_concrete_growth_path_of_branch_witness
   let raw := succMarking net src.marking t
   let target := raw.concretise 0
   let labels := segment ++ [t]
-  let concreteSrc := net.leastPreMarkingSequence labels target
+  let concreteSrc := net.weakestPreMarkingSequence labels target
   let concreteEnd := net.firingSequenceResult concreteSrc labels
   have htargetRaw : target.toOmega ≤ raw :=
     raw.concretise_toOmega_le 0
   have homega : net.OmegaFires src.marking t raw := by
     exact ⟨(mem_dfsSuccessors_iff.mp htr).2.1, fun _ => rfl⟩
   have htailDemand :
-      (net.leastPreMarking t target).toOmega ≤ src.marking :=
-    net.leastPreMarking_toOmega_le_of_omegaFires homega htargetRaw
+      (net.weakestPreMarking t target).toOmega ≤ src.marking :=
+    net.weakestPreMarking_le_of_omegaFires homega htargetRaw
   have hsrcFinite_of_raw {q : P} (hraw : raw q ≠ ⊤) :
       src.marking q ≠ ⊤ := by
     intro htop
@@ -452,10 +452,10 @@ theorem exists_concrete_growth_path_of_branch_witness
       concreteSrc q ≤ (ancestor.marking q).toNat := by
     have hsrcFinite := hsrcFinite_of_raw hraw
     dsimp only [concreteSrc, labels]
-    rw [net.leastPreMarkingSequence_append]
-    change net.leastPreMarkingSequence segment
-        (net.leastPreMarking t target) q ≤ (ancestor.marking q).toNat
-    apply leastPreMarkingSequence_apply_le_of_dfsMTr
+    rw [net.weakestPreMarkingSequence_append]
+    change net.weakestPreMarkingSequence segment
+        (net.weakestPreMarking t target) q ≤ (ancestor.marking q).toNat
+    apply weakestPreMarkingSequence_apply_le_of_dfsMTr
       (net := net) hsegment hsrcFinite
     exact htailDemand q
   have hsrcRaw : concreteSrc.toOmega ≤ raw := by
@@ -476,7 +476,7 @@ theorem exists_concrete_growth_path_of_branch_witness
       rw [← ENat.natCast_toNat hraw]
       exact ENat.natCast_le_natCast.mpr (hrequired.trans hancestorRaw)
   obtain ⟨hsequence, htargetEnd⟩ :=
-    net.firesSequence_cover_of_leastPreMarkingSequence_le
+    net.firesSequence_cover_of_weakestPreMarkingSequence_le
       labels target (by rfl)
   have effect_at {q : P} (hraw : raw q ≠ ⊤) :
       concreteEnd q +
