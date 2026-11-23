@@ -337,6 +337,22 @@ theorem WeightedNet.omegaMarkingLTS_tr_iff {P T : Type*}
     net.omegaMarkingLTS.Tr src t tgt ↔ net.OmegaFires src t tgt :=
   Iff.rfl
 
+/-- The target of an executable ω-firing sequence is its computed
+`omegaFiringSequenceResult`. -/
+theorem WeightedNet.omegaMTr_eq_omegaFiringSequenceResult
+    {P T : Type*} {net : WeightedNet P T}
+    {src tgt : OmegaMarking P} {labels : List T}
+    (hexec : net.omegaMarkingLTS.MTr src labels tgt) :
+    tgt = net.omegaFiringSequenceResult src labels := by
+  induction hexec with
+  | refl => rfl
+  | @stepL src t mid labels tgt hfirst _ ih =>
+      have hmid : mid = net.omegaFiringResult src t := by
+        funext p
+        exact hfirst.2 p
+      rw [WeightedNet.omegaFiringSequenceResult, ← hmid]
+      exact ih
+
 /-- Any ω-marking above the weakest predecessor of a transition sequence can
 execute that sequence, and the resulting ω-marking covers `target`.
 
