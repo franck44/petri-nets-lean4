@@ -6,7 +6,7 @@ Authors: Franck Cassez
 
 module
 
-public import PetriNets.CoveringGraphV2.Successor
+public import PetriNets.CoveringGraphV2.LTS
 
 /-!
 # Covering graphs, version 2
