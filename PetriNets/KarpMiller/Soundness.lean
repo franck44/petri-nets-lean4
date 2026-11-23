@@ -425,12 +425,12 @@ theorem exists_concrete_growth_path_of_branch_witness
       concreteSrc p < concreteEnd p ∧
       concreteEnd.toOmega ≤ succMarking net src.marking t := by
   let raw := succMarking net src.marking t
-  let target := raw.finiteApprox 0
+  let target := raw.concretise 0
   let labels := segment ++ [t]
   let concreteSrc := net.leastPreMarkingSequence labels target
   let concreteEnd := net.firingSequenceResult concreteSrc labels
   have htargetRaw : target.toOmega ≤ raw :=
-    raw.finiteApprox_toOmega_le 0
+    raw.concretise_toOmega_le 0
   have homega : net.OmegaFires src.marking t raw := by
     exact ⟨(mem_dfsSuccessors_iff.mp htr).2.1, fun _ => rfl⟩
   have htailDemand :
@@ -599,11 +599,11 @@ private theorem exists_combined_growth_below_omega
     intro I hIA
     induction I using Finset.induction with
     | empty =>
-        let base := raw.finiteApprox budget
-        refine ⟨base, base, [], raw.finiteApprox_toOmega_le budget,
+        let base := raw.concretise budget
+        refine ⟨base, base, [], raw.concretise_toOmega_le budget,
           WeightedNet.FiresSequence.nil base, by simp, ?_, ?_, by simp⟩
         · intro q hq
-          simp [base, OmegaMarking.finiteApprox, hq]
+          simp [base, OmegaMarking.concretise, hq]
         · intro q hq
           simp [base, hq]
     | @insert p I hp ih =>
@@ -797,19 +797,19 @@ theorem target_eq_raw_of_not_mem_newOmegaPlaces
     exact hsrcMem
   exact marking_apply_eq_succMarking_of_tr_of_ne_top htr htgtFinite
 
-/-- A finite approximation of the raw successor already covers the demand at
+/-- A concretisation of the raw successor already covers the demand at
 every place which is not newly accelerated.
 
-At an existing `ω`-place, `finiteApprox` stores `demand q` directly. At a
+At an existing `ω`-place, `concretise` stores `demand q` directly. At a
 finite raw component, `target_eq_raw_of_not_mem_newOmegaPlaces` identifies the
 DFS target with the raw value, so the result follows from `hdemand`. -/
-theorem demand_le_finiteApprox_raw_of_not_mem_newOmegaPlaces
+theorem demand_le_concretise_raw_of_not_mem_newOmegaPlaces
     [FinEnum P] [FinEnum T] {demand : Marking P}
     {src tgt : Branch P} {t : T} {q : P}
     (htr : (dfsLTS net).Tr src t tgt)
     (hdemand : demand.toOmega ≤ tgt.marking)
     (hq : q ∉ newOmegaPlaces src tgt) :
-    demand q ≤ (succMarking net src.marking t).finiteApprox demand q := by
+    demand q ≤ (succMarking net src.marking t).concretise demand q := by
   let raw := succMarking net src.marking t
   by_cases hraw : raw q = ⊤
   · simp [raw, hraw]
@@ -820,7 +820,7 @@ theorem demand_le_finiteApprox_raw_of_not_mem_newOmegaPlaces
     change (demand q : ℕ∞) ≤ tgt.marking q at hqDemand
     rw [htgtRaw, ← ENat.natCast_toNat hraw] at hqDemand
     have := ENat.natCast_le_natCast.mp hqDemand
-    simpa [raw, OmegaMarking.finiteApprox, hraw] using this
+    simpa [raw, OmegaMarking.concretise, hraw] using this
 
 /-- Combine and repeat the concrete branch witnesses until they cover a
 prescribed finite demand.
@@ -901,9 +901,9 @@ theorem exists_concrete_growth_execution
     · by_cases hq : raw q = ⊤
       · exact (hbudgetGrown q hq).trans (hgrownReached q)
       · have hdemandBase : demand q ≤ base q := by
-          have := demand_le_finiteApprox_raw_of_not_mem_newOmegaPlaces
+          have := demand_le_concretise_raw_of_not_mem_newOmegaPlaces
             htr hdemand hqA
-          simpa [raw, OmegaMarking.finiteApprox, hq,
+          simpa [raw, OmegaMarking.concretise, hq,
             hbaseFinite q hq] using this
         exact hdemandBase.trans ((hmono q hq).trans (hgrownReached q))
 
