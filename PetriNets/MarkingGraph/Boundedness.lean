@@ -12,13 +12,12 @@ public import PetriNets.PlaceInvariant.Boundedness
 /-!
 # Boundedness and finite marking graphs
 
-This module defines unboundedness of an individual place and simultaneous
-unboundedness of a set of places. It also proves Reisig's marking-graph
-characterisation of boundedness. The marking graph is finite-state when its
-generated state type has a `Finite` instance, following CSLib's convention
-for finite-state labelled transition systems.
+Provides individual and simultaneous place-unboundedness notions and proves
+Reisig's marking-graph characterisation of boundedness: for a weighted P/T net
+with finitely many places, the net is bounded from an initial marking if and
+only if its marking graph from that marking is finite.
 
-For a finite place type, a finite marking graph implies boundedness: the
+For a finite set of places, a finite marking graph implies boundedness: the
 finitely many graph states and places provide only finitely many token counts.
 Conversely, if one bound applies to all places, each place has only finitely
 many possible token counts, so there are only finitely many possible markings.
@@ -33,6 +32,8 @@ many possible token counts, so there are only finitely many possible markings.
 @[expose] public section
 
 namespace PetriNet
+
+/-! ## Place unboundedness -/
 
 /-- Place `p` is unbounded from `m₀` when, for every proposed bound `B`,
 there is a marking reachable from `m₀` that contains more than `B` tokens
@@ -67,6 +68,8 @@ theorem WeightedNet.simultaneouslyUnboundedFrom_singleton
   simp [WeightedNet.SimultaneouslyUnboundedFrom,
     WeightedNet.PlaceUnboundedFrom]
 
+/-! ## Boundedness and finite marking graphs -/
+
 /-- If the place type and the state type of the marking graph from `m₀` are
 finite, then the net is bounded from `m₀`. -/
 theorem WeightedNet.boundedFrom_of_finite_markingGraph
@@ -87,42 +90,27 @@ theorem WeightedNet.boundedFrom_of_finite_markingGraph
   exact hB ⟨(state, p), rfl⟩
 
 /-- If `P` is finite and the net is bounded from `m₀`, then the set of states
-of the marking graph from `m₀` is finite. -/
+of the marking graph from `m₀` is finite. A common bound `B` lets us encode
+every reachable marking as an element of the finite vector type
+`P → Fin (B + 1)`. -/
 theorem WeightedNet.finite_markingGraph_of_boundedFrom
     {P T : Type*} [Fintype P] {net : WeightedNet P T} {m₀ : Marking P}
     (hbounded : net.BoundedFrom m₀) :
     Finite {m : Marking P // net.markingLTS.CanReach m₀ m} := by
   obtain ⟨B, hB⟩ := hbounded
-  /- The interval from the zero marking to the constant marking
-     `(B, ..., B)` is a finite box of markings. -/
-  let boundedMarkings : Set (Marking P) := Set.Icc 0 (fun _ => B)
-  have hboundedMarkings : boundedMarkings.Finite := by
-    have hbox : boundedMarkings = {m | ∀ p, m p ≤ B} := by
-      ext m
-      simp [boundedMarkings, Pi.le_def]
-    rw [hbox]
-    have hpi := Set.Finite.pi'
-      (t := fun _ : P => Set.Iic B) (fun _ => Set.finite_Iic B)
-    simpa using hpi
-  /- Every marking in the marking graph belongs to `boundedMarkings`. -/
-  have hstateBounded
-      (state : {m : Marking P // net.markingLTS.CanReach m₀ m}) :
-      state.1 ∈ boundedMarkings := by
-    constructor
-    · simp
-    · exact hB state.1 (WeightedNet.markingGraph_state_reachable state)
-  let _ : Finite boundedMarkings := Set.finite_coe_iff.mpr hboundedMarkings
-  /- The map from marking graph states to bounded markings is injective, so
-     the finiteness of bounded markings implies the finiteness of the marking
-     graph states. -/
-  let toBoundedMarking :
-      {m : Marking P // net.markingLTS.CanReach m₀ m} → boundedMarkings :=
-    fun state => ⟨state.1, hstateBounded state⟩
-  /- The map merely forgets the reachability proof, so it is injective. -/
-  apply Finite.of_injective toBoundedMarking
+  /- Encode each reachable marking as a vector of values in `Fin (B + 1)`. -/
+  let toBoundedVector :
+      {m : Marking P // net.markingLTS.CanReach m₀ m} → P → Fin (B + 1) :=
+    fun state p =>
+      ⟨state.1 p, Nat.lt_succ_of_le
+        (hB state.1 (WeightedNet.markingGraph_state_reachable state) p)⟩
+  /- The vector type is finite, and the encoding forgets only the reachability
+     proof, so it is injective. -/
+  apply Finite.of_injective toBoundedVector
   intro src tgt h
   apply Subtype.ext
-  exact congrArg (fun m : boundedMarkings => m.1) h
+  funext p
+  exact congrArg (fun m => (m p).val) h
 
 /-- For a finite place type, a net is bounded from `m₀` if and only if the
 state type of its marking graph from `m₀` is finite. -/
