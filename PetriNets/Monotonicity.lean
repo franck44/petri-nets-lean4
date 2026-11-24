@@ -152,8 +152,8 @@ theorem WeightedNet.FiresSequence.mono
 
 /-- Combine two nondecreasing segments with the same source.
 
-The first segment s₁ strictly grows every place in `A`;
-The second segment s₂ strictly grows `q`.
+The first non decreasing segment s₁ strictly grows every place in `A`;
+The second non decreasing segment s₂ strictly grows `q`.
 
 We can build a combined segment s₁ ++ s₂ that is non-decreasing and grows
 the places in `A` and `q`.-/
@@ -365,222 +365,6 @@ theorem WeightedNet.FiresSequence.repeat_with_budget_ge_on_each
     exact Finset.single_le_sum (fun q _ => Nat.zero_le (bound q)) hp
   exact hle.trans (hbound p hp)
 
-/-- Shift a p-growing firing sequence to a larger target marking.
-
-Suppose `ts` fires from `src` to `tgt`, the sequence is nondecreasing, and it
-strictly increases place `p`. If `tgt ≤ base`, add the marking
-`d = base - tgt` to both ends of the execution:
-
-```text
-src          ──ts──▶ tgt
-│                       │
-+ d                     + d
-▼                       ▼
-shiftedSrc   ──ts──▶ base
-
-shiftedSrc = src + d       base = tgt + d
-shiftedSrc <= base and shiftedSrc(p) < base(p)
-```
-
-Adding the same marking to both ends preserves `shiftedSrc ≤ base` and the
-strict inequality `shiftedSrc p < base p`. -/
-private theorem WeightedNet.FiresSequence.shift_growth_to
-    {src tgt base : Marking P} {ts : List T} {p : P}
-    (hseq : net.FiresSequence src ts tgt)
-    (hgrows : src <[p] tgt) (htgt : tgt ≤ base) :
-    ∃ shiftedSrc,
-      net.FiresSequence shiftedSrc ts base ∧
-      shiftedSrc <[p] base := by
-  /- Add precisely the difference between the old and new targets. -/
-  let d : Marking P := base - tgt
-  /- Since `tgt ≤ base`, this difference shifts `tgt` exactly to `base`. -/
-  have htgtEq : tgt + d = base := by
-    exact add_tsub_cancel_of_le htgt
-  /- now use the additive property of firing sequences starting from `src + d`. -/
-  refine ⟨src + d, ?_, ?_, ?_⟩
-  /- Shift the original firing sequence by `d`. -/
-  · rw [← htgtEq]
-    exact hseq.add d
-  /- Adding the same marking preserves the non-strict inequality. -/
-  · rw [← htgtEq]
-    simpa [add_comm] using add_le_add_right hgrows.1 d
-  /- Adding the same number at `p` also preserves strict growth. -/
-  · rw [← htgtEq]
-    exact Nat.add_lt_add_right hgrows.2 (d p)
-
-/-- Shift many growth paths to a common endpoint.
-
-For every `p ∈ A`, suppose `tsₚ` is a nondecreasing firing sequence which
-strictly increases `p`, and its endpoint `tgtₚ` is below the supplied marking
-`base`:
-
-```text
-srcₚ ──tsₚ──▶ tgtₚ       srcₚ ≤ tgtₚ       srcₚ(p) < tgtₚ(p)
-                  │
-                  │ tgtₚ ≤ base
-                  ▼
-                 base
-```
-
-Applying `shift_growth_to` to each path produces:
-
-```text
-shiftedSrcₚ ──tsₚ──▶ base
-
-shiftedSrcₚ ≤ base       shiftedSrcₚ(p) < base(p)
-```
- -/
-private theorem WeightedNet.FiresSequence.shift_growth_paths_to
-    (A : Finset P) (base : Marking P)
-    (src tgt : A → Marking P) (ts : A → List T)
-    (hpaths : ∀ p, net.FiresSequence (src p) (ts p) (tgt p) ∧
-      src p <[p] tgt p)
-    (htgt : ∀ p, tgt p ≤ base) :
-    ∀ p : A, ∃ shiftedSrc shiftedTs,
-      net.FiresSequence shiftedSrc shiftedTs base ∧
-      shiftedSrc <[p] base := by
-  intro p
-  obtain ⟨hseq, hgrows⟩ := hpaths p
-  obtain ⟨shiftedSrc, hshifted, hshiftedGrowth⟩ :=
-    hseq.shift_growth_to hgrows (htgt p)
-  exact ⟨shiftedSrc, ts p, hshifted, hshiftedGrowth⟩
-
-/-- **Rebase finitely many growth paths to a supplied common endpoint.**
-
-For every `p ∈ A`, suppose there is a firing sequence which grows `p` and
-whose target is below `base`:
-
-```text
-srcₚ ──tsₚ──▶ tgtₚ ──≤──▶ base
-srcₚ <[p] tgtₚ
-```
-
-The path can be shifted by `base - tgtₚ`, producing a path with the same
-labels that ends exactly at `base` and still grows `p`:
-
-```text
-shiftedSrcₚ ──tsₚ──▶ base
-shiftedSrcₚ <[p] base
-```
-
-Unlike `exists_common_endpoint_growth`, this theorem does not choose the
-common endpoint. The caller supplies it, so additional properties of `base`
-—for example, lying below an abstract `ω`-marking or covering a finite
-demand—are retained unchanged. -/
-theorem WeightedNet.FiresSequence.rebase_growth_paths_to
-    (A : Finset P) (base : Marking P)
-    (hpaths : ∀ p ∈ A, ∃ src tgt ts,
-      net.FiresSequence src ts tgt ∧ (src <[p] tgt) ∧ tgt ≤ base) :
-    ∀ p ∈ A, ∃ src ts,
-      net.FiresSequence src ts base ∧ (src <[p] base) := by
-  intro p hp
-  obtain ⟨src, tgt, ts, hseq, hgrows, htgt⟩ := hpaths p hp
-  obtain ⟨shiftedSrc, hshifted, hshiftedGrowth⟩ :=
-    hseq.shift_growth_to hgrows htgt
-  exact ⟨shiftedSrc, ts, hshifted, hshiftedGrowth⟩
-
-/-- **Give finitely many growth paths a common endpoint.**
-
-For every place `p ∈ A`, assume there is firing sequence
-which is nondecreasing and strictly increases `p`:
-
-```text
-srcₚ ──tsₚ──▶ tgtₚ       srcₚ ≤ tgtₚ       srcₚ(p) < tgtₚ(p)
-```
-
-The theorem constructs one marking `base` that is larger than every tgtₚ and strictly increases
-each `p ∈ A` strictly increases `p` from its source to `tgtₚ`.
-and shifts every path so that all
-paths end at `base`. The transition sequence associated with each place is
-unchanged, but its source is shifted:
-
-```text
-shiftedSrc₁ ──ts₁──▶ ┐
-shiftedSrc₂ ──ts₂──▶ ├── base
-        ⋮             │
-shiftedSrcᵣ ──tsᵣ──▶ ┘
-
-shiftedSrcₚ ≤ base       shiftedSrcₚ(p) < base(p)
-```
-
-The construction has two steps:
-
-1. Choose one path for each `p ∈ A` and let `base` be the pointwise sum of
-   their endpoints. Consequently, every `tgtₚ ≤ base`.
-2. Apply `shift_growth_paths_to` to add `base - tgtₚ` to both ends of every
-   path:
-
-```text
-srcₚ + (base - tgtₚ) ──tsₚ──▶ tgtₚ + (base - tgtₚ) = base
-```
-
-The paths are shifted independently; this theorem does not concatenate them.
--/
-theorem WeightedNet.FiresSequence.exists_common_endpoint_growth
-    (A : Finset P)
-    (hpaths : ∀ p ∈ A, ∃ src tgt ts,
-      net.FiresSequence src ts tgt ∧ src <[p] tgt) :
-    ∃ base, ∀ p ∈ A, ∃ src ts,
-      net.FiresSequence src ts base ∧ src <[p] base := by
-  classical
-  /- Choose a representative source, target, and transition sequence for each `p ∈ A`. -/
-  choose src tgt ts hfiretolargeratp  using (fun p : A => hpaths p p.property)
-  /- get a common endpoint by summing all target markings. -/
-  let base : Marking P := ∑ p : A, tgt p
-  /- this common endpoint is larger than every individual target marking `tgt p` for `p ∈ A` -/
-  have htgt (p : A) : tgt p ≤ base := by
-    dsimp [base]
-    exact Finset.single_le_sum (fun _ _ => by simp) (Finset.mem_attach A p)
-  /- We can now shift each growth path to end at the common endpoint `base`. -/
-  have hshifted := WeightedNet.FiresSequence.shift_growth_paths_to
-    A base src tgt ts hfiretolargeratp htgt
-  /- The shifted paths now end at the common endpoint `base`. -/
-  exact ⟨base, fun p hp => hshifted ⟨p, hp⟩⟩
-
-/-- **Prepend one growth segment to a nondecreasing firing sequence.**
-
-Suppose `ts` grows place `p` while taking `src` to `base`, and `tail`
-takes `base` to a larger marking `tgt`:
-
-```text
-src ──ts──▶ base ──tail──▶ tgt
-
-src ≤ base       src(p) < base(p)       base ≤ tgt
-```
-
-Let `d = base - src`. Since `src ≤ base`, `ts` can be fired again from
-`base`, where it adds the same difference `d`. Adding `d` to the second
-execution then makes the two sequences join:
-
-```text
-base ──ts──▶ base + d ──tail──▶ tgt + d
-```
-
-Consequently, `ts ++ tail` takes `base` to `tgt + d`. This final marking
-is at least `base`; moreover, `d p > 0`, so it is strictly larger than `base`
-at place `p`. -/
-private theorem WeightedNet.FiresSequence.prepend_growth_segment
-    {src base tgt : Marking P} {ts tail : List T} {p : P}
-    (hseq : net.FiresSequence src ts base)
-    (hgrows : src <[p] base)
-    (htail : net.FiresSequence base tail tgt)
-    (hbaseTgt : base ≤ tgt) :
-    net.FiresSequence base (ts ++ tail) (tgt + (base - src)) ∧
-      base <[p] tgt + (base - src) := by
-  let d : Marking P := base - src
-  /- Replay the growth segment from `base`. -/
-  have hfirst : net.FiresSequence base ts (base + d) :=
-    hseq.fire_again hgrows.1
-  /- Shift the tail by the same marking so that it starts where `ts` ends. -/
-  have htailShifted : net.FiresSequence (base + d) tail (tgt + d) :=
-    htail.add d
-  /- Append the compatible executions and establish growth of their target. -/
-  refine ⟨hfirst.append htailShifted, ?_, ?_⟩
-  · exact hbaseTgt.trans (by simp)
-  · have hdp : 0 < d p := Nat.sub_pos_of_lt hgrows.2
-    change base p < tgt p + d p
-    exact (hbaseTgt p).trans_lt (Nat.lt_add_of_pos_right hdp)
-
 /-- Combine finitely many pumpable segments ending at the same marking.
 
 Suppose that, for every `p ∈ A`, some sequence `tsₚ` takes a marking `srcₚ`
@@ -611,39 +395,21 @@ Each replay is enabled by monotonicity because its current source is at least
 The sequences associated with the different places may be concatenated in any
 order.
 
-The proof is by induction on the size of `A`. -/
+The proof first replays every witness from `base`, then combines the resulting
+singleton growth segments with `exists_combined_growth_from`. -/
 theorem WeightedNet.FiresSequence.exists_combined_growth
     (base : Marking P) (A : Finset P)
     (hsegments : ∀ p ∈ A, ∃ src ts,
       net.FiresSequence src ts base ∧ src <[p] base) :
     ∃ ts tgt,
-      net.FiresSequence base ts tgt ∧
-      base ≤ tgt ∧
-      ∀ p ∈ A, base p < tgt p := by
+      WeightedNet.FiresSequence.GrowsOn net base ts tgt A := by
   classical
-  induction A using Finset.induction with
-  | empty =>
-      /- base -[empty sequence]-> base -/
-      simp
-      use [], base
-      simp
-      exact WeightedNet.FiresSequence.nil base
-  | @insert p A hp ih =>
-      obtain ⟨src, ts, hseq, hgrows⟩ := hsegments p (by simp)
-      obtain ⟨combined, tgt, hcombined, hbaseTgt, hstrict⟩ := ih (by
-        intro q hq
-        exact hsegments q (by simp [hq]))
-      let d : Marking P := base - src
-      obtain ⟨hseqAll, hfinalGrowth⟩ :=
-        hseq.prepend_growth_segment hgrows hcombined hbaseTgt
-      refine ⟨ts ++ combined, tgt + d, hseqAll, hfinalGrowth.1, ?_⟩
-      · intro q hq
-        rw [Finset.mem_insert] at hq
-        rcases hq with rfl | hq
-        · exact hfinalGrowth.2
-        · have hqLt := hstrict q hq
-          change base q < tgt q + d q
-          omega
+  apply WeightedNet.FiresSequence.exists_combined_growth_from base A
+  intro p hp
+  obtain ⟨src, ts, hseq, hgrows⟩ := hsegments p hp
+  refine ⟨ts, base + (base - src), hseq.fire_again hgrows.1, ?_⟩
+  rw [Marking.growsOn_singleton]
+  exact ⟨by simp, by simp [Nat.sub_pos_of_lt hgrows.2]⟩
 
 /-! ## Reachability monotonicity -/
 
