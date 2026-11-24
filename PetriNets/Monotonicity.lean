@@ -126,6 +126,41 @@ theorem WeightedNet.FiresSequence.mono
 
 /-! ## Repeating and combining firing sequences -/
 
+/-- Combine two nondecreasing segments with the same source.
+
+The first segment s₁ strictly grows every place in `A`;
+The second segment s₂ strictly grows `q`.
+
+We can build a combined segment s₁ ++ s₂ that is non-decreasing and grows
+the places in `A` and `q`.-/
+theorem WeightedNet.FiresSequence.combine_growth_segments
+    [DecidableEq P] (A : Finset P) (q : P)
+    {src grownA grownQ : Marking P} {labelsA labelsQ : List T}
+    (hgrowsA : net.FiresSequence src labelsA grownA)
+    (hmonoA : src ≤ grownA)
+    (hstrictA : ∀ p ∈ A, src p < grownA p)
+    (hgrowsQ : net.FiresSequence src labelsQ grownQ)
+    (hgrowsAtQ : src <[q] grownQ) :
+    ∃ tgt,
+      net.FiresSequence src (labelsA ++ labelsQ) tgt ∧
+      src ≤ tgt ∧
+      ∀ p ∈ insert q A, src p < tgt p := by
+  let tgt := grownQ + (grownA - src)
+  have hreplayed := hgrowsQ.mono hmonoA
+  refine ⟨tgt, hgrowsA.append hreplayed, ?_, ?_⟩
+  · intro p
+    exact (hgrowsAtQ.1 p).trans (by simp [tgt])
+  · intro p hp
+    rw [Finset.mem_insert] at hp
+    rcases hp with rfl | hp
+    · exact hgrowsAtQ.2.trans_le (by simp [tgt])
+    · have hgrowthAtP := hstrictA p hp
+      have hmonoAtP := hgrowsAtQ.1 p
+      change src p < grownQ p + (grownA p - src p)
+      exact (Nat.lt_add_of_pos_right
+        (Nat.sub_pos_of_lt hgrowthAtP)).trans_le
+          (Nat.add_le_add_right hmonoAtP (grownA p - src p))
+
 /-- A nondecreasing firing sequence can be fired again from its target, and
 the second firing adds the same marking difference as the first.
 
