@@ -555,6 +555,36 @@ theorem WeightedNet.coverableFrom_of_weakestPreMarking
     hreachable.trans ⟨[t], WeightedNet.FiresSequence.singleton hfires⟩,
     htarget⟩
 
+/-- If the weakest predecessor of `target` through a transition sequence is
+coverable, then `target` is coverable.
+
+A reachable marking covering the weakest predecessor can execute the complete
+sequence and reaches a marking covering `target` (monotonicity of the firing sequence):
+
+```text
+                         labels
+ m₀ ──Reachable──▶ reached ─────────▶ result
+                      ▲                 ▲
+                      │ ≤               │ ≤
+                      │                 │
+        weakestPreMarkingSequence     target
+```
+
+The reachable marking covering the weakest predecessor can execute `labels`;
+the resulting marking then covers `target`. -/
+theorem WeightedNet.coverableFrom_of_weakestPreMarkingSequence
+    {P T : Type*} {net : WeightedNet P T}
+    {m₀ target : Marking P} {labels : List T}
+    (hpre : net.CoverableFrom m₀
+      (net.weakestPreMarkingSequence labels target)) :
+    net.CoverableFrom m₀ target := by
+  obtain ⟨src, hreachable, hle⟩ := hpre
+  obtain ⟨hseq, htarget⟩ :=
+    net.firesSequence_cover_of_weakestPreMarkingSequence_le
+      labels target hle
+  exact ⟨net.firingSequenceResult src labels,
+    hreachable.trans ⟨labels, hseq⟩, htarget⟩
+
 /-- An ω-marking `mω` is ω-coverable from `m₀` when every concrete
 marking below `mω` is coverable from `m₀`.
 
