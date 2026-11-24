@@ -93,6 +93,20 @@ theorem firingCount_weighted_sum_cons {T : Type*} [Fintype T] [DecidableEq T]
 
 /-! ## State equations -/
 
+/-- The net token effect of a transition sequence at a place. -/
+def WeightedNet.sequenceEffect {P T : Type*} (net : WeightedNet P T)
+    (ts : List T) (p : P) : ℤ :=
+  (ts.map (net.incidence p)).sum
+
+/-- Repeating a transition sequence `K` times multiplies its token effect by
+`K`. -/
+@[simp]
+theorem WeightedNet.sequenceEffect_replicate {P T : Type*}
+    (net : WeightedNet P T) (ts : List T) (p : P) (K : ℕ) :
+    net.sequenceEffect (List.replicate K ts).flatten p =
+      K * net.sequenceEffect ts p := by
+  simp [WeightedNet.sequenceEffect]
+
 private theorem firingCount_int_weighted_sum {T : Type*} [Fintype T]
     [DecidableEq T] (ts : List T) (f : T → ℤ) :
     (∑ t, (firingCount ts t : ℤ) * f t) = (ts.map f).sum := by
@@ -109,17 +123,54 @@ private theorem firingCount_int_weighted_sum {T : Type*} [Fintype T]
 private theorem WeightedNet.FiresSequence.int_effect_sum {P T : Type*}
     {net : WeightedNet P T} {src tgt : Marking P} {ts : List T}
     (h : net.FiresSequence src ts tgt) :
-    ∀ p, (tgt p : ℤ) = (src p : ℤ) + (ts.map (net.incidence p)).sum := by
+    ∀ p, (tgt p : ℤ) = (src p : ℤ) + net.sequenceEffect ts p := by
   induction h with
   | nil m =>
       intro p
-      simp
+      simp [WeightedNet.sequenceEffect]
   | cons head tail ih =>
       intro p
       have hhead := head.int_state_equation p
       have htail := ih p
+      simp only [WeightedNet.sequenceEffect] at htail ⊢
       simp only [List.map_cons, List.sum_cons]
       omega
+
+/-- Endpoint bounds for an executable repetition of a firing sequence.
+
+If one execution strictly increases the places in `A` and does not decrease
+the places in `B`, then an executable `K`-fold repetition reaches a marking
+with at least `K` tokens on `A` and at least the source value on `B`. No
+condition is imposed outside `A ∪ B`. -/
+theorem WeightedNet.FiresSequence.repeated_ge_on {P T : Type*}
+    {net : WeightedNet P T} {src tgt reached : Marking P} {ts : List T}
+    (A B : Finset P) (K : ℕ)
+    (hseq : net.FiresSequence src ts tgt)
+    (hrepeated :
+      net.FiresSequence src (List.replicate K ts).flatten reached)
+    (hA : ∀ p ∈ A, src p < tgt p)
+    (hB : ∀ p ∈ B, src p ≤ tgt p) :
+    (∀ p ∈ B, src p ≤ reached p) ∧
+      (∀ p ∈ A, K ≤ reached p) := by
+  constructor
+  · intro p hp
+    have hmonoAt := hB p hp
+    have heffect := hseq.int_effect_sum p
+    have hrepeatedEffect := hrepeated.int_effect_sum p
+    rw [net.sequenceEffect_replicate] at hrepeatedEffect
+    have hnonneg : 0 ≤ net.sequenceEffect ts p := by omega
+    have hmul : 0 ≤ (K : ℤ) * net.sequenceEffect ts p :=
+      mul_nonneg (by positivity) hnonneg
+    omega
+  · intro p hp
+    have hgrowthAt := hA p hp
+    have heffect := hseq.int_effect_sum p
+    have hrepeatedEffect := hrepeated.int_effect_sum p
+    rw [net.sequenceEffect_replicate] at hrepeatedEffect
+    have hone : 1 ≤ net.sequenceEffect ts p := by omega
+    have hK : (0 : ℤ) ≤ K := by exact_mod_cast Nat.zero_le K
+    have hmul := mul_le_mul_of_nonneg_left hone hK
+    omega
 
 /-- The integer state equation for a firing sequence. At every place, the
 target marking equals the source marking plus the incidence contribution of
