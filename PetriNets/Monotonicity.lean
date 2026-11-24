@@ -44,6 +44,30 @@ def Marking.GrowsAt {α : Type*} [LE α] [LT α]
 /-- Pointwise growth which is strict at the specified place. -/
 notation:50 src " <[" p "] " tgt => Marking.GrowsAt src tgt p
 
+/-- `Marking.GrowsOn src tgt A` means that `tgt` is pointwise at least
+`src` and is strictly larger at every place in the finite set `A`.
+
+Like `GrowsAt`, the relation is polymorphic in the value type. -/
+def Marking.GrowsOn {α : Type*} [LE α] [LT α]
+    (src tgt : P → α) (A : Finset P) : Prop :=
+  src ≤ tgt ∧ ∀ p ∈ A, src p < tgt p
+
+/-- Growth on a singleton set is growth at its unique place. -/
+@[simp]
+theorem Marking.growsOn_singleton {α : Type*} [LE α] [LT α]
+    [DecidableEq P] (src tgt : P → α) (p : P) :
+    Marking.GrowsOn src tgt {p} ↔ src <[p] tgt := by
+  simp [Marking.GrowsOn, Marking.GrowsAt]
+
+/-- A firing sequence which is nondecreasing and strictly grows every place
+in `A`.
+
+This packages the executable sequence together with the growth property used
+when combining and repeating growth segments. -/
+def WeightedNet.FiresSequence.GrowsOn (net : WeightedNet P T)
+    (src : Marking P) (ts : List T) (tgt : Marking P) (A : Finset P) : Prop :=
+  net.FiresSequence src ts tgt ∧ Marking.GrowsOn src tgt A
+
 /-! ## One-step monotonicity -/
 
 /-- A transition enabled at a marking remains enabled at any pointwise larger
@@ -136,30 +160,51 @@ the places in `A` and `q`.-/
 theorem WeightedNet.FiresSequence.combine_growth_segments
     [DecidableEq P] (A : Finset P) (q : P)
     {src grownA grownQ : Marking P} {labelsA labelsQ : List T}
-    (hgrowsA : net.FiresSequence src labelsA grownA)
-    (hmonoA : src ≤ grownA)
-    (hstrictA : ∀ p ∈ A, src p < grownA p)
-    (hgrowsQ : net.FiresSequence src labelsQ grownQ)
-    (hgrowsAtQ : src <[q] grownQ) :
+    (hgrowsA : WeightedNet.FiresSequence.GrowsOn net src labelsA grownA A)
+    (hgrowsQ : WeightedNet.FiresSequence.GrowsOn net src labelsQ grownQ {q}) :
     ∃ tgt,
-      net.FiresSequence src (labelsA ++ labelsQ) tgt ∧
-      src ≤ tgt ∧
-      ∀ p ∈ insert q A, src p < tgt p := by
+      WeightedNet.FiresSequence.GrowsOn net src
+        (labelsA ++ labelsQ) tgt (insert q A) := by
   let tgt := grownQ + (grownA - src)
-  have hreplayed := hgrowsQ.mono hmonoA
-  refine ⟨tgt, hgrowsA.append hreplayed, ?_, ?_⟩
+  have hgrowsAtQ : src <[q] grownQ :=
+    Marking.growsOn_singleton src grownQ q |>.mp hgrowsQ.2
+  have hreplayed := hgrowsQ.1.mono hgrowsA.2.1
+  refine ⟨tgt, hgrowsA.1.append hreplayed, ?_, ?_⟩
   · intro p
     exact (hgrowsAtQ.1 p).trans (by simp [tgt])
   · intro p hp
     rw [Finset.mem_insert] at hp
     rcases hp with rfl | hp
     · exact hgrowsAtQ.2.trans_le (by simp [tgt])
-    · have hgrowthAtP := hstrictA p hp
+    · have hgrowthAtP := hgrowsA.2.2 p hp
       have hmonoAtP := hgrowsAtQ.1 p
       change src p < grownQ p + (grownA p - src p)
       exact (Nat.lt_add_of_pos_right
         (Nat.sub_pos_of_lt hgrowthAtP)).trans_le
           (Nat.add_le_add_right hmonoAtP (grownA p - src p))
+
+/-- Combine one nondecreasing growth segment per place into a single segment.
+
+All input segments start at `src`. For every `p ∈ A`, one segment is
+nondecreasing everywhere and strictly grows `p`. Their concatenation is
+nondecreasing everywhere and strictly grows every place in `A`. -/
+theorem WeightedNet.FiresSequence.exists_combined_growth_from
+    (src : Marking P) (A : Finset P)
+    (hsegments : ∀ p ∈ A, ∃ labels tgt,
+      WeightedNet.FiresSequence.GrowsOn net src labels tgt {p}) :
+    ∃ labels tgt,
+      WeightedNet.FiresSequence.GrowsOn net src labels tgt A := by
+  classical
+  induction A using Finset.induction with
+  | empty => exact ⟨[], src, WeightedNet.FiresSequence.nil src, le_rfl, by simp⟩
+  | @insert q A hq ih =>
+      obtain ⟨labelsA, grownA, hgrowsA⟩ :=
+        ih (fun p hp => hsegments p (by simp [hp]))
+      obtain ⟨labelsQ, grownQ, hgrowsQ⟩ :=
+        hsegments q (by simp)
+      obtain ⟨combined, hcombined⟩ :=
+        WeightedNet.FiresSequence.combine_growth_segments A q hgrowsA hgrowsQ
+      exact ⟨labelsA ++ labelsQ, combined, hcombined⟩
 
 /-- A nondecreasing firing sequence can be fired again from its target, and
 the second firing adds the same marking difference as the first.
