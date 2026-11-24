@@ -52,12 +52,40 @@ def Marking.GrowsOn {α : Type*} [LE α] [LT α]
     (src tgt : P → α) (A : Finset P) : Prop :=
   src ≤ tgt ∧ ∀ p ∈ A, src p < tgt p
 
+/-- `Marking.GrowsOnWithBudget src tgt budget A` means that `tgt` strictly
+grows every place in `A`, while `budget p` bounds the possible loss at every
+place `p`.
+
+The canonical budget is `src - tgt`. A zero budget recovers `GrowsOn`. -/
+def Marking.GrowsOnWithBudget
+    (src tgt budget : Marking P) (A : Finset P) : Prop :=
+  src ≤ tgt + budget ∧ ∀ p ∈ A, src p < tgt p
+
 /-- Growth on a singleton set is growth at its unique place. -/
 @[simp]
 theorem Marking.growsOn_singleton {α : Type*} [LE α] [LT α]
     [DecidableEq P] (src tgt : P → α) (p : P) :
     Marking.GrowsOn src tgt {p} ↔ src <[p] tgt := by
   simp [Marking.GrowsOn, Marking.GrowsAt]
+
+/-- A zero loss budget is equivalent to global non-decrease. -/
+@[simp]
+theorem Marking.growsOnWithBudget_zero
+    (src tgt : Marking P) (A : Finset P) :
+    Marking.GrowsOnWithBudget src tgt 0 A ↔
+      Marking.GrowsOn src tgt A := by
+  simp [Marking.GrowsOnWithBudget, Marking.GrowsOn]
+
+/-- The pointwise loss `src - tgt` is the canonical budget for a marking
+which strictly grows the places in `A`. -/
+theorem Marking.growsOnWithBudget_sub
+    (src tgt : Marking P) (A : Finset P)
+    (hstrict : ∀ p ∈ A, src p < tgt p) :
+    Marking.GrowsOnWithBudget src tgt (src - tgt) A := by
+  refine ⟨?_, hstrict⟩
+  intro p
+  simp only [Pi.add_apply, Pi.sub_apply]
+  omega
 
 /-- A firing sequence which is nondecreasing and strictly grows every place
 in `A`.
@@ -67,6 +95,23 @@ when combining and repeating growth segments. -/
 def WeightedNet.FiresSequence.GrowsOn (net : WeightedNet P T)
     (src : Marking P) (ts : List T) (tgt : Marking P) (A : Finset P) : Prop :=
   net.FiresSequence src ts tgt ∧ Marking.GrowsOn src tgt A
+
+/-- A firing sequence which strictly grows `A` and whose possible losses are
+bounded pointwise by `budget`. -/
+def WeightedNet.FiresSequence.GrowsOnWithBudget (net : WeightedNet P T)
+    (src : Marking P) (ts : List T) (tgt budget : Marking P)
+    (A : Finset P) : Prop :=
+  net.FiresSequence src ts tgt ∧
+    Marking.GrowsOnWithBudget src tgt budget A
+
+/-- Package a firing sequence with its canonical pointwise loss budget. -/
+theorem WeightedNet.FiresSequence.growsOnWithBudget_sub
+    {src tgt : Marking P} {ts : List T} (A : Finset P)
+    (hseq : net.FiresSequence src ts tgt)
+    (hstrict : ∀ p ∈ A, src p < tgt p) :
+    WeightedNet.FiresSequence.GrowsOnWithBudget
+      net src ts tgt (src - tgt) A := by
+  exact ⟨hseq, Marking.growsOnWithBudget_sub src tgt A hstrict⟩
 
 /-! ## One-step monotonicity -/
 
