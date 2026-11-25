@@ -27,10 +27,9 @@ a concrete infinite token count.
 
 namespace PetriNet.CoveringGraphV2
 
-variable {P T : Type*} [FinEnum P] [FinEnum T]
+variable {P T : Type*} [FinEnum P]
 variable {net : WeightedNet P T}
 
-omit [FinEnum T] in
 /-- The initial marking is `K`-coverable from itself for every `K`. -/
 private theorem kCoverableFrom_initial (net : WeightedNet P T)
     (m₀ : Marking P) :
@@ -40,7 +39,6 @@ private theorem kCoverableFrom_initial (net : WeightedNet P T)
 
 /-! ## Preservation along covering-LTS executions -/
 
-omit [FinEnum T] in
 /-- `K`-coverability is preserved by a covering-LTS edge which
 introduces no new `ω`-place.
 
@@ -92,7 +90,6 @@ private noncomputable def newOmegaPlaces
   OmegaMarking.omegaPlaces tgt.marking \
     OmegaMarking.omegaPlaces src.marking
 
-omit [FinEnum T] in
 /-- Accelerating a single place of the raw successor preserves coverability
 when an ordinary ω-execution ending there witnesses growth at that place. -/
 private theorem omegaCoverableFrom_accelerate_raw_of_growsAt
@@ -110,7 +107,6 @@ private theorem omegaCoverableFrom_accelerate_raw_of_growsAt
   exact net.omegaCoverableFrom_accelerate_of_growsAt
     (net.omegaCoverableFrom_of_omegaFires hsrc hfire) hsegment hgrowth
 
-omit [FinEnum T] in
 /-- Every place newly changed to `ω` by a covering step has a growth witness
 in the source history. -/
 private theorem history_growth_witnesses_of_newOmegaPlaces
@@ -135,7 +131,6 @@ private theorem history_growth_witnesses_of_newOmegaPlaces
     exact hpRawTop
   simpa [Node.acceleratedPlaces] using hpAccelerated
 
-omit [FinEnum T] in
 /-- Every newly accelerated place has a growth segment from an earlier node
 to the source of the covering step.
 
@@ -171,7 +166,6 @@ private theorem growth_segments_of_newOmegaPlaces
       exact ⟨ancestor, segment, hsegment, hgrows⟩
   · exact ⟨src, [], Cslib.LTS.MTr.refl, hgrows⟩
 
-omit [FinEnum T] in
 /-- A covering suffix replays as an ordinary ω-execution when every
 ω-place of its endpoint is set to ω throughout the replay. -/
 private theorem omegaMTr_of_coveringMTr
@@ -206,7 +200,6 @@ private theorem omegaMTr_of_coveringMTr
           simp [successor, OmegaMarking.accelerateFinset, OmegaMarking.accelerate,
             hp, hacc, rawSuccessor]
 
-omit [FinEnum T] in
 /-- Replay a covering suffix followed by the final raw firing. The replay
 starts with the source's existing ω-places set to ω. -/
 private theorem omegaMTr_to_rawSuccessor
@@ -227,7 +220,6 @@ private theorem omegaMTr_to_rawSuccessor
     ⟨htr.2.1, fun _ => rfl⟩
   exact Cslib.LTS.MTr.stepR net.omegaMarkingLTS hreplay hfire
 
-omit [FinEnum T] in
 /-- Accelerating the newly introduced ω-places gives the covering target.
 Places already equal to ω in the raw successor retain that value. -/
 private theorem accelerate_newOmegaPlaces_eq_target

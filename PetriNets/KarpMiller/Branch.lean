@@ -6,7 +6,7 @@ Authors: Franck Cassez
 
 module
 
-public import PetriNets.CoveringGraph.Acceleration
+public import PetriNets.CoveringGraphV2.Acceleration
 
 /-!
 # Karp–Miller branches
