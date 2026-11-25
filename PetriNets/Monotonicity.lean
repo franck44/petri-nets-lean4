@@ -342,6 +342,18 @@ theorem WeightedNet.FiresSequence.repeat_with_budget
       · funext p
         simp [gain, Pi.add_apply, Nat.add_mul, Nat.add_assoc]
 
+/-- At a strictly growing place, the endpoints of a budgeted repetition
+show a gain of at least one token per copy. -/
+theorem Marking.repeat_with_budget_gain_at
+    {src tgt : Marking P} {p : P} (hp : src p < tgt p) (n : ℕ) :
+    (src + n • (src - tgt)) p + (n + 1) ≤
+      (tgt + n • (tgt - src)) p := by
+  change src p + n * (src p - tgt p) + (n + 1) ≤
+    tgt p + n * (tgt p - src p)
+  have hgain := Nat.le_mul_of_pos_right n (Nat.sub_pos_of_lt hp)
+  rw [Nat.sub_eq_zero_of_le hp.le, Nat.mul_zero, Nat.add_zero]
+  omega
+
 /-- **Cover a common bound by budget-backed repetition.** Suppose `ts` strictly
 increases every place in the finite set `A`. Repeating it with `bound` copies
 of the loss as a budget produces a marking containing at least `bound` tokens
