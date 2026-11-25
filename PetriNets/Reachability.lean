@@ -11,7 +11,7 @@ public import PetriNets.Basic
 /-!
 # Firing sequences and reachability
 
-Provides finite firing sequences, weakest predecessor markings, and the
+Provides finite firing sequences (executions), weakest predecessor markings, and the
 resulting reachability relation for weighted P/T nets, extending the one-step
 firing semantics from `PetriNets.Basic`.
 
@@ -30,15 +30,17 @@ firing semantics from `PetriNets.Basic`.
 
 namespace PetriNet
 
-/-! ## Firing sequences -/
+variable {P T : Type*} {net : WeightedNet P T}
+
+/-! ## Firing sequences - Executions -/
 
 /-- `net.FiresSequence src ts tgt` means that firing the transitions in `ts`
-from left to right takes marking `src` to marking `tgt`.
+from first to last takes marking `src` to marking `tgt`.
 
 A proof is built with `nil` for the empty sequence, or with `cons` from a
 proof that the first transition fires and a proof that the remaining sequence
 fires from the resulting intermediate marking. -/
-inductive WeightedNet.FiresSequence {P T : Type*} (net : WeightedNet P T) :
+inductive WeightedNet.FiresSequence (net : WeightedNet P T) :
     Marking P → List T → Marking P → Prop where
   /-- The empty sequence leaves a marking unchanged. -/
   | nil (m) : net.FiresSequence m [] m
@@ -52,22 +54,21 @@ inductive WeightedNet.FiresSequence {P T : Type*} (net : WeightedNet P T) :
 /-- The marking obtained by applying the token updates of a transition list
 from left to right.
 
-Like `firingResult`, this is a total function: it computes a marking even if
-some transition in the list is not enabled. A proof of `FiresSequence`
-additionally establishes that every transition is enabled when it is applied.
+Like `firingResult` (Basic), this is a total function: it computes the marking
+that would result from firing all transitions in `ts` from `src`.
 -/
-def WeightedNet.firingSequenceResult {P T : Type*}
+def WeightedNet.firingSequenceResult
     (net : WeightedNet P T) (src : Marking P) (ts : List T) : Marking P :=
   ts.foldl net.firingResult src
 
 @[simp]
-theorem WeightedNet.firingSequenceResult_nil {P T : Type*}
+theorem WeightedNet.firingSequenceResult_nil
     (net : WeightedNet P T) (src : Marking P) :
     net.firingSequenceResult src [] = src :=
   rfl
 
 @[simp]
-theorem WeightedNet.firingSequenceResult_cons {P T : Type*}
+theorem WeightedNet.firingSequenceResult_cons
     (net : WeightedNet P T) (src : Marking P) (t : T) (ts : List T) :
     net.firingSequenceResult src (t :: ts) =
       net.firingSequenceResult (net.firingResult src t) ts :=
@@ -75,8 +76,8 @@ theorem WeightedNet.firingSequenceResult_cons {P T : Type*}
 
 /-- The target of a valid firing sequence is exactly the marking computed by
 `firingSequenceResult`. -/
-theorem WeightedNet.FiresSequence.eq_firingSequenceResult {P T : Type*}
-    {net : WeightedNet P T} {src tgt : Marking P} {ts : List T}
+theorem WeightedNet.FiresSequence.eq_firingSequenceResult
+    {src tgt : Marking P} {ts : List T}
     (h : net.FiresSequence src ts tgt) :
     tgt = net.firingSequenceResult src ts := by
   induction h with
@@ -86,14 +87,14 @@ theorem WeightedNet.FiresSequence.eq_firingSequenceResult {P T : Type*}
       exact ih
 
 /-- Lift a standard firing to a singleton firing sequence. -/
-theorem WeightedNet.FiresSequence.singleton {P T : Type*}
-    {net : WeightedNet P T} {src tgt : Marking P} {t : T}
+theorem WeightedNet.FiresSequence.singleton
+    {src tgt : Marking P} {t : T}
     (h : net.Fires src t tgt) : net.FiresSequence src [t] tgt := by
   exact WeightedNet.FiresSequence.cons h (WeightedNet.FiresSequence.nil tgt)
 
 /-- Concatenate two firing sequences whose intermediate markings agree. -/
-theorem WeightedNet.FiresSequence.append {P T : Type*}
-    {net : WeightedNet P T} {src i tgt : Marking P} {ts₁ ts₂ : List T}
+theorem WeightedNet.FiresSequence.append
+    {src i tgt : Marking P} {ts₁ ts₂ : List T}
     (h₁ : net.FiresSequence src ts₁ i)
     (h₂ : net.FiresSequence i ts₂ tgt) :
     net.FiresSequence src (ts₁ ++ ts₂) tgt := by
@@ -104,15 +105,15 @@ theorem WeightedNet.FiresSequence.append {P T : Type*}
 
 /-- A transition sequence has a unique target marking when fired from a
 source marking. -/
-theorem WeightedNet.FiresSequence.deterministic {P T : Type*}
-    {net : WeightedNet P T} {src tgt₁ tgt₂ : Marking P} {ts : List T}
+theorem WeightedNet.FiresSequence.deterministic
+    {src tgt₁ tgt₂ : Marking P} {ts : List T}
     (h₁ : net.FiresSequence src ts tgt₁)
     (h₂ : net.FiresSequence src ts tgt₂) : tgt₁ = tgt₂ := by
   exact h₁.eq_firingSequenceResult.trans h₂.eq_firingSequenceResult.symm
 
 /-! ## Weakest predecessor markings -/
 
-/-- The least marking from which firing `t` can cover `target`.
+/-- Compute the one-step premarking for covering `target` by firing `t`.
 
 At each place, it contains the tokens consumed by `t`, plus the part of the
 target demand not supplied by the post-incidence of `t`:
@@ -121,15 +122,27 @@ target demand not supplied by the post-incidence of `t`:
 weakestPreMarking(p) = pre(p,t) + (target(p) - post(p,t)).
 ```
 
-This is the standard one-step predecessor construction used in backward
-reachability arguments. -/
-def WeightedNet.weakestPreMarking {P T : Type*} (net : WeightedNet P T)
+The formula uses natural-number arithmetic. If `target p ≤ net.post p t`,
+the subtraction gives zero and the premarking at `p` is just `net.pre p t`.
+
+For example, suppose `t` consumes 2 tokens and produces 3 at `p`.
+
+* With a target of 5 tokens, the premarking is `2 + (5 - 3) = 4`.
+  Firing leaves 5 tokens at `p`.
+* With a target of 1 token, the subtraction `1 - 3` truncates to zero,
+  so the premarking is `2 + 0 = 2`. Firing leaves 3 tokens at `p`,
+  which covers the target of 1.
+
+The cover lemma below proves that any source meeting the computed demand
+can fire `t` and cover `target`. -/
+def WeightedNet.weakestPreMarking (net : WeightedNet P T)
     (t : T) (target : Marking P) : Marking P := fun p =>
   net.pre p t + (target p - net.post p t)
 
-/-- Propagate a target demand backwards through a transition sequence.
+/-- Compute the sequence premarking for covering `target` by firing a list
+of transitions.
 
-The construction applies `weakestPreMarking` from right to left:
+The construction applies `weakestPreMarking` from right to left (fold right):
 
 ```text
 weakestPreMarkingSequence []       target = target
@@ -137,18 +150,34 @@ weakestPreMarkingSequence (t::ts)  target =
   weakestPreMarking t (weakestPreMarkingSequence ts target).
 ```
 
-It is the least initial demand obtained by successively propagating the final
-demand backwards across every transition in the list. -/
-def WeightedNet.weakestPreMarkingSequence {P T : Type*}
-    (net : WeightedNet P T) : List T → Marking P → Marking P
-  | [], target => target
-  | t :: ts, target =>
-      net.weakestPreMarking t (net.weakestPreMarkingSequence ts target)
+The result is the marking obtained by propagating the weakest premarking
+backwards from the target through the sequence of transitions.
 
-/-- Propagating a demand backwards through concatenated transition lists is
-the same as first propagating it through the suffix and then through the
-prefix. -/
-theorem WeightedNet.weakestPreMarkingSequence_append {P T : Type*}
+For example, at one place let `t₁` consume 2 tokens and produce 3, and let
+`t₂` consume 4 tokens and produce 2. For the sequence `[t₁, t₂]`,
+compute the weakest premarking (wpm) for `t₂` first, and then for `t₁`.
+
+* With a target of 3 tokens, the wpm before `t₂` is `4 + (3 - 2) = 5`.
+  The wpm before `t₁` is then `2 + (5 - 3) = 4`. Firing the sequence
+  takes the token count from 4 to 5 and then to 3.
+* With a target of 1 token, `1 - 2` truncates to zero, so the demand
+  before `t₂` is 4. The demand before `t₁` is then `2 + (4 - 3) = 3`.
+  Firing the sequence takes the token count from 3 to 4 and then to 2,
+  which covers the target of 1. -/
+def WeightedNet.weakestPreMarkingSequence
+    (net : WeightedNet P T) (ts : List T) (target : Marking P) : Marking P :=
+  match ts with
+  | [] => target
+  | t :: rest =>
+      net.weakestPreMarking t (net.weakestPreMarkingSequence rest target)
+
+/-- The sequence premarking for covering `target` can be computed using
+any decomposition of the transition sequence `ts` into a prefix `ts₁` and a
+suffix `ts₂` with `ts = ts₁ ++ ts₂`.
+
+First compute the premarking of `target` for `ts₂`, then use that intermediate
+marking as the target for `ts₁`. -/
+theorem WeightedNet.weakestPreMarkingSequence_append
     (net : WeightedNet P T) (ts₁ ts₂ : List T) (target : Marking P) :
     net.weakestPreMarkingSequence (ts₁ ++ ts₂) target =
       net.weakestPreMarkingSequence ts₁
@@ -159,13 +188,10 @@ theorem WeightedNet.weakestPreMarkingSequence_append {P T : Type*}
       simp only [List.cons_append, WeightedNet.weakestPreMarkingSequence]
       rw [ih]
 
-/-- Any marking above `weakestPreMarking` enables `t`, and its post-firing
-marking covers `target`.
-
-Thus `weakestPreMarking` is a threshold for one-step backward reachability,
-not merely one particular source from which the target can be covered. -/
+/-- Any source marking at least as large as the one-step premarking can
+fire `t` and cover `target`. -/
 theorem WeightedNet.fires_firingResult_cover_of_weakestPreMarking_le
-    {P T : Type*} (net : WeightedNet P T) (t : T) (target : Marking P)
+    (net : WeightedNet P T) (t : T) (target : Marking P)
     {src : Marking P} (hsrc : net.weakestPreMarking t target ≤ src) :
     net.Fires src t (net.firingResult src t) ∧
       target ≤ net.firingResult src t := by
@@ -184,23 +210,10 @@ theorem WeightedNet.fires_firingResult_cover_of_weakestPreMarking_le
     omega
   exact ⟨hfires, htarget⟩
 
-/-- Any marking above `weakestPreMarkingSequence ts target` can execute `ts`,
-and its computed result covers `target`.
-
-```text
-weakestPreMarkingSequence ts target ≤ src
-
-src ────────────ts─────────────▶ firingSequenceResult src ts
-                                  ▲
-                                  │ target ≤ result
-```
-
-The proof follows the list from left to right. The first application of
-`fires_firingResult_cover_of_weakestPreMarking_le` reaches a marking covering
-the `weakestPreMarkingSequence` of the tail; the induction hypothesis then
-executes the tail and covers the original target. -/
+/-- Any source marking at least as large as the sequence premarking can
+fire `ts` and cover `target`. -/
 theorem WeightedNet.firesSequence_cover_of_weakestPreMarkingSequence_le
-    {P T : Type*} (net : WeightedNet P T) (ts : List T)
+    (net : WeightedNet P T) (ts : List T)
     (target : Marking P) {src : Marking P}
     (hsrc : net.weakestPreMarkingSequence ts target ≤ src) :
     net.FiresSequence src ts (net.firingSequenceResult src ts) ∧
@@ -218,21 +231,21 @@ theorem WeightedNet.firesSequence_cover_of_weakestPreMarkingSequence_le
 /-! ## Reachability -/
 
 /-- A marking `m'` is reachable from another marking `m` if there exists
-a finite transition sequence that takes `m` to `m'`. -/
-def WeightedNet.Reachable {P T : Type*} (net : WeightedNet P T)
+a finite firing sequence that takes `m` to `m'`. -/
+def WeightedNet.Reachable (net : WeightedNet P T)
     (m m' : Marking P) : Prop :=
   ∃ ts : List T, net.FiresSequence m ts m'
 
 /-- Every marking is reachable from itself by the empty firing sequence. -/
 @[refl]
-theorem WeightedNet.Reachable.refl {P T : Type*} (net : WeightedNet P T)
+theorem WeightedNet.Reachable.refl (net : WeightedNet P T)
     (m : Marking P) : net.Reachable m m := by
   exact ⟨[], WeightedNet.FiresSequence.nil m⟩
 
 /-- Reachability is transitive: consecutive witnessing firing sequences can be
 concatenated. -/
 @[trans]
-theorem WeightedNet.Reachable.trans {P T : Type*} {net : WeightedNet P T}
+theorem WeightedNet.Reachable.trans {net : WeightedNet P T}
     {m₁ m₂ m₃ : Marking P} (h₁ : net.Reachable m₁ m₂)
     (h₂ : net.Reachable m₂ m₃) : net.Reachable m₁ m₃ := by
   rcases h₁ with ⟨ts₁, hts₁⟩
