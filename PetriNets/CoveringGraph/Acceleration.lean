@@ -7,6 +7,7 @@ Authors: Franck Cassez
 module
 
 public import PetriNets.Coverability
+public import PetriNets.Monotonicity
 
 /-!
 # Acceleration of ω-markings
@@ -219,5 +220,63 @@ theorem WeightedNet.ValidCoverStep.preserves_top {P T : Type*}
   · exact OmegaMarking.accelerate_apply_of_mem hpA
   · rw [OmegaMarking.accelerate_apply_of_not_mem hpA]
     exact hfires.preserves_top hp
+
+/-- If a growing ω-execution ends at a coverable marking, accelerating its
+strictly growing place preserves ω-coverability. -/
+theorem WeightedNet.omegaCoverableFrom_accelerate_of_growsAt
+    {P T : Type*} [Fintype P] {net : WeightedNet P T}
+    {m₀ : Marking P} {src tgt : OmegaMarking P} {ts : List T} {p : P}
+    (htgt : net.OmegaCoverableFrom m₀ tgt)
+    (hexec : net.omegaMarkingLTS.MTr src ts tgt)
+    (hgrowth : src <[p] tgt) :
+    net.OmegaCoverableFrom m₀ (OmegaMarking.accelerate ({p} : Set P) tgt) := by
+  classical
+  apply net.omegaCoverableFrom_iff_forall_kCoverableFrom.mpr
+  intro K
+  obtain ⟨base, reached, hbase, hrepeat, hgain, hcover⟩ :=
+    net.exists_concrete_replay_repeated_growsAt hexec hgrowth.1 hgrowth.2 (K + 1) K
+  obtain ⟨m, hm, hbase⟩ := htgt base (hbase.trans hgrowth.1)
+  obtain ⟨m', hm', hend⟩ := (show net.Reachable _ _ from ⟨_, hrepeat⟩).mono hbase
+  refine ⟨m', hm.trans hm', fun q => ?_⟩
+  by_cases hq : q = p
+  · subst q
+    have hp : K ≤ reached p := by omega
+    simpa [OmegaMarking.accelerate] using hp.trans (hend p)
+  · simpa [OmegaMarking.concretise, OmegaMarking.accelerate, hq] using
+      (hcover (Nat.succ_pos K) q).trans (hend q)
+
+/-- Accelerate a finite set one place at a time, using a growth witness
+ending at the original target for each selected place. -/
+theorem WeightedNet.omegaCoverableFrom_accelerateFinset_of_growsAt
+    {P T : Type*} [Fintype P] [DecidableEq P] {net : WeightedNet P T}
+    {m₀ : Marking P} {tgt : OmegaMarking P} (A : Finset P)
+    (htgt : net.OmegaCoverableFrom m₀ tgt)
+    (hwitness : ∀ p ∈ A, ∃ src ts,
+      net.omegaMarkingLTS.MTr src ts tgt ∧ src <[p] tgt) :
+    net.OmegaCoverableFrom m₀ (OmegaMarking.accelerateFinset A tgt) := by
+  classical
+  induction A using Finset.induction with
+  | empty =>
+      have heq : OmegaMarking.accelerateFinset ∅ tgt = tgt := by
+        funext q
+        simp [OmegaMarking.accelerateFinset]
+      rw [heq]
+      exact htgt
+  | @insert p A hp ih =>
+      have hcover := ih (fun q hq => hwitness q (Finset.mem_insert_of_mem hq))
+      obtain ⟨src, ts, hexec, hgrowth⟩ := hwitness p (Finset.mem_insert_self p A)
+      let d : OmegaMarking P := fun q => if q ∈ A then ⊤ else 0
+      have ht : tgt + d = OmegaMarking.accelerateFinset A tgt := by
+        funext q
+        by_cases hq : q ∈ A <;> simp [d, OmegaMarking.accelerateFinset, hq]
+      have hstep := net.omegaCoverableFrom_accelerate_of_growsAt
+        (ht.symm ▸ hcover) (net.omegaMTr_add hexec d)
+        (show (src + d) <[p] (tgt + d) from
+          ⟨add_le_add_left hgrowth.1 d, by simpa [d, hp] using hgrowth.2⟩)
+      rw [ht] at hstep
+      convert hstep using 1
+      funext q
+      by_cases hq : q = p <;> simp [OmegaMarking.accelerateFinset,
+        OmegaMarking.accelerate, hq]
 
 end PetriNet
