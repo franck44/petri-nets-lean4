@@ -11,16 +11,20 @@ public import PetriNets.Reachability
 /-!
 # Monotonicity of weighted P/T nets
 
-Provides monotonicity results for enabled transitions, firings, firing
-sequences, and reachability with respect to the pointwise order on markings.
+Provides monotonicity results for the pointwise order on markings.
+Here `m₁ ≤ m₂` means `m₁ p ≤ m₂ p` for every place `p`.
 
-For two markings, `m₁ ≤ m₂` means that `m₁ p ≤ m₂ p` for every place `p`.
-Adding tokens cannot disable a transition. Consequently, an executable firing
-sequence remains executable after adding the same marking to its source and
-target.
+* An enabled transition remains enabled at any larger marking.
+* Adding the same tokens to both ends of a firing preserves that firing.
+* A firing sequence can be replayed from a larger source, reaching a marking
+  at least as large as its original target.
+* Reachability is preserved when the same tokens are added to the source
+  and target (`Reachable.add`).
+* From a larger source, some reachable marking covers the original reachable
+  target (`Reachable.mono`).
 
-We provide formal statements and proofs of these monotonicity properties
-for weighted P/T nets as well results that combine and repeat firing sequences while preserving monotonicity.
+Later sections use these results to repeat firing sequences and combine
+sequences that grow selected places.
 -/
 
 @[expose] public section
@@ -29,93 +33,9 @@ namespace PetriNet
 
 variable {P T : Type*} {net : WeightedNet P T}
 
-/-! ## Strict growth at a place -/
-
-/-- `src <[p] tgt` means that `tgt` is pointwise at least `src` and is
-strictly larger at place `p`.
-
-The value type is polymorphic, so the relation applies to any pointwise
-ordered indexed family. In particular, it can be used with ordinary markings,
-ω-markings, vectors represented by `Fin n → α`, and matrix rows. -/
-def Marking.GrowsAt {α : Type*} [LE α] [LT α]
-    (src tgt : P → α) (p : P) : Prop :=
-  src ≤ tgt ∧ src p < tgt p
-
-/-- Pointwise growth which is strict at the specified place. -/
-notation:50 src " <[" p "] " tgt => Marking.GrowsAt src tgt p
-
-/-- `Marking.GrowsOn src tgt A` means that `tgt` is pointwise at least
-`src` and is strictly larger at every place in the finite set `A`.
-
-Like `GrowsAt`, the relation is polymorphic in the value type. -/
-def Marking.GrowsOn {α : Type*} [LE α] [LT α]
-    (src tgt : P → α) (A : Finset P) : Prop :=
-  src ≤ tgt ∧ ∀ p ∈ A, src p < tgt p
-
-/-- `Marking.GrowsOnWithBudget src tgt budget A` means that `tgt` strictly
-grows every place in `A`, while `budget p` bounds the possible loss at every
-place `p`.
-
-The canonical budget is `src - tgt`. A zero budget recovers `GrowsOn`. -/
-def Marking.GrowsOnWithBudget
-    (src tgt budget : Marking P) (A : Finset P) : Prop :=
-  src ≤ tgt + budget ∧ ∀ p ∈ A, src p < tgt p
-
-/-- Growth on a singleton set is growth at its unique place. -/
-@[simp]
-theorem Marking.growsOn_singleton {α : Type*} [LE α] [LT α]
-    [DecidableEq P] (src tgt : P → α) (p : P) :
-    Marking.GrowsOn src tgt {p} ↔ src <[p] tgt := by
-  simp [Marking.GrowsOn, Marking.GrowsAt]
-
-/-- A zero loss budget is equivalent to global non-decrease. -/
-@[simp]
-theorem Marking.growsOnWithBudget_zero
-    (src tgt : Marking P) (A : Finset P) :
-    Marking.GrowsOnWithBudget src tgt 0 A ↔
-      Marking.GrowsOn src tgt A := by
-  simp [Marking.GrowsOnWithBudget, Marking.GrowsOn]
-
-/-- The pointwise loss `src - tgt` is the canonical budget for a marking
-which strictly grows the places in `A`. -/
-theorem Marking.growsOnWithBudget_sub
-    (src tgt : Marking P) (A : Finset P)
-    (hstrict : ∀ p ∈ A, src p < tgt p) :
-    Marking.GrowsOnWithBudget src tgt (src - tgt) A := by
-  refine ⟨?_, hstrict⟩
-  intro p
-  simp only [Pi.add_apply, Pi.sub_apply]
-  omega
-
-/-- A firing sequence which is nondecreasing and strictly grows every place
-in `A`.
-
-This packages the executable sequence together with the growth property used
-when combining and repeating growth segments. -/
-def WeightedNet.FiresSequence.GrowsOn (net : WeightedNet P T)
-    (src : Marking P) (ts : List T) (tgt : Marking P) (A : Finset P) : Prop :=
-  net.FiresSequence src ts tgt ∧ Marking.GrowsOn src tgt A
-
-/-- A firing sequence which strictly grows `A` and whose possible losses are
-bounded pointwise by `budget`. -/
-def WeightedNet.FiresSequence.GrowsOnWithBudget (net : WeightedNet P T)
-    (src : Marking P) (ts : List T) (tgt budget : Marking P)
-    (A : Finset P) : Prop :=
-  net.FiresSequence src ts tgt ∧
-    Marking.GrowsOnWithBudget src tgt budget A
-
-/-- Package a firing sequence with its canonical pointwise loss budget. -/
-theorem WeightedNet.FiresSequence.growsOnWithBudget_sub
-    {src tgt : Marking P} {ts : List T} (A : Finset P)
-    (hseq : net.FiresSequence src ts tgt)
-    (hstrict : ∀ p ∈ A, src p < tgt p) :
-    WeightedNet.FiresSequence.GrowsOnWithBudget
-      net src ts tgt (src - tgt) A := by
-  exact ⟨hseq, Marking.growsOnWithBudget_sub src tgt A hstrict⟩
-
 /-! ## One-step monotonicity -/
 
-/-- A transition enabled at a marking remains enabled at any pointwise larger
+/-- A transition enabled at a marking remains enabled at any larger
 marking. -/
 theorem WeightedNet.Enabled.mono {m₁ m₂ : Marking P} {t : T}
     (h : net.Enabled m₁ t) (hle : m₁ ≤ m₂) :
@@ -123,8 +43,8 @@ theorem WeightedNet.Enabled.mono {m₁ m₂ : Marking P} {t : T}
   intro p
   exact (h p).trans (hle p)
 
-/-- If `t` fires from `m` to `m'`, then for any additional marking, or token
-budget, `d`, the transition also fires from `m + d` to `m' + d`.
+/-- If `t` fires from `m` to `m'`, then for any additional marking `d`,
+the transition also fires from `m + d` to `m' + d`.
 
 ```text
 m   ──t──▶ m'
@@ -133,9 +53,7 @@ m   ──t──▶ m'
 ▼          ▼
 m+d ──t──▶ m'+d
 ```
-
-The proof uses enabledness monotonicity and checks the firing equation
-pointwise. -/
+-/
 theorem WeightedNet.Fires.add {m m' : Marking P} {t : T}
     (h : net.Fires m t m') (d : Marking P) :
     net.Fires (m + d) t (m' + d) := by
@@ -155,10 +73,7 @@ theorem WeightedNet.Fires.add {m m' : Marking P} {t : T}
 /-- Extend `WeightedNet.Fires.add` to firing sequences: if `ts` fires from
 `src` to `tgt`, then for any additional marking `d`, `ts` also fires from
 `src + d` to `tgt + d`.
-
-The empty case is immediate. In the nonempty case, apply
-`WeightedNet.Fires.add` to the first firing and the induction hypothesis to
-the remaining sequence. -/
+ -/
 theorem WeightedNet.FiresSequence.add {src tgt : Marking P} {ts : List T}
     (h : net.FiresSequence src ts tgt) (d : Marking P) :
     net.FiresSequence (src + d) ts (tgt + d) := by
@@ -168,20 +83,8 @@ theorem WeightedNet.FiresSequence.add {src tgt : Marking P} {ts : List T}
   | cons head tail ih =>
       exact WeightedNet.FiresSequence.cons (WeightedNet.Fires.add head d) ih
 
-/-- A firing sequence can be replayed from any pointwise larger source. The
-target is shifted by the additional marking `largerSrc - src`.
-
-This follows directly from `WeightedNet.FiresSequence.add`: apply it with the
-additional marking `largerSrc - src`, and use
-`src + (largerSrc - src) = largerSrc`.
-
-```text
-src       ──ts──▶ tgt
-│                   │
-+ (largerSrc-src)   + (largerSrc-src)
-▼                   ▼
-largerSrc ──ts──▶ tgt + (largerSrc-src)
-``` -/
+/-- A firing sequence can be replayed from any larger source. The
+target is shifted by the additional marking `largerSrc - src`. -/
 theorem WeightedNet.FiresSequence.mono
     {src tgt largerSrc : Marking P} {ts : List T}
     (h : net.FiresSequence src ts tgt) (hle : src ≤ largerSrc) :
@@ -192,281 +95,6 @@ theorem WeightedNet.FiresSequence.mono
   have hshifted := h.add (largerSrc - src)
   rw [hsrc] at hshifted
   exact hshifted
-
-/-! ## Repeating and combining firing sequences -/
-
-/-- Combine two nondecreasing segments with the same source.
-
-The first non decreasing segment s₁ strictly grows every place in `A`;
-The second non decreasing segment s₂ strictly grows `q`.
-
-We can build a combined segment s₁ ++ s₂ that is non-decreasing and grows
-the places in `A` and `q`.-/
-theorem WeightedNet.FiresSequence.combine_growth_segments
-    [DecidableEq P] (A : Finset P) (q : P)
-    {src grownA grownQ : Marking P} {labelsA labelsQ : List T}
-    (hgrowsA : WeightedNet.FiresSequence.GrowsOn net src labelsA grownA A)
-    (hgrowsQ : WeightedNet.FiresSequence.GrowsOn net src labelsQ grownQ {q}) :
-    ∃ tgt,
-      WeightedNet.FiresSequence.GrowsOn net src
-        (labelsA ++ labelsQ) tgt (insert q A) := by
-  let tgt := grownQ + (grownA - src)
-  have hgrowsAtQ : src <[q] grownQ :=
-    Marking.growsOn_singleton src grownQ q |>.mp hgrowsQ.2
-  have hreplayed := hgrowsQ.1.mono hgrowsA.2.1
-  refine ⟨tgt, hgrowsA.1.append hreplayed, ?_, ?_⟩
-  · intro p
-    exact (hgrowsAtQ.1 p).trans (by simp [tgt])
-  · intro p hp
-    rw [Finset.mem_insert] at hp
-    rcases hp with rfl | hp
-    · exact hgrowsAtQ.2.trans_le (by simp [tgt])
-    · have hgrowthAtP := hgrowsA.2.2 p hp
-      have hmonoAtP := hgrowsAtQ.1 p
-      change src p < grownQ p + (grownA p - src p)
-      exact (Nat.lt_add_of_pos_right
-        (Nat.sub_pos_of_lt hgrowthAtP)).trans_le
-          (Nat.add_le_add_right hmonoAtP (grownA p - src p))
-
-/-- Combine one nondecreasing growth segment per place into a single segment.
-
-All input segments start at `src`. For every `p ∈ A`, one segment is
-nondecreasing everywhere and strictly grows `p`. Their concatenation is
-nondecreasing everywhere and strictly grows every place in `A`. -/
-theorem WeightedNet.FiresSequence.exists_combined_growth_from
-    (src : Marking P) (A : Finset P)
-    (hsegments : ∀ p ∈ A, ∃ labels tgt,
-      WeightedNet.FiresSequence.GrowsOn net src labels tgt {p}) :
-    ∃ labels tgt,
-      WeightedNet.FiresSequence.GrowsOn net src labels tgt A := by
-  classical
-  induction A using Finset.induction with
-  | empty => exact ⟨[], src, WeightedNet.FiresSequence.nil src, le_rfl, by simp⟩
-  | @insert q A hq ih =>
-      obtain ⟨labelsA, grownA, hgrowsA⟩ :=
-        ih (fun p hp => hsegments p (by simp [hp]))
-      obtain ⟨labelsQ, grownQ, hgrowsQ⟩ :=
-        hsegments q (by simp)
-      obtain ⟨combined, hcombined⟩ :=
-        WeightedNet.FiresSequence.combine_growth_segments A q hgrowsA hgrowsQ
-      exact ⟨labelsA ++ labelsQ, combined, hcombined⟩
-
-/-- A nondecreasing firing sequence can be fired again from its target, and
-the second firing adds the same marking difference as the first.
-
-If `ts` takes `src` to `tgt` and `src ≤ tgt`, the additional marking
-`tgt - src` supplies the difference between the two markings. Monotonicity
-therefore shifts the original execution from `src` to `tgt` and gives the
-exact next target.
-
-```text
-src ──ts──▶ tgt ──ts──▶ tgt + (tgt - src)
-``` -/
-theorem WeightedNet.FiresSequence.fire_again
-    {src tgt : Marking P} {ts : List T}
-    (hseq : net.FiresSequence src ts tgt) (hle : src ≤ tgt) :
-    net.FiresSequence tgt ts (tgt + (tgt - src)) := by
-  exact hseq.mono hle
-
-/-- The arithmetic identity joining consecutive budget-backed repetitions.
-At every place, `src - tgt` is the loss and `tgt - src` is the gain of one
-execution. -/
-theorem Marking.budget_join (src tgt : Marking P) (n : ℕ) :
-    tgt + (n + 1) • (src - tgt) =
-      (src + n • (src - tgt)) + (tgt - src) := by
-  funext p
-  have hparts : tgt p + (src p - tgt p) =
-      src p + (tgt p - src p) := by omega
-  simp only [Pi.add_apply, Pi.sub_apply, Pi.smul_apply, smul_eq_mul,
-    Nat.add_mul]
-  omega
-
-/-- **Repeat a firing sequence with a budget.** An arbitrary firing sequence
-can be repeated an arbitrary number of times by supplying enough initial tokens
-at every place which it decreases.
-
-Let `loss = src - tgt` and `gain = tgt - src`, both pointwise. These are the
-negative and positive parts of the effect of a sequence of transitions `ts`.
-Starting with `n` copies of `loss` as a budget allows `n + 1` repetitions;
-the final marking contains the original target plus `n` copies of `gain`:
-
-```text
-src + n·loss ─────────────ts^(n+1)────────────▶ tgt + n·gain
-
-inductive step:
-src + (n+1)·loss ──ts──▶ tgt + (n+1)·loss
-                              = src + n·loss + gain
-                        ──ts^(n+1)──▶ tgt + (n+1)·gain
-```
-
-The loss and gain are respectively the negative and positive parts of the
-same marking change. Consequently,
-
-```text
-tgt + loss = src + gain.
-```
-
-Adding `n` further copies of `loss` to both sides gives the identity that
-makes the target of the first shifted execution equal to the source of the
-remaining shifted repetitions:
-
-```text
-tgt + (n+1)·loss = (src + n·loss) + gain.
-```
-
-No hypothesis `src ≤ tgt` is required. The repeated execution instead starts
-at `src + n • loss`, rather than at `src` itself. An application must
-separately show that this enlarged source is available or covered by a
-reachable marking. -/
-theorem WeightedNet.FiresSequence.repeat_with_budget
-    {src tgt : Marking P} {ts : List T}
-    (hseq : net.FiresSequence src ts tgt) (n : ℕ) :
-    net.FiresSequence
-      (src + n • (src - tgt))
-      (List.replicate (n + 1) ts).flatten
-      (tgt + n • (tgt - src)) := by
-  induction n with
-  | zero => simpa using hseq
-  | succ n ih =>
-      let loss : Marking P := src - tgt
-      let gain : Marking P := tgt - src
-      have hfirst := hseq.add ((n + 1) • loss)
-      have htail := ih.add gain
-      have hjoin : tgt + (n + 1) • loss =
-          (src + n • loss) + gain := by
-        simpa [loss, gain] using Marking.budget_join src tgt n
-      rw [hjoin] at hfirst
-      have hall := WeightedNet.FiresSequence.append hfirst htail
-      convert hall using 1
-      · simp [List.replicate_succ]
-      · funext p
-        simp [gain, Pi.add_apply, Nat.add_mul, Nat.add_assoc]
-
-/-- At a strictly growing place, the endpoints of a budgeted repetition
-show a gain of at least one token per copy. -/
-theorem Marking.repeat_with_budget_gain_at
-    {src tgt : Marking P} {p : P} (hp : src p < tgt p) (n : ℕ) :
-    (src + n • (src - tgt)) p + (n + 1) ≤
-      (tgt + n • (tgt - src)) p := by
-  change src p + n * (src p - tgt p) + (n + 1) ≤
-    tgt p + n * (tgt p - src p)
-  have hgain := Nat.le_mul_of_pos_right n (Nat.sub_pos_of_lt hp)
-  rw [Nat.sub_eq_zero_of_le hp.le, Nat.mul_zero, Nat.add_zero]
-  omega
-
-/-- **Cover a common bound by budget-backed repetition.** Suppose `ts` strictly
-increases every place in the finite set `A`. Repeating it with `bound` copies
-of the loss as a budget produces a marking containing at least `bound` tokens
-at every place in `A`.
-
-The sequence may decrease at places outside `A`; the initial marking
-`src + bound • (src - tgt)` contains the budget needed to pay for those
-losses. At each `p ∈ A`, the gain `tgt p - src p` is at least one, so `bound`
-repetitions add at least `bound` tokens there. The resulting marking is also
-pointwise above `tgt`.
-
-```text
-src + bound·(src - tgt)
-          │
-          │  ts repeated bound + 1 times
-          ▼
-tgt + bound·(tgt - src) = reached
-          ▲
-          │  tgt ≤ reached
-          │  bound ≤ reached(p)  for every p ∈ A
-```
-
-As with `repeat_with_budget`, this theorem constructs a firing sequence from
-an enlarged source; it does not by itself prove that this source is reachable. -/
-theorem WeightedNet.FiresSequence.repeat_with_budget_ge_on
-    {src tgt : Marking P} {ts : List T}
-    (A : Finset P) (bound : ℕ)
-    (hseq : net.FiresSequence src ts tgt)
-    (hgrows : ∀ p ∈ A, src p < tgt p) :
-    net.FiresSequence
-        (src + bound • (src - tgt))
-        (List.replicate (bound + 1) ts).flatten
-        (tgt + bound • (tgt - src)) ∧
-      tgt ≤ tgt + bound • (tgt - src) ∧
-      ∀ p ∈ A, bound ≤ (tgt + bound • (tgt - src)) p := by
-  refine ⟨hseq.repeat_with_budget bound, by simp, ?_⟩
-  intro p hp
-  have hgain : 0 < (tgt - src) p :=
-    Nat.sub_pos_of_lt (hgrows p hp)
-  change bound ≤ tgt p + bound * (tgt p - src p)
-  exact (Nat.le_mul_of_pos_right bound hgain).trans
-    (Nat.le_add_left (bound * (tgt p - src p)) (tgt p))
-
-/-- Cover a separate bound at each place by choosing their sum as a common
-bound and applying `repeat_with_budget_ge_on`. -/
-theorem WeightedNet.FiresSequence.repeat_with_budget_ge_on_each
-    {src tgt : Marking P} {ts : List T}
-    (A : Finset P) (bound : P → ℕ)
-    (hseq : net.FiresSequence src ts tgt)
-    (hgrows : ∀ p ∈ A, src p < tgt p) :
-    let n := ∑ p ∈ A, bound p
-    net.FiresSequence
-        (src + n • (src - tgt))
-        (List.replicate (n + 1) ts).flatten
-        (tgt + n • (tgt - src)) ∧
-      tgt ≤ tgt + n • (tgt - src) ∧
-      ∀ p ∈ A, bound p ≤ (tgt + n • (tgt - src)) p := by
-  dsimp only
-  let n := ∑ p ∈ A, bound p
-  obtain ⟨hrepeated, hmono, hbound⟩ :=
-    hseq.repeat_with_budget_ge_on A n hgrows
-  refine ⟨hrepeated, hmono, ?_⟩
-  intro p hp
-  have hle : bound p ≤ n := by
-    dsimp [n]
-    exact Finset.single_le_sum (fun q _ => Nat.zero_le (bound q)) hp
-  exact hle.trans (hbound p hp)
-
-/-- Combine finitely many pumpable segments ending at the same marking.
-
-Suppose that, for every `p ∈ A`, some sequence `tsₚ` takes a marking `srcₚ`
-to a common endpoint `base`, with `srcₚ ≤ base` and
-`srcₚ p < base p` (strict increase at `p`).
-
-```text
-src₁ ──ts₁──▶ base       src₁ ≤ base,  src₁(p₁) < base(p₁)
-src₂ ──ts₂──▶ base       src₂ ≤ base,  src₂(p₂) < base(p₂)
-       ⋮
-srcᵣ ──tsᵣ──▶ base       srcᵣ ≤ base,  srcᵣ(pᵣ) < base(pᵣ)
-```
-Then we can concatenate the sequences ts_p to obtain a firing sequence from `base` to a marking `tgt` that strictly grows at every place `p ∈ A`.
-```text
-                         replay shifted copies
-base ──ts₁──▶ base + d₁ ──ts₂──▶ base + d₁ + d₂ ── ... ──tsᵣ──▶ tgt
-       where dᵢ = base - srcᵢ
-```
-
-Moreover
-```text
-base ≤ tgt       and       base(p) < tgt(p) for every p ∈ A
-```
-
-Each replay is enabled by monotonicity because its current source is at least
-`base`, and `srcᵢ ≤ base`.
-
-The sequences associated with the different places may be concatenated in any
-order.
-
-The proof first replays every witness from `base`, then combines the resulting
-singleton growth segments with `exists_combined_growth_from`. -/
-theorem WeightedNet.FiresSequence.exists_combined_growth
-    (base : Marking P) (A : Finset P)
-    (hsegments : ∀ p ∈ A, ∃ src ts,
-      net.FiresSequence src ts base ∧ src <[p] base) :
-    ∃ ts tgt,
-      WeightedNet.FiresSequence.GrowsOn net base ts tgt A := by
-  classical
-  apply WeightedNet.FiresSequence.exists_combined_growth_from base A
-  intro p hp
-  obtain ⟨src, ts, hseq, hgrows⟩ := hsegments p hp
-  refine ⟨ts, base + (base - src), hseq.fire_again hgrows.1, ?_⟩
-  rw [Marking.growsOn_singleton]
-  exact ⟨by simp, by simp [Nat.sub_pos_of_lt hgrows.2]⟩
 
 /-! ## Reachability monotonicity -/
 
@@ -506,5 +134,343 @@ theorem WeightedNet.Reachable.mono {m₁ m₂ m₁' : Marking P}
     intro p
     simp
   use m₁' + d
+
+/-! ## Growth at places -/
+
+/-- `src <[p] tgt` means that `tgt` is pointwise at least `src` and is
+strictly larger at place `p`.
+
+The value type is polymorphic, so the relation applies to any pointwise
+ordered indexed family. In particular, it can be used with ordinary markings,
+ω-markings, vectors represented by `Fin n → α`, and matrix rows. -/
+def Marking.GrowsAt {α : Type*} [LE α] [LT α]
+    (src tgt : P → α) (p : P) : Prop :=
+  src ≤ tgt ∧ src p < tgt p
+
+/-- Pointwise growth notation which is strict at the specified place. -/
+notation:50 src " <[" p "] " tgt => Marking.GrowsAt src tgt p
+
+/-- `Marking.GrowsOn src tgt A` means that `tgt` is pointwise at least
+`src` and is strictly larger at every place in the finite set `A`.
+
+Like `GrowsAt`, the relation is polymorphic in the value type. -/
+def Marking.GrowsOn {α : Type*} [LE α] [LT α]
+    (src tgt : P → α) (A : Finset P) : Prop :=
+  src ≤ tgt ∧ ∀ p ∈ A, src p < tgt p
+
+/-- Growth on a singleton set is growth at its unique place. -/
+@[simp]
+theorem Marking.growsOn_singleton {α : Type*} [LE α] [LT α]
+    [DecidableEq P] (src tgt : P → α) (p : P) :
+    Marking.GrowsOn src tgt {p} ↔ src <[p] tgt := by
+  simp [Marking.GrowsOn, Marking.GrowsAt]
+
+/-- A firing sequence which is nondecreasing and strictly grows every place
+in `A`.
+
+This packages the executable sequence together with the growth property used
+when combining and repeating firing sequences. -/
+def WeightedNet.FiresSequence.GrowsOn (net : WeightedNet P T)
+    (src : Marking P) (ts : List T) (tgt : Marking P) (A : Finset P) : Prop :=
+  net.FiresSequence src ts tgt ∧ Marking.GrowsOn src tgt A
+
+/-! ## Replaying and repeating firing sequences -/
+
+/-- A nondecreasing firing sequence can be fired again from its target, and
+the second firing adds the same marking difference as the first.
+
+If `ts` takes `src` to `tgt` and `src ≤ tgt`, the additional marking
+`tgt - src` supplies the difference between the two markings. Monotonicity
+therefore shifts the original execution from `src` to `tgt` and gives the
+exact next target.
+
+```text
+src ──ts──▶ tgt ──ts──▶ tgt + (tgt - src)
+``` -/
+theorem WeightedNet.FiresSequence.fire_again
+    {src tgt : Marking P} {ts : List T}
+    (hseq : net.FiresSequence src ts tgt) (hle : src ≤ tgt) :
+    net.FiresSequence tgt ts (tgt + (tgt - src)) := by
+  exact hseq.mono hle
+
+/-! ### Repetition with a loss budget -/
+
+/-- `Marking.GrowsOnWithBudget src tgt budget A` compares two markings
+place by place. Every place in `A` must gain tokens. At any place outside of A
+where the token count may decrease, the decrease must be at most `budget p`, so
+overall `src p ≤ tgt p + budget p`, i.e src ≤ tgt + budget.
+
+For example, going from `(2, 5)` to `(3, 3)` grows the first place and
+loses two tokens at the second. For `A` containing only the first place,
+`(0, 2)` is a sufficient budget.
+
+The canonical budget is `src - tgt`. A zero budget recovers `GrowsOn`. -/
+def Marking.GrowsOnWithBudget
+    (src tgt budget : Marking P) (A : Finset P) : Prop :=
+  src ≤ tgt + budget ∧ ∀ p ∈ A, src p < tgt p
+
+/-- A zero loss budget is equivalent to global non-decrease. -/
+@[simp]
+theorem Marking.growsOnWithBudget_zero
+    (src tgt : Marking P) (A : Finset P) :
+    Marking.GrowsOnWithBudget src tgt 0 A ↔
+      Marking.GrowsOn src tgt A := by
+  simp [Marking.GrowsOnWithBudget, Marking.GrowsOn]
+
+/-- If every place in `A` gains tokens from `src` to `tgt`, then the
+difference `src - tgt` is a sufficient loss budget.
+
+At a place that loses tokens, the budget is exactly the number lost.
+At a place that stays the same or gains tokens, natural-number subtraction
+gives zero. Adding the budget to `tgt` therefore gives a marking at least
+as large as `src`. -/
+theorem Marking.growsOnWithBudget_sub
+    (src tgt : Marking P) (A : Finset P)
+    (hstrict : ∀ p ∈ A, src p < tgt p) :
+    Marking.GrowsOnWithBudget src tgt (src - tgt) A := by
+  refine ⟨?_, hstrict⟩
+  intro p
+  simp only [Pi.add_apply, Pi.sub_apply]
+  omega
+
+/-- The sequence `ts` fires from `src` to `tgt`. Every place in `A`
+gains tokens, and any decrease at a place `p` is at most `budget p`.
+The budget bounds the net loss between the endpoints of the sequence. -/
+def WeightedNet.FiresSequence.GrowsOnWithBudget (net : WeightedNet P T)
+    (src : Marking P) (ts : List T) (tgt budget : Marking P)
+    (A : Finset P) : Prop :=
+  net.FiresSequence src ts tgt ∧
+    Marking.GrowsOnWithBudget src tgt budget A
+
+/-- If firing `ts` from `src` to `tgt` increases the token count at every
+place in `A`, then `src - tgt` is a sufficient loss budget for the sequence.
+It records the number of tokens lost at each decreasing place. -/
+theorem WeightedNet.FiresSequence.growsOnWithBudget_sub
+    {src tgt : Marking P} {ts : List T} (A : Finset P)
+    (hseq : net.FiresSequence src ts tgt)
+    (hstrict : ∀ p ∈ A, src p < tgt p) :
+    WeightedNet.FiresSequence.GrowsOnWithBudget
+      net src ts tgt (src - tgt) A := by
+  exact ⟨hseq, Marking.growsOnWithBudget_sub src tgt A hstrict⟩
+
+/-- Let `loss = src - tgt` and `gain = tgt - src`, computed pointwise
+using natural-number subtraction. At each place, `tgt + loss` and
+`src + gain` both give the larger of the two original token counts.
+Adding `n • loss` to both sides gives the stated identity. -/
+private theorem Marking.repeat_add_budget (src tgt : Marking P) (n : ℕ) :
+    tgt + (n + 1) • (src - tgt) =
+      (src + n • (src - tgt)) + (tgt - src) := by
+  funext p
+  have hparts : tgt p + (src p - tgt p) =
+      src p + (tgt p - src p) := by omega
+  simp only [Pi.add_apply, Pi.sub_apply, Pi.smul_apply, smul_eq_mul,
+    Nat.add_mul]
+  omega
+
+/-- If `ts` fires from `src` to `tgt`, it can fire `n + 1` times
+from `src + n • loss` and reach `tgt + n • gain`, where
+`loss = src - tgt` and `gain = tgt - src` are computed pointwise.
+
+Every execution of `ts` has the same net effect. The original source
+already enables one execution, so the extra budget only needs to cover
+the losses of the other `n` executions. The original target already
+includes the gain from one execution, so the final marking adds the
+gain from the other `n`.
+
+For example, suppose `ts` takes `(5, 2)` to `(3, 3)`. Each execution
+loses two tokens at the first place and gains one at the second. To
+fire `ts` three times, add four tokens at the first place:
+
+```text
+(9, 2) ──ts──▶ (7, 3) ──ts──▶ (5, 4) ──ts──▶ (3, 5)
+```
+
+After the first execution, `(7, 3) = (5, 2) + (2, 0) + (0, 1)`.
+The marking consists of the original source, the remaining loss budget,
+and the gain so far. The identity `repeat_add_budget` gives this
+decomposition in general so the remaining executions can start there. -/
+theorem WeightedNet.FiresSequence.repeat_with_budget
+    {src tgt : Marking P} {ts : List T}
+    (hseq : net.FiresSequence src ts tgt) (n : ℕ) :
+    net.FiresSequence
+      (src + n • (src - tgt))
+      (List.replicate (n + 1) ts).flatten
+      (tgt + n • (tgt - src)) := by
+  induction n with
+  | zero => simpa using hseq
+  | succ n ih =>
+      let loss : Marking P := src - tgt
+      let gain : Marking P := tgt - src
+      have hfirst := hseq.add ((n + 1) • loss)
+      have htail := ih.add gain
+      have hjoin : tgt + (n + 1) • loss =
+          (src + n • loss) + gain := by
+        simpa [loss, gain] using Marking.repeat_add_budget src tgt n
+      rw [hjoin] at hfirst
+      have hall := WeightedNet.FiresSequence.append hfirst htail
+      convert hall using 1
+      · simp [List.replicate_succ]
+      · funext p
+        simp [gain, Pi.add_apply, Nat.add_mul, Nat.add_assoc]
+
+/-- If the effect from `src` to `tgt` gains at least one token at `p`,
+then repeating that effect `n + 1` times gains at least `n + 1` tokens
+at `p` relative to the budgeted source.
+
+The loss `src p - tgt p` is zero, so the budgeted source starts with
+`src p` tokens at `p`. The repeated effect ends with `tgt p` plus
+`n` times the gain `tgt p - src p`. -/
+theorem Marking.repeat_with_budget_gain_at
+    {src tgt : Marking P} {p : P} (hp : src p < tgt p) (n : ℕ) :
+    (src + n • (src - tgt)) p + (n + 1) ≤
+      (tgt + n • (tgt - src)) p := by
+  change src p + n * (src p - tgt p) + (n + 1) ≤
+    tgt p + n * (tgt p - src p)
+  have hgain := Nat.le_mul_of_pos_right n (Nat.sub_pos_of_lt hp)
+  rw [Nat.sub_eq_zero_of_le hp.le, Nat.mul_zero, Nat.add_zero]
+  omega
+
+/-- If firing `ts` takes `src` to `tgt` and strictly increases every
+place in `A`, firing it once and then repeating it `n` more times
+reaches at least `n` tokens at each place in `A`.
+
+The extra budget `n • (src - tgt)` pays for the losses of the `n`
+repetitions. Each repetition gains at least one token at every place in
+`A`, and the final marking `tgt + n • (tgt - src)` also covers `tgt`. -/
+theorem WeightedNet.FiresSequence.repeat_with_budget_ge_on
+    {src tgt : Marking P} {ts : List T}
+    (A : Finset P) (n : ℕ)
+    (hseq : net.FiresSequence src ts tgt)
+    (hgrows : ∀ p ∈ A, src p < tgt p) :
+    let repeatTs := (List.replicate (n + 1) ts).flatten
+    let tgtAfterNPlusOne := tgt + n • (tgt - src)
+    net.FiresSequence (src + n • (src - tgt)) repeatTs tgtAfterNPlusOne ∧
+      tgt ≤ tgtAfterNPlusOne ∧
+      ∀ p ∈ A, n ≤ tgtAfterNPlusOne p := by
+  dsimp only
+  refine ⟨hseq.repeat_with_budget n, by simp, ?_⟩
+  intro p hp
+  have hgain : 0 < (tgt - src) p :=
+    Nat.sub_pos_of_lt (hgrows p hp)
+  change n ≤ tgt p + n * (tgt p - src p)
+  exact (Nat.le_mul_of_pos_right n hgain).trans
+    (Nat.le_add_left (n * (tgt p - src p)) (tgt p))
+
+/-- If firing `ts` strictly increases every place in `A`, we can repeat it
+to meet a separate token bound `bound p` at each place `p ∈ A`.
+
+Let `n` be the sum of these bounds, so `bound p ≤ n` for every `p ∈ A`.
+With the extra loss budget `n • (src - tgt)`, fire `ts` once and then
+repeat it `n` more times. The resulting sequence `repeatTs` reaches
+`tgtAfterNPlusOne`, which covers `tgt` and has at least `bound p` tokens
+at every place `p ∈ A`. -/
+theorem WeightedNet.FiresSequence.repeat_with_budget_ge_on_each
+    {src tgt : Marking P} {ts : List T}
+    (A : Finset P) (bound : P → ℕ)
+    (hseq : net.FiresSequence src ts tgt)
+    (hgrows : ∀ p ∈ A, src p < tgt p) :
+    let n := ∑ p ∈ A, bound p
+    let repeatTs := (List.replicate (n + 1) ts).flatten
+    let tgtAfterNPlusOne := tgt + n • (tgt - src)
+    net.FiresSequence (src + n • (src - tgt)) repeatTs tgtAfterNPlusOne ∧
+      tgt ≤ tgtAfterNPlusOne ∧
+      ∀ p ∈ A, bound p ≤ tgtAfterNPlusOne p := by
+  dsimp only
+  let n := ∑ p ∈ A, bound p
+  obtain ⟨hrepeated, hmono, hbound⟩ :=
+    hseq.repeat_with_budget_ge_on A n hgrows
+  refine ⟨hrepeated, hmono, ?_⟩
+  intro p hp
+  have hle : bound p ≤ n := by
+    dsimp [n]
+    exact Finset.single_le_sum (fun q _ => Nat.zero_le (bound q)) hp
+  exact hle.trans (hbound p hp)
+
+/-! ## Combining growth sequences -/
+
+/-- Combine two firing sequences `σ₁` and `σ₂` starting at `src`.
+Each leaves every place with at least its starting token count.
+The sequence `σ₁` strictly increases every place in `A`, and
+`σ₂` strictly increases the token count at `q`.
+
+After firing `σ₁` to reach `grownA`, replay `σ₂` from `grownA`.
+Since `src ≤ grownA`, monotonicity lets `σ₂` fire there and carry
+the extra tokens `grownA - src` through to its target. The concatenation
+`σ₁ ++ σ₂` thus strictly increases every place in `A ∪ {q}` and
+leaves every place with at least its starting token count. -/
+theorem WeightedNet.FiresSequence.combine_growth_firing_sequences
+    [DecidableEq P] (A : Finset P) (q : P)
+    {src grownA grownQ : Marking P} {labelsA labelsQ : List T}
+    (hgrowsA : WeightedNet.FiresSequence.GrowsOn net src labelsA grownA A)
+    (hgrowsQ : WeightedNet.FiresSequence.GrowsOn net src labelsQ grownQ {q}) :
+    ∃ tgt,
+      WeightedNet.FiresSequence.GrowsOn net src
+        (labelsA ++ labelsQ) tgt (insert q A) := by
+  let tgt := grownQ + (grownA - src)
+  have hgrowsAtQ : src <[q] grownQ :=
+    Marking.growsOn_singleton src grownQ q |>.mp hgrowsQ.2
+  have hreplayed := hgrowsQ.1.mono hgrowsA.2.1
+  refine ⟨tgt, hgrowsA.1.append hreplayed, ?_, ?_⟩
+  · intro p
+    exact (hgrowsAtQ.1 p).trans (by simp [tgt])
+  · intro p hp
+    rw [Finset.mem_insert] at hp
+    rcases hp with rfl | hp
+    · exact hgrowsAtQ.2.trans_le (by simp [tgt])
+    · have hgrowthAtP := hgrowsA.2.2 p hp
+      have hmonoAtP := hgrowsAtQ.1 p
+      change src p < grownQ p + (grownA p - src p)
+      exact (Nat.lt_add_of_pos_right
+        (Nat.sub_pos_of_lt hgrowthAtP)).trans_le
+          (Nat.add_le_add_right hmonoAtP (grownA p - src p))
+
+/-- Given, for each `p ∈ A`, a non-decreasing firing sequence from `src`
+that strictly grows `p`, combine these sequences into a single non-decreasing
+firing sequence from `src` that strictly grows every place in `A`.
+
+For each `p ∈ A`, suppose a sequence `σₚ` fires from `src`, strictly
+increases the token count at `p`, and leaves every place with at least
+its starting token count. Replay each `σₚ` in turn from the marking reached
+so far. The resulting sequence fires from `src`, strictly increases every
+place in `A`, and leaves every place with at least its starting token count. -/
+theorem WeightedNet.FiresSequence.exists_combined_growth_from
+    (src : Marking P) (A : Finset P)
+    (hsegments : ∀ p ∈ A, ∃ labels tgt,
+      WeightedNet.FiresSequence.GrowsOn net src labels tgt {p}) :
+    ∃ labels tgt,
+      WeightedNet.FiresSequence.GrowsOn net src labels tgt A := by
+  classical
+  induction A using Finset.induction with
+  | empty => exact ⟨[], src, WeightedNet.FiresSequence.nil src, le_rfl, by simp⟩
+  | @insert q A hq ih =>
+      obtain ⟨labelsA, grownA, hgrowsA⟩ :=
+        ih (fun p hp => hsegments p (by simp [hp]))
+      obtain ⟨labelsQ, grownQ, hgrowsQ⟩ :=
+        hsegments q (by simp)
+      obtain ⟨combined, hcombined⟩ :=
+        WeightedNet.FiresSequence.combine_growth_firing_sequences A q hgrowsA hgrowsQ
+      exact ⟨labelsA ++ labelsQ, combined, hcombined⟩
+
+/-- Given, for each `p ∈ A`, a non-decreasing firing sequence `σₚ` that
+ends at `base` and strictly grows `p`, combine them into a single
+non-decreasing firing sequence from `base` that strictly grows every
+place in `A`.
+
+Each `σₚ` can fire again from `base` because its original source is
+at most `base`. The replays now share the same source, so
+`exists_combined_growth_from` combines them. -/
+theorem WeightedNet.FiresSequence.exists_combined_growth
+    (base : Marking P) (A : Finset P)
+    (hsegments : ∀ p ∈ A, ∃ src ts,
+      net.FiresSequence src ts base ∧ src <[p] base) :
+    ∃ ts tgt,
+      WeightedNet.FiresSequence.GrowsOn net base ts tgt A := by
+  classical
+  apply WeightedNet.FiresSequence.exists_combined_growth_from base A
+  intro p hp
+  obtain ⟨src, ts, hseq, hgrows⟩ := hsegments p hp
+  refine ⟨ts, base + (base - src), hseq.fire_again hgrows.1, ?_⟩
+  rw [Marking.growsOn_singleton]
+  exact ⟨by simp, by simp [Nat.sub_pos_of_lt hgrows.2]⟩
 
 end PetriNet
