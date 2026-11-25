@@ -92,30 +92,33 @@ private noncomputable def newOmegaPlaces
   OmegaMarking.omegaPlaces tgt.marking \
     OmegaMarking.omegaPlaces src.marking
 
-/-- Every newly accelerated place has a growth witness realised by an earlier
-node on the prefix.
+omit [FinEnum T] in
+/-- Accelerating a single place of the raw successor preserves coverability
+when an ordinary ω-execution ending there witnesses growth at that place. -/
+private theorem omegaCoverableFrom_accelerate_raw_of_growsAt
+    {m₀ : Marking P} {src tgt : Node P} {t : T}
+    {earlier : OmegaMarking P} {segment : List T} {p : P}
+    (hsrc : net.OmegaCoverableFrom m₀ src.marking)
+    (htr : (coveringLTS net).Tr src t tgt)
+    (hsegment : net.omegaMarkingLTS.MTr earlier segment
+      (rawSuccessor net src.marking t))
+    (hgrowth : earlier <[p] rawSuccessor net src.marking t) :
+    net.OmegaCoverableFrom m₀
+      (OmegaMarking.accelerate ({p} : Set P) (rawSuccessor net src.marking t)) := by
+  have hfire : net.OmegaFires src.marking t (rawSuccessor net src.marking t) :=
+    ⟨htr.2.1, fun _ => rfl⟩
+  exact net.omegaCoverableFrom_accelerate_of_growsAt
+    (net.omegaCoverableFrom_of_omegaFires hsrc hfire) hsegment hgrowth
 
-For each `p ∈ newOmegaPlaces src tgt`, the prefix splits at an ancestor
-whose marking is below the raw successor and strictly smaller there at `p`:
-
-```text
-Node.initial m₀ ──before──▶ ancestor ──segment──▶ src ──t──▶ raw
-                                  │                         ▲
-                                  └──≤, strict at p───────────────────┘
-```
--/
-private theorem growth_witnesses_of_newOmegaPlaces
-    {m₀ : Marking P} {pre : List T}
+omit [FinEnum T] in
+/-- Every place newly changed to `ω` by a covering step has a growth witness
+in the source history. -/
+private theorem history_growth_witnesses_of_newOmegaPlaces
     {src tgt : Node P} {t : T}
-    (hprefix :
-      (coveringLTS net).MTr (Node.initial m₀) pre src)
     (htr : (coveringLTS net).Tr src t tgt) :
     ∀ p ∈ newOmegaPlaces src tgt,
-      ∃ ancestor before segment,
-        (coveringLTS net).MTr (Node.initial m₀) before ancestor ∧
-        (coveringLTS net).MTr ancestor segment src ∧
-        ancestor.marking ≤ rawSuccessor net src.marking t ∧
-        ancestor.marking p < rawSuccessor net src.marking t p := by
+      ∃ earlier ∈ src.history,
+        earlier <[p] rawSuccessor net src.marking t := by
   intro p hp
   have hpParts := Finset.mem_sdiff.mp hp
   have hpAccelerated : p ∈ Node.acceleratedPlaces
@@ -130,26 +133,126 @@ private theorem growth_witnesses_of_newOmegaPlaces
     rw [← omegaPlaces_rawSuccessor (net := net) src.marking t,
       OmegaMarking.mem_omegaPlaces]
     exact hpRawTop
-  obtain ⟨a, ha, hgrows⟩ : ∃ a ∈ src.history,
-      a <[p] rawSuccessor net src.marking t := by
-    simpa [Node.acceleratedPlaces] using hpAccelerated
+  simpa [Node.acceleratedPlaces] using hpAccelerated
+
+omit [FinEnum T] in
+/-- Every newly accelerated place has a growth segment from an earlier node
+to the source of the covering step.
+
+For each `p ∈ newOmegaPlaces src tgt`, the prefix splits at an ancestor
+whose marking is below the raw successor and strictly smaller there at `p`:
+
+```text
+Node.initial m₀ ──before──▶ ancestor ──segment──▶ src ──t──▶ raw
+                                  │                         ▲
+                                  └──≤, strict at p───────────────────┘
+```
+-/
+private theorem growth_segments_of_newOmegaPlaces
+    {m₀ : Marking P}
+    {src tgt : Node P} {t : T}
+    (hreach :
+      (coveringLTS net).CanReach (Node.initial m₀) src)
+    (htr : (coveringLTS net).Tr src t tgt) :
+    ∀ p ∈ newOmegaPlaces src tgt,
+      ∃ ancestor segment,
+        (coveringLTS net).MTr ancestor segment src ∧
+        ancestor.marking <[p] rawSuccessor net src.marking t := by
+  obtain ⟨pre, hprefix⟩ := hreach
+  intro p hp
+  obtain ⟨a, ha, hgrows⟩ :=
+    history_growth_witnesses_of_newOmegaPlaces htr p hp
   rw [Node.history, List.mem_append, List.mem_singleton] at ha
   rcases ha with ha | rfl
   · rcases ancestor_eq_predecessor_of_mTr hprefix ha with hroot |
-        ⟨before, ancestor, segment, _, hbefore, hsegment, _, hmarking⟩
+        ⟨_before, ancestor, segment, _, _hbefore, hsegment, _, hmarking⟩
     · simp [Node.initial, Node.root] at hroot
     · rw [← hmarking] at hgrows
-      exact ⟨ancestor, before, segment, hbefore, hsegment,
-        hgrows.1, hgrows.2⟩
-  · exact ⟨src, pre, [], hprefix, Cslib.LTS.MTr.refl,
-      hgrows.1, hgrows.2⟩
+      exact ⟨ancestor, segment, hsegment, hgrows⟩
+  · exact ⟨src, [], Cslib.LTS.MTr.refl, hgrows⟩
 
-/-- Soundness is preserved by a covering-LTS edge which introduces at least
-one new `ω`-place.
+omit [FinEnum T] in
+/-- A covering suffix replays as an ordinary ω-execution when every
+ω-place of its endpoint is set to ω throughout the replay. -/
+private theorem omegaMTr_of_coveringMTr
+    {src tgt : Node P} {ts : List T} {A : Set P}
+    (hexec : (coveringLTS net).MTr src ts tgt)
+    (hA : ∀ p, tgt.marking p = ⊤ → p ∈ A) :
+    net.omegaMarkingLTS.MTr (OmegaMarking.accelerate A src.marking) ts
+      (OmegaMarking.accelerate A tgt.marking) := by
+  classical
+  induction hexec with
+  | refl => exact Cslib.LTS.MTr.refl
+  | @stepL src t mid ts tgt htr htail ih =>
+      have hmid p (hp : mid.marking p = ⊤) := hA p (OmegaMarking.mem_omegaPlaces.mp
+        (omegaPlaces_mono_of_mTr htail (OmegaMarking.mem_omegaPlaces.mpr hp)))
+      apply Cslib.LTS.MTr.stepL _ (ih hA)
+      constructor
+      · intro p
+        by_cases hp : p ∈ A
+        · simp [OmegaMarking.accelerate, hp]
+        · simpa [OmegaMarking.accelerate, hp] using htr.2.1 p
+      · intro p
+        by_cases hp : p ∈ A
+        · simp [OmegaMarking.accelerate, hp]
+        · have hfinite := fun heq => hp (hmid p heq)
+          have hacc : p ∉ Node.acceleratedPlaces
+              (rawSuccessor net src.marking t) src := by
+            intro ha
+            apply hfinite
+            rw [htr.2.2]
+            exact successor_eq_top_of_mem_acceleratedPlaces _ _ ha
+          rw [htr.2.2]
+          simp [successor, OmegaMarking.accelerateFinset, OmegaMarking.accelerate,
+            hp, hacc, rawSuccessor]
 
-This is the substantive pumping case. Before implementing it, we must isolate
-a short construction which combines the concrete growth witnesses using the
-existing monotonicity results. -/
+omit [FinEnum T] in
+/-- Replay a covering suffix followed by the final raw firing. The replay
+starts with the source's existing ω-places set to ω. -/
+private theorem omegaMTr_to_rawSuccessor
+    {earlier src tgt : Node P} {segment : List T} {t : T}
+    (hsegment : (coveringLTS net).MTr earlier segment src)
+    (htr : (coveringLTS net).Tr src t tgt) :
+    net.omegaMarkingLTS.MTr
+      (OmegaMarking.accelerate {q | src.marking q = ⊤} earlier.marking)
+      (segment ++ [t]) (rawSuccessor net src.marking t) := by
+  have hreplay := omegaMTr_of_coveringMTr
+    (A := {q | src.marking q = ⊤}) hsegment (fun _ h => h)
+  have hsrc : OmegaMarking.accelerate {q | src.marking q = ⊤}
+      src.marking = src.marking := by
+    funext q
+    by_cases hq : src.marking q = ⊤ <;> simp [OmegaMarking.accelerate, hq]
+  rw [hsrc] at hreplay
+  have hfire : net.OmegaFires src.marking t (rawSuccessor net src.marking t) :=
+    ⟨htr.2.1, fun _ => rfl⟩
+  exact Cslib.LTS.MTr.stepR net.omegaMarkingLTS hreplay hfire
+
+omit [FinEnum T] in
+/-- Accelerating the newly introduced ω-places gives the covering target.
+Places already equal to ω in the raw successor retain that value. -/
+private theorem accelerate_newOmegaPlaces_eq_target
+    {src tgt : Node P} {t : T} (htr : (coveringLTS net).Tr src t tgt) :
+    OmegaMarking.accelerateFinset (newOmegaPlaces src tgt)
+      (rawSuccessor net src.marking t) = tgt.marking := by
+  funext p
+  have hraw : rawSuccessor net src.marking t p = ⊤ ↔ src.marking p = ⊤ := by
+    simp [rawSuccessor]
+  have hmem : p ∈ newOmegaPlaces src tgt ↔
+      tgt.marking p = ⊤ ∧ src.marking p ≠ ⊤ := by
+    simp [newOmegaPlaces, OmegaMarking.mem_omegaPlaces]
+  by_cases hs : src.marking p = ⊤
+  · simp [OmegaMarking.accelerateFinset, hraw.mpr hs, marking_eq_top_of_tr htr hs]
+  · by_cases ht : tgt.marking p = ⊤
+    · simp [OmegaMarking.accelerateFinset, hmem.mpr ⟨ht, hs⟩, ht]
+    · have hn : p ∉ newOmegaPlaces src tgt := fun hp => ht (hmem.mp hp).1
+      rw [htr.2.2] at ht
+      have ha : p ∉ Node.acceleratedPlaces (rawSuccessor net src.marking t) src :=
+        fun hp => ht (successor_eq_top_of_mem_acceleratedPlaces src t hp)
+      simp only [OmegaMarking.accelerateFinset, ite_eq_right hn]
+      rw [htr.2.2]
+      simp [successor, OmegaMarking.accelerateFinset, ha]
+
+/-- Soundness of a covering edge that introduces new ω-places. -/
 private theorem kCoverableFrom_of_coveringLTS_tr_of_newOmega
     {m₀ : Marking P} {pre : List T}
     {src tgt : Node P} {t : T}
@@ -158,7 +261,24 @@ private theorem kCoverableFrom_of_coveringLTS_tr_of_newOmega
     (hsrc : ∀ K, net.KCoverableFrom m₀ src.marking K)
     (htr : (coveringLTS net).Tr src t tgt) :
     ∀ K, net.KCoverableFrom m₀ tgt.marking K := by
-  sorry
+  let raw := rawSuccessor net src.marking t
+  have hfire : net.OmegaFires src.marking t raw := ⟨htr.2.1, fun _ => rfl⟩
+  have hraw := net.omegaCoverableFrom_of_omegaFires
+    (net.omegaCoverableFrom_iff_forall_kCoverableFrom.mpr hsrc) hfire
+  apply net.omegaCoverableFrom_iff_forall_kCoverableFrom.mp
+  rw [← accelerate_newOmegaPlaces_eq_target htr]
+  apply net.omegaCoverableFrom_accelerateFinset_of_growsAt _ hraw
+  intro p hp
+  obtain ⟨earlier, segment, hsegment, hgrowth⟩ :=
+    growth_segments_of_newOmegaPlaces ⟨pre, hprefix⟩ htr p hp
+  have hpFinite : src.marking p ≠ ⊤ :=
+    fun htop => (Finset.mem_sdiff.mp hp).2 (OmegaMarking.mem_omegaPlaces.mpr htop)
+  refine ⟨_, segment ++ [t], omegaMTr_to_rawSuccessor hsegment htr, ?_, ?_⟩
+  · intro q
+    by_cases hq : src.marking q = ⊤
+    · simp [OmegaMarking.accelerate, raw, rawSuccessor, hq]
+    · simpa [OmegaMarking.accelerate, hq] using hgrowth.1 q
+  · simpa [OmegaMarking.accelerate, hpFinite] using hgrowth.2
 
 /-- `K`-coverability for every `K` is preserved by one covering-LTS transition reached from the
 initial node.
