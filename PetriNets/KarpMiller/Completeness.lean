@@ -7,6 +7,7 @@ Authors: Franck Cassez
 module
 
 public import PetriNets.KarpMiller
+import PetriNets.CoveringGraphV2.Completeness
 
 /-!
 # Completeness of the Karp–Miller construction
@@ -113,15 +114,17 @@ theorem dfsLTS_covers_of_reachable
 
 For every marking `tgt` reachable from `m₀`, there exists an ω-marking `mω` occurring in the
 finite Karp–Miller tree such that `tgt ≤ mω`.
-This follows directly from the fact that the dfsLTS covers all reachable markings. -/
+Covering-LTS completeness supplies a covering marking and the marking
+equivalence puts it in the tree. -/
 theorem karpMillerDFS_covers_of_reachable
     {m₀ tgt : Marking P}
     (hreach : net.Reachable m₀ tgt) :
     ∃ mω,
       (karpMillerDFS net (Branch.initial m₀)).HasNode mω ∧
       tgt ≤ mω := by
-  obtain ⟨branch, ⟨labels, hexec⟩, hcover⟩ :=
-    dfsLTS_covers_of_reachable net hreach
-  exact ⟨branch.marking, karpMillerDFS_hasNode_of_mTr net hexec, hcover⟩
+  obtain ⟨node, hnode, hcover⟩ := CoveringGraphV2.coveringLTS_covers_of_reachable net hreach
+  exact ⟨node.marking,
+    (karpMillerDFS_hasNode_iff_exists_coveringLTS_canReach net m₀ node.marking).mpr
+      ⟨node, hnode, rfl⟩, hcover⟩
 
 end PetriNet.KarpMiller

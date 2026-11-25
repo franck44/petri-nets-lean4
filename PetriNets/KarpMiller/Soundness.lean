@@ -7,6 +7,7 @@ Authors: Franck Cassez
 module
 
 public import PetriNets.KarpMiller
+import PetriNets.CoveringGraphV2.Soundness
 import PetriNets.Monotonicity
 import PetriNets.StateEquation
 
@@ -1089,19 +1090,18 @@ theorem omegaCoverableFrom_of_dfsMTr
 /-- **Soundness of the Karp–Miller tree.** Every ω-marking stored in the tree
 generated from `m₀` is omega coverable from `m₀`.
 
-The tree/DFS equivalence supplies a reachable branch carrying the stored
-marking; `omegaCoverableFrom_of_dfsMTr` supplies its soundness. -/
+The marking equivalence supplies a reachable covering-LTS node carrying
+the stored marking, and covering-LTS soundness gives its coverability. -/
 theorem karpMillerDFS_omegaCoverableFrom_of_hasNode
     [FinEnum P] [FinEnum T] (net : WeightedNet P T) (m₀ : Marking P)
     {mω : OmegaMarking P}
     (hnode :
       (karpMillerDFS net (Branch.initial m₀)).HasNode mω) :
     net.OmegaCoverableFrom m₀ mω := by
-  obtain ⟨labels, branch, hexec, hmarking⟩ :=
-    (karpMillerDFS_hasNode_iff_exists_dfsMTr net
-      (Branch.initial m₀) mω).mp hnode
+  obtain ⟨node, hreach, hmarking⟩ :=
+    (karpMillerDFS_hasNode_iff_exists_coveringLTS_canReach net m₀ mω).mp hnode
   rw [← hmarking]
-  exact omegaCoverableFrom_of_dfsMTr hexec
+  exact CoveringGraphV2.omegaCoverableFrom_of_coveringLTS_canReach hreach
 
 end KarpMiller
 
