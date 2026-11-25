@@ -8,6 +8,7 @@ module
 
 public import PetriNets.KarpMiller.Successor
 public import PetriNets.LTS.Basic
+public import Cslib.Foundations.Semantics.LTS.OmegaExecution
 
 /-!
 # The Karp–Miller DFS transition system

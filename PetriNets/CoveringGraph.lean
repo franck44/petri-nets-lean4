@@ -9,7 +9,7 @@ module
 public import PetriNets.CoveringGraph.Acceleration
 public import PetriNets.MarkingGraph
 public import PetriNets.LTS.Konig
-public import Mathlib.Order.WellQuasiOrder
+public import PetriNets.OmegaMarking.Sequence
 
 /-!
 # Covering graphs
@@ -89,20 +89,6 @@ graph selects the appropriate candidate.
 @[expose] public section
 
 namespace PetriNet
-
-namespace OmegaMarking
-
-/-! ## Properties of ω-markings -/
-
-/-- **Dickson's lemma for ω-marking sequences.** If the type of places is
-finite, every infinite sequence of ω-markings `m₀, m₁, m₂, …` contains two
-markings `mᵢ` and `mⱼ`, with `i < j`, such that `mᵢ ≤ mⱼ`. -/
-theorem exists_le_pair {P : Type*} [Finite P]
-    (markings : ℕ → OmegaMarking P) :
-    ∃ i j, i < j ∧ markings i ≤ markings j := by
-  exact wellQuasiOrdered_le markings
-
-end OmegaMarking
 
 /-- Every edge reachable from `m₀` obeys the covering-graph step rule.
 For an edge `src --t--> tgt`, first fire `t` to obtain `i`. A place `p` is

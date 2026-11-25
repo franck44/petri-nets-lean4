@@ -6,7 +6,8 @@ Authors: Franck Cassez
 
 module
 
-public import PetriNets.CoveringGraph
+public import PetriNets.CoveringGraph.Acceleration
+import Mathlib.Order.WellQuasiOrder
 
 /-!
 # Increasing sequences of ω-markings
@@ -19,6 +20,14 @@ proofs.
 @[expose] public section
 
 namespace PetriNet.OmegaMarking
+
+/-- **Dickson's lemma for ω-marking sequences.** If the type of places is
+finite, every infinite sequence of ω-markings `m₀, m₁, m₂, …` contains two
+markings `mᵢ` and `mⱼ`, with `i < j`, such that `mᵢ ≤ mⱼ`. -/
+theorem exists_le_pair {P : Type*} [Finite P]
+    (markings : ℕ → OmegaMarking P) :
+    ∃ i j, i < j ∧ markings i ≤ markings j := by
+  exact wellQuasiOrdered_le markings
 
 /-- A sequence of `ω`-markings whose sets of `ω`-places grow monotonically
 has a suffix on which that set is constant.

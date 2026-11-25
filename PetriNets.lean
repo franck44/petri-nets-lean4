@@ -7,7 +7,7 @@ Authors: Franck Cassez
 module
 
 public import PetriNets.Coverability
-public import PetriNets.CoveringGraph
+public import PetriNets.CoveringGraphV2
 public import PetriNets.Incidence
 public import PetriNets.KarpMiller
 public import PetriNets.KarpMiller.Completeness
