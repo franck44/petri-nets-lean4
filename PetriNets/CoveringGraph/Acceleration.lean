@@ -12,8 +12,8 @@ public import PetriNets.Monotonicity
 /-!
 # Acceleration of ω-markings
 
-Provides acceleration of ω-markings and the candidate transition system used
-to construct covering graphs for weighted P/T nets.
+Provides acceleration of ω-markings and proves when acceleration preserves
+coverability in a weighted P/T net.
 
 ## References
 
@@ -130,96 +130,7 @@ theorem le_accelerate {P : Type*} (A : Set P) (m : OmegaMarking P) :
     exact le_top
   · rw [accelerate_apply_of_not_mem hp]
 
-/-! ## Justified acceleration -/
-
-/-- `AccelerationJustifiedFrom graph root m A` states that `A` is exactly the
-set of places justified for acceleration at the current marking `m`.
-
-Following Reisig, a place `p` belongs to `A` precisely when some path from
-`root` to `m` contains a marking `a` such that `a ≤ m` and `a p < m p`. The
-two reachability conditions below express that a path from `root` to `m` can
-be formed through `a`.
-
-This condition determines which places will be set to `ω` in the successor of
-`m`. It compares `a` with `m`, not with the result of the transition
-subsequently fired from `m`. -/
-def AccelerationJustifiedFrom {P T : Type*}
-    (graph : Cslib.LTS (OmegaMarking P) T) (root m : OmegaMarking P)
-    (A : Set P) : Prop :=
-  ∀ p, p ∈ A ↔
-    ∃ a, graph.CanReach root a ∧ graph.CanReach a m ∧
-      a ≤ m ∧ a p < m p
-
 end OmegaMarking
-
-/-! ## Candidate and valid cover steps -/
-
-/-- A cover step first performs an ω-firing and then makes an arbitrary
-possible choice of places (including the empty set) to accelerate to `ω`. -/
-def WeightedNet.CoverStep {P T : Type*} (net : WeightedNet P T)
-    (src : OmegaMarking P) (t : T) (tgt : OmegaMarking P) : Prop :=
-  ∃ i A, net.OmegaFires src t i ∧ tgt = OmegaMarking.accelerate A i
-
-/-- The LTS of all candidate cover steps. It contains an edge for every
-ω-firing and every subset of places, including the empty subset, that may
-subsequently be replaced by `ω`. -/
-def WeightedNet.coverStepLTS {P T : Type*} (net : WeightedNet P T) :
-    Cslib.LTS (OmegaMarking P) T where
-  Tr := net.CoverStep
-
-/-- An edge of `coverStepLTS` is exactly a candidate cover step. -/
-@[simp]
-theorem WeightedNet.coverStepLTS_tr_iff {P T : Type*}
-    (net : WeightedNet P T) (src : OmegaMarking P) (t : T)
-    (tgt : OmegaMarking P) :
-    net.coverStepLTS.Tr src t tgt ↔ net.CoverStep src t tgt :=
-  Iff.rfl
-
-/-- Every ω-firing is a cover step that chooses no new place to accelerate. -/
-theorem WeightedNet.OmegaFires.coverStep {P T : Type*}
-    {net : WeightedNet P T} {src tgt : OmegaMarking P} {t : T}
-    (h : net.OmegaFires src t tgt) : net.CoverStep src t tgt := by
-  refine ⟨tgt, ∅, h, ?_⟩
-  funext p
-  classical
-  simp [OmegaMarking.accelerate]
-
-/-- A transition is enabled at an ω-marking exactly when `coverStepLTS` has
-an outgoing edge carrying that transition. -/
-theorem WeightedNet.coverStepLTS_enabled_iff_exists_tr {P T : Type*}
-    (net : WeightedNet P T) (m : OmegaMarking P) (t : T) :
-    net.OmegaEnabled m t ↔ ∃ m', net.coverStepLTS.Tr m t m' := by
-  constructor
-  · intro henabled
-    obtain ⟨m', hfires⟩ :=
-      (net.omegaEnabled_iff_exists_omegaFires m t).mp henabled
-    exact ⟨m', hfires.coverStep⟩
-  · rintro ⟨_, _, _, hfires, _⟩
-    exact hfires.1
-
-/-- `ValidCoverStep graph root src t tgt` means that `t` fires from `src`, and
-the firing result is accelerated exactly at the places justified by a path
-from `root` to `src`, producing `tgt`. -/
-def WeightedNet.ValidCoverStep {P T : Type*} (net : WeightedNet P T)
-    (graph : Cslib.LTS (OmegaMarking P) T) (root src : OmegaMarking P)
-    (t : T) (tgt : OmegaMarking P) : Prop :=
-  ∃ i A, net.OmegaFires src t i ∧
-    OmegaMarking.AccelerationJustifiedFrom graph root src A ∧
-    tgt = OmegaMarking.accelerate A i
-
-/-- A valid covering step preserves every component already equal to `ω`.
-The firing itself preserves `ω`, and the subsequent acceleration can only
-introduce additional `ω` components. -/
-theorem WeightedNet.ValidCoverStep.preserves_top {P T : Type*}
-    {net : WeightedNet P T} {graph : Cslib.LTS (OmegaMarking P) T}
-    {root src tgt : OmegaMarking P} {t : T}
-    (hstep : net.ValidCoverStep graph root src t tgt)
-    {p : P} (hp : src p = ⊤) : tgt p = ⊤ := by
-  obtain ⟨i, A, hfires, _, rfl⟩ := hstep
-  by_cases hpA : p ∈ A
-  · exact OmegaMarking.accelerate_apply_of_mem hpA
-  · rw [OmegaMarking.accelerate_apply_of_not_mem hpA]
-    exact hfires.preserves_top hp
 
 /-- If a growing ω-execution ends at a coverable marking, accelerating its
 strictly growing place preserves ω-coverability. -/

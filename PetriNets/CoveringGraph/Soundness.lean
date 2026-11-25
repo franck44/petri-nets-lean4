@@ -90,23 +90,6 @@ private noncomputable def newOmegaPlaces
   OmegaMarking.omegaPlaces tgt.marking \
     OmegaMarking.omegaPlaces src.marking
 
-/-- Accelerating a single place of the raw successor preserves coverability
-when an ordinary ω-execution ending there witnesses growth at that place. -/
-private theorem omegaCoverableFrom_accelerate_raw_of_growsAt
-    {m₀ : Marking P} {src tgt : Node P} {t : T}
-    {earlier : OmegaMarking P} {segment : List T} {p : P}
-    (hsrc : net.OmegaCoverableFrom m₀ src.marking)
-    (htr : (coveringLTS net).Tr src t tgt)
-    (hsegment : net.omegaMarkingLTS.MTr earlier segment
-      (rawSuccessor net src.marking t))
-    (hgrowth : earlier <[p] rawSuccessor net src.marking t) :
-    net.OmegaCoverableFrom m₀
-      (OmegaMarking.accelerate ({p} : Set P) (rawSuccessor net src.marking t)) := by
-  have hfire : net.OmegaFires src.marking t (rawSuccessor net src.marking t) :=
-    ⟨htr.2.1, fun _ => rfl⟩
-  exact net.omegaCoverableFrom_accelerate_of_growsAt
-    (net.omegaCoverableFrom_of_omegaFires hsrc hfire) hsegment hgrowth
-
 /-- Every place newly changed to `ω` by a covering step has a growth witness
 in the source history. -/
 private theorem history_growth_witnesses_of_newOmegaPlaces
