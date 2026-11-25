@@ -7,6 +7,7 @@ Authors: Franck Cassez
 module
 
 public import PetriNets.KarpMiller.Termination
+public import PetriNets.CoveringGraphV2.LTS
 public import Mathlib.Data.FinEnum
 
 /-!
@@ -219,6 +220,66 @@ theorem karpMillerDFS_hasNode_iff_exists_dfsMTr
   · rintro ⟨labels, branch, hexec, hmarking⟩
     rw [← hmarking]
     exact karpMillerDFS_hasNode_of_mTr net hexec
+
+private def nodeOfBranch (branch : Branch P) : CoveringGraphV2.Node P :=
+  ⟨branch.marking, branch.ancestors⟩
+
+/-- A DFS execution translates to a covering execution with the same labels. -/
+private theorem coveringMTr_of_dfsMTr
+    (net : WeightedNet P T) {src tgt : Branch P} {ts : List T}
+    (h : (dfsLTS net).MTr src ts tgt) :
+    (CoveringGraphV2.coveringLTS net).MTr (nodeOfBranch src) ts (nodeOfBranch tgt) := by
+  induction h with
+  | refl => exact Cslib.LTS.MTr.refl
+  | stepL hstep _ ih =>
+      obtain ⟨hfirst, henabled, rfl⟩ := mem_dfsSuccessors_iff.mp hstep
+      exact Cslib.LTS.MTr.stepL
+        (CoveringGraphV2.coveringLTS_tr_iff.mpr ⟨hfirst, henabled, rfl⟩) ih
+
+/-- Every marking in the Karp–Miller tree labels a reachable covering-LTS node. -/
+theorem exists_coveringLTS_canReach_of_karpMillerDFS_hasNode
+    (net : WeightedNet P T) (m₀ : Marking P) (mω : OmegaMarking P)
+    (h : (karpMillerDFS net (Branch.initial m₀)).HasNode mω) :
+    ∃ node, (CoveringGraphV2.coveringLTS net).CanReach
+      (CoveringGraphV2.Node.initial m₀) node ∧ node.marking = mω := by
+  obtain ⟨ts, branch, hexec, hmarking⟩ :=
+    (karpMillerDFS_hasNode_iff_exists_dfsMTr net (Branch.initial m₀) mω).mp h
+  exact ⟨nodeOfBranch branch, ⟨ts, coveringMTr_of_dfsMTr net hexec⟩, hmarking⟩
+
+private def branchOfNode (node : CoveringGraphV2.Node P) : Branch P :=
+  ⟨node.marking, node.ancestors⟩
+
+/-- A covering execution translates to a DFS execution with the same labels. -/
+private theorem dfsMTr_of_coveringMTr
+    (net : WeightedNet P T) {src tgt : CoveringGraphV2.Node P} {ts : List T}
+    (h : (CoveringGraphV2.coveringLTS net).MTr src ts tgt) :
+    (dfsLTS net).MTr (branchOfNode src) ts (branchOfNode tgt) := by
+  induction h with
+  | refl => exact Cslib.LTS.MTr.refl
+  | stepL hstep _ ih =>
+      obtain ⟨hfirst, henabled, rfl⟩ := CoveringGraphV2.coveringLTS_tr_iff.mp hstep
+      exact Cslib.LTS.MTr.stepL
+        (mem_dfsSuccessors_iff.mpr ⟨hfirst, henabled, rfl⟩) ih
+
+/-- Every marking labelling a reachable covering-LTS node occurs in the
+Karp–Miller tree. -/
+theorem karpMillerDFS_hasNode_of_exists_coveringLTS_canReach
+    (net : WeightedNet P T) (m₀ : Marking P) (mω : OmegaMarking P)
+    (h : ∃ node, (CoveringGraphV2.coveringLTS net).CanReach
+      (CoveringGraphV2.Node.initial m₀) node ∧ node.marking = mω) :
+    (karpMillerDFS net (Branch.initial m₀)).HasNode mω := by
+  obtain ⟨node, ⟨ts, hexec⟩, rfl⟩ := h
+  exact karpMillerDFS_hasNode_of_mTr net (dfsMTr_of_coveringMTr net hexec)
+
+/-- The Karp–Miller tree contains exactly the ω-markings labelling nodes
+reachable from the initial node of the covering LTS. -/
+theorem karpMillerDFS_hasNode_iff_exists_coveringLTS_canReach
+    (net : WeightedNet P T) (m₀ : Marking P) (mω : OmegaMarking P) :
+    (karpMillerDFS net (Branch.initial m₀)).HasNode mω ↔
+      ∃ node, (CoveringGraphV2.coveringLTS net).CanReach
+        (CoveringGraphV2.Node.initial m₀) node ∧ node.marking = mω :=
+  ⟨exists_coveringLTS_canReach_of_karpMillerDFS_hasNode net m₀ mω,
+    karpMillerDFS_hasNode_of_exists_coveringLTS_canReach net m₀ mω⟩
 
 end FinitePlaces
 
