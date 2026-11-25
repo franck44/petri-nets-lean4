@@ -404,6 +404,23 @@ theorem WeightedNet.omegaMTr_add
   | stepL hfirst _ ih =>
       exact Cslib.LTS.MTr.stepL (hfirst.add d) ih
 
+/-- A non-decreasing ω-firing sequence stays non-decreasing when replayed
+from a larger source. The same extra tokens are added to both endpoints. -/
+theorem WeightedNet.omegaMTr_replay_nondecreasing
+    {P T : Type*} {net : WeightedNet P T}
+    {src tgt largerSrc : OmegaMarking P} {labels : List T}
+    (hexec : net.omegaMarkingLTS.MTr src labels tgt)
+    (hgrowth : src ≤ tgt) (hle : src ≤ largerSrc) :
+    ∃ largerTgt, net.omegaMarkingLTS.MTr largerSrc labels largerTgt ∧
+      largerSrc ≤ largerTgt := by
+  let d := largerSrc - src
+  have hsrc : src + d = largerSrc := by
+    funext p
+    exact add_tsub_cancel_of_le (hle p)
+  refine ⟨tgt + d, hsrc ▸ net.omegaMTr_add hexec d, ?_⟩
+  rw [← hsrc]
+  exact add_le_add_left hgrowth d
+
 /-- Any ω-marking above the weakest predecessor of a transition sequence can
 execute that sequence, and the resulting ω-marking covers `target`.
 
@@ -499,6 +516,140 @@ theorem WeightedNet.weakestPreMarking_le_of_omegaFires
     net.weakestPreMarking t target ≤ omegaSrc := by
   rw [← net.weakestPreOmegaMarking_coe t target]
   exact net.weakestPreOmegaMarking_le_of_omegaFires hfires htarget
+
+/-- Propagating a concrete demand backwards along an ω-execution gives
+a concrete predecessor below the abstract source. -/
+private theorem WeightedNet.weakestPreMarkingSequence_le_of_omegaMTr
+    {P T : Type*} {net : WeightedNet P T}
+    {src tgt : OmegaMarking P} {ts : List T} {demand : Marking P}
+    (hexec : net.omegaMarkingLTS.MTr src ts tgt) (hdemand : demand ≤ tgt) :
+    net.weakestPreMarkingSequence ts demand ≤ src := by
+  induction hexec with
+  | refl => exact hdemand
+  | stepL hfirst _ ih =>
+      exact net.weakestPreMarking_le_of_omegaFires hfirst (ih hdemand)
+
+/-- Every concrete marking `c` below an ω-marking `m` is covered by a concretisation
+using one uniform bound for all ω-places. -/
+private theorem OmegaMarking.exists_uniform_concretise_ge {P : Type*} [Fintype P]
+    {m : OmegaMarking P} {c : Marking P} (hle : c ≤ m) :
+    ∃ L : ℕ, c ≤ m.concretise (fun _ => L) := by
+  /- We choose a uniform bound `L` as the largest value in `c`. -/
+  let L := Finset.univ.sup c
+  let uniformcConcrete := m.concretise (fun _ => L)
+  refine ⟨L, ?_⟩
+  intro q
+  by_cases hq : m q = ⊤
+  · have hmax : c q ≤ L := Finset.le_sup (Finset.mem_univ q)
+    simpa [uniformcConcrete, hq] using hmax
+  · have hvalue : (uniformcConcrete q : ℕ∞) = m q :=
+      m.concretise_apply_of_ne_top hq
+    have hqle := hle q
+    rw [← hvalue] at hqle
+    simpa using hqle
+
+/-- Replay an ω-execution concretely using enough tokens at the
+source's ω-places to cover the target demand. -/
+private theorem WeightedNet.exists_concrete_replay
+    {P T : Type*} [Fintype P] {net : WeightedNet P T}
+    {src tgt : OmegaMarking P} {ts : List T}
+    (hexec : net.omegaMarkingLTS.MTr src ts tgt)
+    (K : ℕ) :
+    ∃ (L : ℕ) (reached : Marking P),
+      net.FiresSequence (src.concretise (fun _ => L)) ts reached ∧
+      tgt.concretise (fun _ => K) ≤ reached := by
+  let demand := tgt.concretise (fun _ => K)
+  let pre := net.weakestPreMarkingSequence ts demand
+  have hpre : pre ≤ src :=
+    net.weakestPreMarkingSequence_le_of_omegaMTr hexec
+      (tgt.concretise_toOmega_le _)
+  obtain ⟨L, hbudget⟩ := OmegaMarking.exists_uniform_concretise_ge hpre
+  obtain ⟨hfire, hcover⟩ := net.firesSequence_cover_of_weakestPreMarkingSequence_le
+    ts demand hbudget
+  exact ⟨L, _, hfire, hcover⟩
+
+/-- An ordinary ω-execution preserves finiteness at each finite place. -/
+private theorem WeightedNet.omegaMTr_preserves_finite
+    {P T : Type*} {net : WeightedNet P T}
+    {src tgt : OmegaMarking P} {ts : List T} {p : P}
+    (hexec : net.omegaMarkingLTS.MTr src ts tgt)
+    (hsrc : src p ≠ ⊤) : tgt p ≠ ⊤ := by
+  induction hexec with
+  | refl => exact hsrc
+  | stepL hfirst _ ih =>
+      apply ih
+      rw [hfirst.2 p]
+      simp [hsrc, ENat.add_eq_top]
+
+/-- A concrete replay covering the target demand gains at least one token
+at a place that strictly grows in the ω-execution. -/
+private theorem WeightedNet.exists_concrete_replay_growsAt
+    {P T : Type*} [Fintype P] {net : WeightedNet P T}
+    {src tgt : OmegaMarking P} {ts : List T} {p : P}
+    (hexec : net.omegaMarkingLTS.MTr src ts tgt)
+    (hgrowth : src p < tgt p) (K : ℕ) :
+    ∃ (L : ℕ) (reached : Marking P),
+      net.FiresSequence (src.concretise (fun _ => L)) ts reached ∧
+      tgt.concretise (fun _ => K) ≤ reached ∧
+      src.concretise (fun _ => L) p + 1 ≤ reached p := by
+  obtain ⟨L, reached, hfire, hcover⟩ := net.exists_concrete_replay hexec K
+  have hsrc : src p ≠ ⊤ := ne_top_of_lt hgrowth
+  have htgt := net.omegaMTr_preserves_finite hexec hsrc
+  have hlt : src.concretise (fun _ => L) p < tgt.concretise (fun _ => K) p := by
+    apply ENat.natCast_lt_natCast.mp
+    change _ < (tgt.concretise (fun _ => K) p : ℕ∞)
+    rw [src.concretise_apply_of_ne_top hsrc,
+      tgt.concretise_apply_of_ne_top htgt]
+    exact hgrowth
+  exact ⟨L, reached, hfire, hcover, hlt.trans_le (hcover p)⟩
+
+/-- A repetition budget fits below an ω-marking when the concrete source
+already fits below it and the replay loses no tokens at its finite places. -/
+private theorem OmegaMarking.repeat_budget_le
+    {P : Type*} {m : OmegaMarking P} {base reached : Marking P}
+    (hbase : base ≤ m)
+    (hfinite : ∀ q, m q ≠ ⊤ → base q ≤ reached q) (n : ℕ) :
+    base + n • (base - reached) ≤ m := by
+  intro q
+  by_cases hq : m q = ⊤
+  · simp [hq]
+  · change ((base q + n * (base q - reached q) : ℕ) : ℕ∞) ≤ m q
+    rw [Nat.sub_eq_zero_of_le (hfinite q hq), Nat.mul_zero, Nat.add_zero]
+    exact hbase q
+
+/-- Repeat a concrete replay exactly `n` times. The concrete source stays
+below the abstract source, and the repetition gains at least `n` tokens
+at the strictly growing place. A nonempty repetition also covers the
+target concretisation with budget `K`. -/
+theorem WeightedNet.exists_concrete_replay_repeated_growsAt
+    {P T : Type*} [Fintype P] {net : WeightedNet P T}
+    {src tgt : OmegaMarking P} {ts : List T} {p : P}
+    (hexec : net.omegaMarkingLTS.MTr src ts tgt)
+    (hle : src ≤ tgt) (hgrowth : src p < tgt p) (n K : ℕ) :
+    ∃ base reached : Marking P,
+      base ≤ src ∧
+      net.FiresSequence base (List.replicate n ts).flatten reached ∧
+      base p + n ≤ reached p ∧
+      (0 < n → tgt.concretise (fun _ => K) ≤ reached) := by
+  cases n with
+  | zero =>
+      exact ⟨src.concretise 0, src.concretise 0, src.concretise_toOmega_le 0,
+        WeightedNet.FiresSequence.nil _, le_rfl, fun h => (Nat.lt_irrefl 0 h).elim⟩
+  | succ n =>
+      obtain ⟨L, reached, hfire, hcover, hp⟩ :=
+        net.exists_concrete_replay_growsAt hexec hgrowth K
+      let base := src.concretise (fun _ => L)
+      let start := base + n • (base - reached)
+      refine ⟨start, _, ?_, hfire.repeat_with_budget n, ?_, ?_⟩
+      · apply OmegaMarking.repeat_budget_le (src.concretise_toOmega_le _) _ n
+        intro q hq
+        have htq := net.omegaMTr_preserves_finite hexec hq
+        apply (ENat.natCast_le_natCast.mp ?_).trans (hcover q)
+        rw [src.concretise_apply_of_ne_top hq, tgt.concretise_apply_of_ne_top htq]
+        exact hle q
+      · exact Marking.repeat_with_budget_gain_at hp n
+      · intro _
+        exact hcover.trans (by simp)
 
 /-- Realise a concrete demand below an ω-firing target by an ordinary firing.
 
