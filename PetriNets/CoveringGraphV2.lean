@@ -11,9 +11,19 @@ public import PetriNets.CoveringGraphV2.Completeness
 public import PetriNets.CoveringGraphV2.Soundness
 
 /-!
-# Covering graphs, version 2
+# Covering graphs
 
-Experimental algorithm-independent covering-graph development. This module is
-kept outside the public `PetriNets` umbrella until it replaces the existing
-covering-graph formalisation.
+Provides the covering transition system of a weighted place/transition net
+and its finiteness, completeness, and soundness results.
+
+A node records an ω-marking and the markings encountered on its path.
+An edge fires an enabled transition and accelerates coordinates where the
+raw successor grows relative to a marking in that history. A node whose
+marking repeats an ancestor marking has no outgoing edges.
+
+The covering LTS has no infinite execution. From a concrete initial marking,
+every reachable concrete marking is covered by a reachable node label, and
+every finite demand below a reachable node label is coverable in the net.
+The Karp–Miller DFS uses these results through its correspondence with the
+reachable node labels.
 -/
