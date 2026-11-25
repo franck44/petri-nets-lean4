@@ -66,10 +66,6 @@ def KarpMillerTree.children :
     KarpMillerTree P T → List (T × KarpMillerTree P T)
   | .node _ children => children
 
-/-- A Karp–Miller tree is a leaf when it has no child subtree. -/
-def KarpMillerTree.IsLeaf (tree : KarpMillerTree P T) : Prop :=
-  tree.children = []
-
 /-- `tree.HasNode m` means that the ω-marking `m` occurs at some node of
 `tree`. The root marking occurs directly; a marking occurring in any
 immediate subtree also occurs in the whole tree. -/
@@ -81,22 +77,6 @@ inductive KarpMillerTree.HasNode :
       (hchild : (t, subtree) ∈ children)
       (hnode : subtree.HasNode m) :
       HasNode (.node rootMarking children) m
-
-omit [FinEnum P] [FinEnum T] in
-/-- A node of an immediate child subtree is also a node of the whole tree. -/
-theorem KarpMillerTree.HasNode.of_child
-    {tree subtree : KarpMillerTree P T} {t : T} {m : OmegaMarking P}
-    (hchild : (t, subtree) ∈ tree.children)
-    (hnode : subtree.HasNode m) : tree.HasNode m := by
-  cases tree
-  exact KarpMillerTree.HasNode.child hchild hnode
-
-/-- A Karp–Miller tree covers an ordinary marking `m` when one of its nodes
-has an ω-marking greater than or equal to `m.toOmega`. This is the induction
-invariant used to simulate ordinary firing sequences in the finite tree. -/
-def KarpMillerTree.Covers (tree : KarpMillerTree P T)
-    (m : Marking P) : Prop :=
-  ∃ mω, tree.HasNode mω ∧ m.toOmega ≤ mω
 
 /-- Construct the complete Karp–Miller tree by depth-first search, starting
 from the root branch `src`. For a net with initial marking `m₀`, the initial
@@ -123,14 +103,6 @@ termination_by (dfsCall_wellFounded (net := net) (T := T)).wrap src
 decreasing_by
   exact ⟨candidate.1.1, candidate.2⟩
 
-/-- The tree constructed by `karpMillerDFS` stores the source marking at its
-root. -/
-@[simp]
-theorem karpMillerDFS_rootMarking (net : WeightedNet P T) (src : Branch P) :
-    (karpMillerDFS net src).rootMarking = src.marking := by
-  rw [karpMillerDFS]
-  rfl
-
 /-- The source marking occurs at the root of the tree constructed from its
 branch. -/
 theorem karpMillerDFS_hasNode_root (net : WeightedNet P T) (src : Branch P) :
@@ -138,103 +110,45 @@ theorem karpMillerDFS_hasNode_root (net : WeightedNet P T) (src : Branch P) :
   rw [karpMillerDFS]
   exact KarpMillerTree.HasNode.root
 
-/-- If `src` is a first occurrence and `t` is enabled, its computed successor occurs as an
-immediate node of the Karp–Miller tree rooted at `src`. -/
-theorem karpMillerDFS_hasNode_succBranch (net : WeightedNet P T)
-    (src : Branch P) (t : T) (hfirst : src.IsFirstOccurrence)
-    (henabled : net.OmegaEnabled src.marking t) :
-    (karpMillerDFS net src).HasNode (succBranch net src t).marking := by
-  rw [karpMillerDFS]
-  apply KarpMillerTree.HasNode.child
-    (t := t) (subtree := karpMillerDFS net (succBranch net src t))
-  · simp only [List.mem_map]
-    have hsuccessor :
-        (t, succBranch net src t) ∈ successors net src :=
-      mem_successors_iff.mpr ⟨hfirst, henabled, rfl⟩
-    refine ⟨⟨(t, succBranch net src t), hsuccessor⟩, ?_, rfl⟩
-    simp
-  · exact karpMillerDFS_hasNode_root net (succBranch net src t)
-
-/-- Every branch reached by a finite execution of `dfsLTS` has its marking in
-the Karp–Miller tree constructed from the execution's source branch. -/
-theorem karpMillerDFS_hasNode_of_mTr
-    (net : WeightedNet P T) {src tgt : Branch P} {labels : List T}
-    (hexec : (dfsLTS net).MTr src labels tgt) :
-    (karpMillerDFS net src).HasNode tgt.marking := by
+/-- A covering execution reaches a marking stored by the executable DFS. -/
+private theorem karpMillerDFS_hasNode_of_coveringMTr
+    (net : WeightedNet P T) {src tgt : CoveringGraph.Node P} {labels : List T}
+    (hexec : (CoveringGraph.coveringLTS net).MTr src labels tgt) :
+    (karpMillerDFS net (branchOfNode src)).HasNode tgt.marking := by
   induction hexec with
   | refl => exact karpMillerDFS_hasNode_root net _
-  | @stepL src t next labels tgt htr htail ih =>
+  | @stepL src t next labels tgt htr _ ih =>
       rw [karpMillerDFS]
       apply KarpMillerTree.HasNode.child
-        (t := t) (subtree := karpMillerDFS net next)
+        (t := t) (subtree := karpMillerDFS net (branchOfNode next))
       · simp only [List.mem_map]
-        refine ⟨⟨(t, next), ?_⟩, ?_, rfl⟩
-        · exact htr
-        · simp
+        have hmem : (t, branchOfNode next) ∈ successors net (branchOfNode src) :=
+          mem_successors_iff_coveringLTS_tr.mpr htr
+        exact ⟨⟨(t, branchOfNode next), hmem⟩, by simp, rfl⟩
       · exact ih
 
-/-- A node stored in the Karp–Miller tree is the marking of a branch reachable
-from the tree's source in `dfsLTS`.
-
-The proof follows the recursive construction of `karpMillerDFS`. The root
-gives the empty execution. For a node in a child subtree, the child transition
-is prefixed to the execution obtained recursively from that subtree. -/
-private theorem exists_dfsMTr_of_karpMillerDFS_hasNode
+/-- Each tree label comes from a covering execution starting at its root. -/
+private theorem exists_coveringMTr_of_karpMillerDFS_hasNode
     (net : WeightedNet P T) (src : Branch P) {mω : OmegaMarking P}
     (hnode : (karpMillerDFS net src).HasNode mω) :
-    ∃ labels branch,
-      (dfsLTS net).MTr src labels branch ∧ branch.marking = mω := by
+    ∃ labels node,
+      (CoveringGraph.coveringLTS net).MTr (nodeOfBranch src) labels node ∧
+        node.marking = mω := by
   rw [karpMillerDFS] at hnode
   cases hnode with
-  | root =>
-      exact ⟨[], src, Cslib.LTS.MTr.refl, rfl⟩
+  | root => exact ⟨[], nodeOfBranch src, Cslib.LTS.MTr.refl, rfl⟩
   | @child root children t subtree mω hchild hsubtree =>
       simp only [List.mem_map] at hchild
-      obtain ⟨candidate, hcandidate, heq⟩ := hchild
+      obtain ⟨candidate, _, heq⟩ := hchild
       rcases candidate with ⟨⟨u, next⟩, hnext⟩
       simp only at heq
       cases heq
-      obtain ⟨labels, branch, hexec, hmarking⟩ :=
-        exists_dfsMTr_of_karpMillerDFS_hasNode net next hsubtree
-      exact ⟨t :: labels, branch, hexec.stepL hnext, hmarking⟩
-termination_by (dfsCall_wellFounded (net := net) (T := T)).wrap src
-decreasing_by
-  exact ⟨t, hnext⟩
-
-/-- Nodes of the Karp–Miller tree are exactly the markings of branches
-reachable from the tree's source in `dfsLTS`.
-
-```text
-(karpMillerDFS net src).HasNode mω
-  ↔ ∃ labels branch,
-      src ──labels──▶ branch ∧ branch.marking = mω
-```
--/
-theorem karpMillerDFS_hasNode_iff_exists_dfsMTr
-    (net : WeightedNet P T) (src : Branch P) (mω : OmegaMarking P) :
-    (karpMillerDFS net src).HasNode mω ↔
-      ∃ labels branch,
-        (dfsLTS net).MTr src labels branch ∧ branch.marking = mω := by
-  constructor
-  · exact exists_dfsMTr_of_karpMillerDFS_hasNode net src
-  · rintro ⟨labels, branch, hexec, hmarking⟩
-    rw [← hmarking]
-    exact karpMillerDFS_hasNode_of_mTr net hexec
-
-private def nodeOfBranch (branch : Branch P) : CoveringGraph.Node P :=
-  ⟨branch.marking, branch.ancestors⟩
-
-/-- A DFS execution translates to a covering execution with the same labels. -/
-private theorem coveringMTr_of_dfsMTr
-    (net : WeightedNet P T) {src tgt : Branch P} {ts : List T}
-    (h : (dfsLTS net).MTr src ts tgt) :
-    (CoveringGraph.coveringLTS net).MTr (nodeOfBranch src) ts (nodeOfBranch tgt) := by
-  induction h with
-  | refl => exact Cslib.LTS.MTr.refl
-  | stepL hstep _ ih =>
-      obtain ⟨hfirst, henabled, rfl⟩ := mem_successors_iff.mp hstep
-      exact Cslib.LTS.MTr.stepL
-        (CoveringGraph.coveringLTS_tr_iff.mpr ⟨hfirst, henabled, rfl⟩) ih
+      obtain ⟨labels, node, hexec, hmarking⟩ :=
+        exists_coveringMTr_of_karpMillerDFS_hasNode net next hsubtree
+      exact ⟨t :: labels, node,
+        hexec.stepL (mem_successors_iff_coveringLTS_tr.mp hnext), hmarking⟩
+termination_by (dfsCall_wellFounded (net := net)).wrap src
+decreasing_by exact ⟨t, hnext⟩
 
 /-- Every marking in the Karp–Miller tree labels a reachable covering-LTS node. -/
 theorem exists_coveringLTS_canReach_of_karpMillerDFS_hasNode
@@ -242,34 +156,18 @@ theorem exists_coveringLTS_canReach_of_karpMillerDFS_hasNode
     (h : (karpMillerDFS net (Branch.initial m₀)).HasNode mω) :
     ∃ node, (CoveringGraph.coveringLTS net).CanReach
       (CoveringGraph.Node.initial m₀) node ∧ node.marking = mω := by
-  obtain ⟨ts, branch, hexec, hmarking⟩ :=
-    (karpMillerDFS_hasNode_iff_exists_dfsMTr net (Branch.initial m₀) mω).mp h
-  exact ⟨nodeOfBranch branch, ⟨ts, coveringMTr_of_dfsMTr net hexec⟩, hmarking⟩
+  obtain ⟨ts, node, hexec, hmarking⟩ :=
+    exists_coveringMTr_of_karpMillerDFS_hasNode net (Branch.initial m₀) h
+  exact ⟨node, ⟨ts, hexec⟩, hmarking⟩
 
-private def branchOfNode (node : CoveringGraph.Node P) : Branch P :=
-  ⟨node.marking, node.ancestors⟩
-
-/-- A covering execution translates to a DFS execution with the same labels. -/
-private theorem dfsMTr_of_coveringMTr
-    (net : WeightedNet P T) {src tgt : CoveringGraph.Node P} {ts : List T}
-    (h : (CoveringGraph.coveringLTS net).MTr src ts tgt) :
-    (dfsLTS net).MTr (branchOfNode src) ts (branchOfNode tgt) := by
-  induction h with
-  | refl => exact Cslib.LTS.MTr.refl
-  | stepL hstep _ ih =>
-      obtain ⟨hfirst, henabled, rfl⟩ := CoveringGraph.coveringLTS_tr_iff.mp hstep
-      exact Cslib.LTS.MTr.stepL
-        (mem_successors_iff.mpr ⟨hfirst, henabled, rfl⟩) ih
-
-/-- Every marking labelling a reachable covering-LTS node occurs in the
-Karp–Miller tree. -/
+/-- Every reachable covering-LTS label occurs in the Karp–Miller tree. -/
 theorem karpMillerDFS_hasNode_of_exists_coveringLTS_canReach
     (net : WeightedNet P T) (m₀ : Marking P) (mω : OmegaMarking P)
     (h : ∃ node, (CoveringGraph.coveringLTS net).CanReach
       (CoveringGraph.Node.initial m₀) node ∧ node.marking = mω) :
     (karpMillerDFS net (Branch.initial m₀)).HasNode mω := by
   obtain ⟨node, ⟨ts, hexec⟩, rfl⟩ := h
-  exact karpMillerDFS_hasNode_of_mTr net (dfsMTr_of_coveringMTr net hexec)
+  exact karpMillerDFS_hasNode_of_coveringMTr net hexec
 
 /-- The Karp–Miller tree contains exactly the ω-markings labelling nodes
 reachable from the initial node of the covering LTS. -/
