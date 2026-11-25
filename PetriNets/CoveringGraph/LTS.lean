@@ -6,7 +6,7 @@ Authors: Franck Cassez
 
 module
 
-public import PetriNets.CoveringGraphV2.Successor
+public import PetriNets.CoveringGraph.Successor
 
 /-!
 # Covering transition system
@@ -20,7 +20,7 @@ marking already occurs among its ancestors is terminal.-/
 
 @[expose] public section
 
-namespace PetriNet.CoveringGraphV2
+namespace PetriNet.CoveringGraph
 
 variable {P T : Type*}
 variable {net : WeightedNet P T}
@@ -152,4 +152,4 @@ def coveringGraphInitial (net : WeightedNet P T) (m₀ : Marking P) :
 
 end FinitePlaces
 
-end PetriNet.CoveringGraphV2
+end PetriNet.CoveringGraph

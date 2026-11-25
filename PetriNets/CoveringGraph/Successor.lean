@@ -6,8 +6,8 @@ Authors: Franck Cassez
 
 module
 
-public import PetriNets.CoveringGraphV2.Node
-public import PetriNets.CoveringGraphV2.Acceleration
+public import PetriNets.CoveringGraph.Node
+public import PetriNets.CoveringGraph.Acceleration
 public import PetriNets.Monotonicity
 
 /-!
@@ -22,7 +22,7 @@ node.
 
 @[expose] public section
 
-namespace PetriNet.CoveringGraphV2
+namespace PetriNet.CoveringGraph
 
 variable {P T : Type*}
 variable {net : WeightedNet P T}
@@ -222,4 +222,4 @@ theorem not_growsAt_successor_of_mem_history_of_omegaPlaces_eq [FinEnum P]
   rw [hpEarlierTop, hpTgtTop] at hp
   exact (lt_irrefl _ hp).elim
 
-end PetriNet.CoveringGraphV2
+end PetriNet.CoveringGraph

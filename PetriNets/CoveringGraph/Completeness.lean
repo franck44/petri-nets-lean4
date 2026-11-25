@@ -6,7 +6,7 @@ Authors: Franck Cassez
 
 module
 
-public import PetriNets.CoveringGraphV2.Properties
+public import PetriNets.CoveringGraph.Properties
 public import PetriNets.LTS.Basic
 
 /-!
@@ -27,7 +27,7 @@ The proof proceeds in three steps:
 
 @[expose] public section
 
-namespace PetriNet.CoveringGraphV2
+namespace PetriNet.CoveringGraph
 
 variable {P T : Type*} [FinEnum P]
 variable (net : WeightedNet P T)
@@ -104,4 +104,4 @@ theorem coveringLTS_covers_of_reachable
       Cslib.LTS.CanReach.refl (coveringLTS net) (Node.initial m₀), le_rfl⟩
     hexec
 
-end PetriNet.CoveringGraphV2
+end PetriNet.CoveringGraph

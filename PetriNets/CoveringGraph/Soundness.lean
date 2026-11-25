@@ -6,7 +6,7 @@ Authors: Franck Cassez
 
 module
 
-public import PetriNets.CoveringGraphV2.Properties
+public import PetriNets.CoveringGraph.Properties
 import PetriNets.LTS.Basic
 
 /-!
@@ -25,7 +25,7 @@ a concrete infinite token count.
 
 @[expose] public section
 
-namespace PetriNet.CoveringGraphV2
+namespace PetriNet.CoveringGraph
 
 variable {P T : Type*} [FinEnum P]
 variable {net : WeightedNet P T}
@@ -351,4 +351,4 @@ theorem omegaCoverableFrom_of_coveringLTS_canReach
     Cslib.LTS.MTr.refl
     (kCoverableFrom_initial net m₀) hexec
 
-end PetriNet.CoveringGraphV2
+end PetriNet.CoveringGraph

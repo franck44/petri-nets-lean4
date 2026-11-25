@@ -22,7 +22,7 @@ The ancestors are used to prune the search space by identifying repeated occurre
 
 @[expose] public section
 
-namespace PetriNet.CoveringGraphV2
+namespace PetriNet.CoveringGraph
 
 /-- A node is an ω-marking together with a sequence of ancestor ω-markings.
 The ancestor list should record a witness sequence of ω-markings from the root to reach
@@ -89,4 +89,4 @@ theorem history_nodup {node : Node P}
 
 end Node
 
-end PetriNet.CoveringGraphV2
+end PetriNet.CoveringGraph

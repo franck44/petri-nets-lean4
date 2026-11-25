@@ -7,7 +7,7 @@ Authors: Franck Cassez
 module
 
 public import PetriNets.KarpMiller
-import PetriNets.CoveringGraphV2.Soundness
+import PetriNets.CoveringGraph.Soundness
 
 /-!
 # Soundness of the Karp–Miller construction
@@ -39,7 +39,7 @@ theorem karpMillerDFS_omegaCoverableFrom_of_hasNode
   obtain ⟨node, hreach, hmarking⟩ :=
     (karpMillerDFS_hasNode_iff_exists_coveringLTS_canReach net m₀ mω).mp hnode
   rw [← hmarking]
-  exact CoveringGraphV2.omegaCoverableFrom_of_coveringLTS_canReach hreach
+  exact CoveringGraph.omegaCoverableFrom_of_coveringLTS_canReach hreach
 
 end KarpMiller
 

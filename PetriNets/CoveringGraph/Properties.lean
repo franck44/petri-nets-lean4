@@ -6,7 +6,7 @@ Authors: Franck Cassez
 
 module
 
-public import PetriNets.CoveringGraphV2.LTS
+public import PetriNets.CoveringGraph.LTS
 public import Cslib.Foundations.Semantics.LTS.OmegaExecution
 
 /-!
@@ -23,7 +23,7 @@ Provides the main structural properties of covering-LTS executions:
 
 @[expose] public section
 
-namespace PetriNet.CoveringGraphV2
+namespace PetriNet.CoveringGraph
 
 variable {P T : Type*} [FinEnum P]
 variable {net : WeightedNet P T}
@@ -222,4 +222,4 @@ theorem exists_first_occurrence_of_canReach
     · simp [Node.initial, Node.root] at hroot
     · exact ⟨first, ⟨pre, hpre⟩, hfirst, hmarking⟩
 
-end PetriNet.CoveringGraphV2
+end PetriNet.CoveringGraph

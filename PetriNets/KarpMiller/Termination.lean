@@ -7,7 +7,7 @@ Authors: Franck Cassez
 module
 
 public import PetriNets.KarpMiller.LTS
-import PetriNets.CoveringGraphV2.Finiteness
+import PetriNets.CoveringGraph.Finiteness
 public import Mathlib.Data.FinEnum
 
 /-!
@@ -44,13 +44,13 @@ theorem not_omegaExecution
     {labels : Cslib.ωSequence T} :
     ¬ (dfsLTS net).OmegaExecution nodes labels := by
   intro hexec
-  let toNode (b : Branch P) : CoveringGraphV2.Node P :=
+  let toNode (b : Branch P) : CoveringGraph.Node P :=
     ⟨b.marking, b.ancestors⟩
-  apply CoveringGraphV2.no_OmegaExecution (net := net)
+  apply CoveringGraph.no_OmegaExecution (net := net)
     (nodes := fun n => toNode (nodes n)) (labels := labels)
   intro n
   obtain ⟨hfirst, henabled, hnext⟩ := mem_dfsSuccessors_iff.mp (hexec n)
-  exact CoveringGraphV2.coveringLTS_tr_iff.mpr
+  exact CoveringGraph.coveringLTS_tr_iff.mpr
     ⟨hfirst, henabled, (congrArg toNode hnext).symm⟩
 
 /-- `DfsCall net next current` means that computing the Karp–Miller DFS at

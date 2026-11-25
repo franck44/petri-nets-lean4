@@ -6,7 +6,7 @@ Authors: Franck Cassez
 
 module
 
-public import PetriNets.CoveringGraphV2.Properties
+public import PetriNets.CoveringGraph.Properties
 public import PetriNets.OmegaMarking.Sequence
 
 /-!
@@ -28,7 +28,7 @@ occurrence and is terminal.
 
 @[expose] public section
 
-namespace PetriNet.CoveringGraphV2
+namespace PetriNet.CoveringGraph
 
 variable {P T : Type*} [FinEnum P]
 variable {net : WeightedNet P T}
@@ -125,4 +125,4 @@ theorem no_OmegaExecution
   exact coveringLTS_terminal_of_not_first_occurrence hnotfirst
     (labels j) (nodes (j + 1)) (hexec j)
 
-end PetriNet.CoveringGraphV2
+end PetriNet.CoveringGraph

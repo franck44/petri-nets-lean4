@@ -6,7 +6,7 @@ Authors: Franck Cassez
 
 module
 
-public import PetriNets.CoveringGraphV2.Acceleration
+public import PetriNets.CoveringGraph.Acceleration
 import Mathlib.Order.WellQuasiOrder
 
 /-!

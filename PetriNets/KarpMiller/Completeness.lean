@@ -7,7 +7,7 @@ Authors: Franck Cassez
 module
 
 public import PetriNets.KarpMiller
-import PetriNets.CoveringGraphV2.Completeness
+import PetriNets.CoveringGraph.Completeness
 
 /-!
 # Completeness of the Karp–Miller construction
@@ -37,7 +37,7 @@ theorem karpMillerDFS_covers_of_reachable
     ∃ mω,
       (karpMillerDFS net (Branch.initial m₀)).HasNode mω ∧
       tgt ≤ mω := by
-  obtain ⟨node, hnode, hcover⟩ := CoveringGraphV2.coveringLTS_covers_of_reachable net hreach
+  obtain ⟨node, hnode, hcover⟩ := CoveringGraph.coveringLTS_covers_of_reachable net hreach
   exact ⟨node.marking,
     (karpMillerDFS_hasNode_iff_exists_coveringLTS_canReach net m₀ node.marking).mpr
       ⟨node, hnode, rfl⟩, hcover⟩
