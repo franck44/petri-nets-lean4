@@ -41,22 +41,22 @@ first-occurrence branch, `succMarkings` enumerates the enabled transitions and t
 markings; `succBranch` then accelerates each marking with respect to the branch
 history and extends the branch. A branch that is not a first occurrence has no DFS
 successors. -/
-def dfsSuccessors (net : WeightedNet P T) (src : Branch P) :
+def successors (net : WeightedNet P T) (src : Branch P) :
     List (T × Branch P) :=
   if src.marking ∈ src.ancestors then []
   else
     (succMarkings net src.marking).map fun candidate =>
       (candidate.1, succBranch net src candidate.1)
 
-/-- Membership in `dfsSuccessors` is characterised by first-occurrence
+/-- Membership in `successors` is characterised by first-occurrence
 status, enabledness, and construction of the target branch. -/
-theorem mem_dfsSuccessors_iff {src tgt : Branch P} {t : T} :
-    (t, tgt) ∈ dfsSuccessors net src ↔
+theorem mem_successors_iff {src tgt : Branch P} {t : T} :
+    (t, tgt) ∈ successors net src ↔
       src.IsFirstOccurrence ∧ net.OmegaEnabled src.marking t ∧
         succBranch net src t = tgt := by
   constructor
   · intro h
-    unfold dfsSuccessors at h
+    unfold successors at h
     split at h
     · simp at h
     · rename_i hfirst
@@ -70,7 +70,7 @@ theorem mem_dfsSuccessors_iff {src tgt : Branch P} {t : T} :
       exact ⟨by simpa [Branch.IsFirstOccurrence], henabled, rfl⟩
   · rintro ⟨hfirst, henabled, rfl⟩
     have hnotmem : src.marking ∉ src.ancestors := hfirst
-    unfold dfsSuccessors
+    unfold successors
     simp only [hnotmem, ↓reduceIte, List.mem_map]
     refine ⟨(t, succMarking net src.marking t),
       mem_succMarkings_of_enabled henabled, ?_⟩
@@ -78,7 +78,7 @@ theorem mem_dfsSuccessors_iff {src tgt : Branch P} {t : T} :
 
 /-- The labelled transition system explored by the Karp–Miller DFS. -/
 def dfsLTS (net : WeightedNet P T) : Cslib.LTS (Branch P) T where
-  Tr src t tgt := (t, tgt) ∈ dfsSuccessors net src
+  Tr src t tgt := (t, tgt) ∈ successors net src
 
 /-- The Karp–Miller DFS LTS is deterministic. Registering this fact as an
 instance allows CSLib results for deterministic LTSs to apply directly. -/
@@ -86,9 +86,9 @@ instance (net : WeightedNet P T) :
     (dfsLTS net).Deterministic := by
   constructor
   intro src t tgt₁ tgt₂ h₁ h₂
-  change (t, tgt₁) ∈ dfsSuccessors net src at h₁
-  change (t, tgt₂) ∈ dfsSuccessors net src at h₂
-  rw [mem_dfsSuccessors_iff] at h₁ h₂
+  change (t, tgt₁) ∈ successors net src at h₁
+  change (t, tgt₂) ∈ successors net src at h₂
+  rw [mem_successors_iff] at h₁ h₂
   exact h₁.2.2.symm.trans h₂.2.2
 
 /-- Simulate one concrete firing from a covering first-occurrence branch.
@@ -113,7 +113,7 @@ theorem dfsLTS_tr_cover_of_fires
     (dfsLTS net).Tr branch t (succBranch net branch t) ∧
       m' ≤ (succBranch net branch t).marking := by
   obtain ⟨henabled, hcoverNext⟩ := fires_le_succBranch hcover hfires
-  exact ⟨mem_dfsSuccessors_iff.mpr ⟨hfirst, henabled, rfl⟩,
+  exact ⟨mem_successors_iff.mpr ⟨hfirst, henabled, rfl⟩,
     hcoverNext⟩
 
 /-! ## Marking and ω-place behaviour -/
@@ -123,8 +123,8 @@ theorem omegaPlaces_mono_of_tr {src tgt : Branch P} {t : T}
     (htr : (dfsLTS net).Tr src t tgt) :
     OmegaMarking.omegaPlaces src.marking ⊆
       OmegaMarking.omegaPlaces tgt.marking := by
-  change (t, tgt) ∈ dfsSuccessors net src at htr
-  rw [mem_dfsSuccessors_iff] at htr
+  change (t, tgt) ∈ successors net src at htr
+  rw [mem_successors_iff] at htr
   rw [← htr.2.2]
   exact omegaPlaces_mono_of_succBranch src t
 
@@ -180,7 +180,7 @@ theorem marking_eq_succMarking_of_tr_of_omegaPlaces_eq
     (homega : OmegaMarking.omegaPlaces src.marking =
       OmegaMarking.omegaPlaces tgt.marking) :
     tgt.marking = succMarking net src.marking t := by
-  obtain ⟨_, _, rfl⟩ := mem_dfsSuccessors_iff.mp htr
+  obtain ⟨_, _, rfl⟩ := mem_successors_iff.mp htr
   exact succBranch_marking_eq_succMarking_of_omegaPlaces_eq src t homega
 
 /-! ## Branch histories -/
@@ -190,7 +190,7 @@ branch in the target branch. -/
 theorem ancestors_mono_of_tr {src tgt : Branch P} {t : T}
     (htr : (dfsLTS net).Tr src t tgt) :
     src.ancestors ⊆ tgt.ancestors := by
-  obtain ⟨_, _, rfl⟩ := mem_dfsSuccessors_iff.mp htr
+  obtain ⟨_, _, rfl⟩ := mem_successors_iff.mp htr
   simp [succBranch, Branch.history]
 
 /-- Along a finite Karp–Miller execution, every ancestor of the initial branch
@@ -221,7 +221,7 @@ target branch. -/
 theorem marking_mem_ancestors_of_tr {src tgt : Branch P} {t : T}
     (htr : (dfsLTS net).Tr src t tgt) :
     src.marking ∈ tgt.ancestors := by
-  obtain ⟨_, _, rfl⟩ := mem_dfsSuccessors_iff.mp htr
+  obtain ⟨_, _, rfl⟩ := mem_successors_iff.mp htr
   simp [succBranch, Branch.history]
 
 /-- Every marking occurring earlier on an infinite Karp–Miller execution is
@@ -307,14 +307,14 @@ theorem ancestor_eq_predecessor_of_mTr
       rcases ih ha with hsrc | ⟨pre, mid, rest, hlabels,
           hpre, hrest, hfirst, hmarking⟩
       · rw [show next.ancestors = src.history by
-          obtain ⟨_, _, rfl⟩ := mem_dfsSuccessors_iff.mp htr
+          obtain ⟨_, _, rfl⟩ := mem_successors_iff.mp htr
           rfl] at hsrc
         rw [Branch.history, List.mem_append, List.mem_singleton] at hsrc
         rcases hsrc with hancestor | hcurrent
         · exact Or.inl hancestor
         · exact Or.inr ⟨[], src, t :: labels, rfl,
             Cslib.LTS.MTr.refl, htail.stepL htr,
-            (mem_dfsSuccessors_iff.mp htr).1, hcurrent.symm⟩
+            (mem_successors_iff.mp htr).1, hcurrent.symm⟩
       · exact Or.inr ⟨t :: pre, mid, rest,
           by simp [hlabels], hpre.stepL htr, hrest, hfirst, hmarking⟩
 

@@ -111,13 +111,13 @@ from the root to its parent. This history is used internally for acceleration
 and duplicate detection; only the current ω-marking of each branch is stored
 in the resulting tree.
 
-The recursive calls are exactly the branches returned by `dfsSuccessors`.
+The recursive calls are exactly the branches returned by `successors`.
 Their termination is justified by `dfsCall_wellFounded`; its accessibility
 proof is used only by Lean's termination checker and is erased from the
 compiled algorithm. -/
 def karpMillerDFS (net : WeightedNet P T) (src : Branch P) :
     KarpMillerTree P T :=
-  .node src.marking <| (dfsSuccessors net src).attach.map fun candidate =>
+  .node src.marking <| (successors net src).attach.map fun candidate =>
     (candidate.1.1, karpMillerDFS net candidate.1.2)
 termination_by (dfsCall_wellFounded (net := net) (T := T)).wrap src
 decreasing_by
@@ -149,8 +149,8 @@ theorem karpMillerDFS_hasNode_succBranch (net : WeightedNet P T)
     (t := t) (subtree := karpMillerDFS net (succBranch net src t))
   · simp only [List.mem_map]
     have hsuccessor :
-        (t, succBranch net src t) ∈ dfsSuccessors net src :=
-      mem_dfsSuccessors_iff.mpr ⟨hfirst, henabled, rfl⟩
+        (t, succBranch net src t) ∈ successors net src :=
+      mem_successors_iff.mpr ⟨hfirst, henabled, rfl⟩
     refine ⟨⟨(t, succBranch net src t), hsuccessor⟩, ?_, rfl⟩
     simp
   · exact karpMillerDFS_hasNode_root net (succBranch net src t)
@@ -232,7 +232,7 @@ private theorem coveringMTr_of_dfsMTr
   induction h with
   | refl => exact Cslib.LTS.MTr.refl
   | stepL hstep _ ih =>
-      obtain ⟨hfirst, henabled, rfl⟩ := mem_dfsSuccessors_iff.mp hstep
+      obtain ⟨hfirst, henabled, rfl⟩ := mem_successors_iff.mp hstep
       exact Cslib.LTS.MTr.stepL
         (CoveringGraph.coveringLTS_tr_iff.mpr ⟨hfirst, henabled, rfl⟩) ih
 
@@ -259,7 +259,7 @@ private theorem dfsMTr_of_coveringMTr
   | stepL hstep _ ih =>
       obtain ⟨hfirst, henabled, rfl⟩ := CoveringGraph.coveringLTS_tr_iff.mp hstep
       exact Cslib.LTS.MTr.stepL
-        (mem_dfsSuccessors_iff.mpr ⟨hfirst, henabled, rfl⟩) ih
+        (mem_successors_iff.mpr ⟨hfirst, henabled, rfl⟩) ih
 
 /-- Every marking labelling a reachable covering-LTS node occurs in the
 Karp–Miller tree. -/

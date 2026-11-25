@@ -49,7 +49,7 @@ theorem not_omegaExecution
   apply CoveringGraph.no_OmegaExecution (net := net)
     (nodes := fun n => toNode (nodes n)) (labels := labels)
   intro n
-  obtain ⟨hfirst, henabled, hnext⟩ := mem_dfsSuccessors_iff.mp (hexec n)
+  obtain ⟨hfirst, henabled, hnext⟩ := mem_successors_iff.mp (hexec n)
   exact CoveringGraph.coveringLTS_tr_iff.mpr
     ⟨hfirst, henabled, (congrArg toNode hnext).symm⟩
 
