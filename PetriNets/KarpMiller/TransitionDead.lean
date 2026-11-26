@@ -7,9 +7,7 @@ Authors: Franck Cassez
 module
 
 public import PetriNets.KarpMiller.Tree
-public import PetriNets.MarkingGraph.Properties
-import PetriNets.KarpMiller.Completeness
-import PetriNets.KarpMiller.Soundness
+public import PetriNets.CoveringGraph.TransitionDead
 
 /-!
 # Deciding whether a transition is dead
@@ -27,25 +25,15 @@ open KarpMiller
 variable {P T : Type*} [FinEnum P] [FinEnum T]
 
 /-- A transition is dead from `m₀` exactly when no Karp–Miller tree marking
-enables it. Completeness lifts concrete enabledness to a tree marking.
-Soundness gives a reachable cover of the transition's input marking whenever
-a tree marking enables it. -/
+enables it. -/
 theorem WeightedNet.transitionDeadFrom_iff_no_enabled_tree_marking
     (net : WeightedNet P T) (m₀ : Marking P) (t : T) :
     net.TransitionDeadFrom m₀ t ↔
       ¬ ∃ m, (karpMillerDFS net (Branch.initial m₀)).HasNode m ∧
         net.OmegaEnabled m t := by
-  constructor
-  · rintro hdead ⟨m, hnode, henabled⟩
-    let input : Marking P := fun p => net.pre p t
-    have hcoverable :=
-      karpMillerDFS_omegaCoverableFrom_of_hasNode net m₀ hnode input henabled
-    obtain ⟨reached, hreach, hcover⟩ := hcoverable
-    exact hdead reached hreach hcover
-  · intro hnone m hreach henabled
-    obtain ⟨label, hnode, hcover⟩ := karpMillerDFS_covers_of_reachable net hreach
-    exact hnone ⟨label, hnode, fun p =>
-      (ENat.natCast_le_natCast.mpr (henabled p)).trans (hcover p)⟩
+  rw [CoveringGraph.transitionDeadFrom_iff_no_enabled_covering_node net m₀ t]
+  simp only [karpMillerDFS_hasNode_iff_exists_coveringLTS_canReach]
+  aesop
 
 /-- Decide whether `t` is dead from `m₀` by searching the collected tree
 markings for one that enables `t`. -/
