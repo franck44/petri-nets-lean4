@@ -11,10 +11,14 @@ public import PetriNets.CoveringGraph.Acceleration
 /-!
 # Karp–Miller branches
 
-This module defines the branches used by the DFS implementation of the
-Karp–Miller algorithm. A branch stores its current ω-marking together with
-the markings of its ancestors. Its history is used to determine which places
-must be accelerated when a successor is constructed.
+Provides branches for the depth-first implementation of the Karp–Miller
+algorithm. A branch stores its current ω-marking and the ancestor markings
+in order from the root to its parent.
+
+When constructing a successor, the algorithm uses the complete history,
+including the current marking, to select the places to accelerate. If the
+current marking already occurs among the ancestors, the algorithm stops
+expanding that branch.
 -/
 
 @[expose] public section
@@ -72,17 +76,6 @@ an ancestor. -/
 def IsFirstOccurrence (branch : Branch P) : Prop :=
   branch.marking ∉ branch.ancestors
 
-/-- If a branch has no duplicate ancestors and is a first occurrence, then
-its complete history has no duplicates. -/
-theorem history_nodup {branch : Branch P}
-    (hancestors : branch.ancestors.Nodup) (hfirst : branch.IsFirstOccurrence) :
-    branch.history.Nodup := by
-  change branch.marking ∉ branch.ancestors at hfirst
-  simp [history, List.nodup_append, hancestors]
-  intro m hm heq
-  apply hfirst
-  exact heq ▸ hm
-
 section FinitePlaces
 
 variable [FinEnum P]
@@ -104,23 +97,6 @@ for termination of the Karp–Miller construction. -/
 def acceleratedPlaces (m : OmegaMarking P) (branch : Branch P) : Finset P :=
   Finset.univ.filter fun p =>
     ∃ a ∈ branch.history, a ≤ m ∧ a p < m p
-
-/-- A place is selected for acceleration when a marking in the branch history
-is below the successor marking and is strictly smaller at that place. -/
-theorem mem_acceleratedPlaces {m a : OmegaMarking P} {branch : Branch P}
-    {p : P} (ha : a ∈ branch.history) (hle : a ≤ m) (hlt : a p < m p) :
-    p ∈ acceleratedPlaces m branch := by
-  simp only [acceleratedPlaces, Finset.mem_filter, Finset.mem_univ, true_and]
-  exact ⟨a, ha, hle, hlt⟩
-
-/-- A marking with no accelerated place is left unchanged. -/
-theorem accelerate_eq_self_of_acceleratedPlaces_eq_empty
-    {m : OmegaMarking P} {branch : Branch P}
-    (h : acceleratedPlaces m branch = ∅) :
-    OmegaMarking.accelerateFinset (acceleratedPlaces m branch) m = m := by
-  funext p
-  rw [h]
-  simp [OmegaMarking.accelerateFinset]
 
 end FinitePlaces
 
