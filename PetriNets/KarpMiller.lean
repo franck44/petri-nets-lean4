@@ -13,22 +13,21 @@ public import Mathlib.Data.FinEnum
 /-!
 # The Karp–Miller construction
 
-This module formalises the Karp–Miller algorithm for constructing a covering
-graph of a weighted P/T net. The construction is implemented using a
-depth-first search (DFS).
+Provides the executable Karp–Miller tree for a weighted P/T net, constructed
+by depth-first search (DFS).
 
 A DFS branch stores its current ω-marking and its ancestor markings because
 acceleration depends on the history of the branch. The executable successor
 functions enumerate enabled transitions, accelerate their successor
-markings, and extend a first-occurrence branch. These computed successors define the DFS
-labelled transition system.
+markings, and extend a first-occurrence branch. The computed successors
+correspond exactly to edges in the covering LTS.
 
 When the current marking already occurs among the ancestors, the branch is
-not a first occurrence and becomes a leaf. The completed finite DFS tree retains these
-closed leaves.
+expanded further. The tree retains it as a leaf.
 
 Termination of `karpMillerDFS` is justified by the well-founded recursive-call
-relation `DfsCall`.
+relation `DfsCall`. The tree contains exactly the ω-markings that label
+reachable nodes in the covering LTS.
 
 ## References
 
@@ -110,7 +109,9 @@ theorem karpMillerDFS_hasNode_root (net : WeightedNet P T) (src : Branch P) :
   rw [karpMillerDFS]
   exact KarpMillerTree.HasNode.root
 
-/-- A covering execution reaches a marking stored by the executable DFS. -/
+/-- A covering execution reaches a marking stored by the executable DFS.
+Each edge of the execution gives a child in the tree, so following the
+execution leads to a node labelled by the final marking. -/
 private theorem karpMillerDFS_hasNode_of_coveringMTr
     (net : WeightedNet P T) {src tgt : CoveringGraph.Node P} {labels : List T}
     (hexec : (CoveringGraph.coveringLTS net).MTr src labels tgt) :
@@ -127,7 +128,9 @@ private theorem karpMillerDFS_hasNode_of_coveringMTr
         exact ⟨⟨(t, branchOfNode next), hmem⟩, by simp, rfl⟩
       · exact ih
 
-/-- Each tree label comes from a covering execution starting at its root. -/
+/-- Each tree label comes from a covering execution starting at its root.
+For a label in a child subtree, prepend the covering edge corresponding
+to that child to the execution within the subtree. -/
 private theorem exists_coveringMTr_of_karpMillerDFS_hasNode
     (net : WeightedNet P T) (src : Branch P) {mω : OmegaMarking P}
     (hnode : (karpMillerDFS net src).HasNode mω) :
