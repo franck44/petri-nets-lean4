@@ -31,7 +31,6 @@ namespace PetriNet
 namespace KarpMiller
 
 variable {P T : Type*}
-variable {net : WeightedNet P T}
 
 section FinitePlaces
 
@@ -49,7 +48,7 @@ def DfsCall (net : WeightedNet P T)
 An infinite chain of calls would supply one transition label per call.
 The successor correspondence turns these labelled calls into an infinite
 covering-LTS execution, which `CoveringGraph.no_OmegaExecution` rules out. -/
-theorem dfsCall_wellFounded : WellFounded (DfsCall net) := by
+theorem dfsCall_wellFounded (net : WeightedNet P T) : WellFounded (DfsCall net) := by
   rw [wellFounded_iff_isEmpty_descending_chain]
   constructor
   rintro ⟨nodes, hchildren⟩

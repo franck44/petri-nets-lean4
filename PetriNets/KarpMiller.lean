@@ -90,17 +90,19 @@ from the root to its parent. This history is used internally for acceleration
 and duplicate detection; only the current ω-marking of each branch is stored
 in the resulting tree.
 
-The recursive calls are exactly the branches returned by `successors`.
-Their termination is justified by `dfsCall_wellFounded`; its accessibility
-proof is used only by Lean's termination checker and is erased from the
-compiled algorithm. -/
+Each `child` passed to `map` is an entry from `(successors net src).attach`.
+Its value `child.val` is a pair consisting of the transition label and the
+successor branch. Its proof `child.property` shows that the pair belongs to
+the successor list. The recursive call builds the subtree from that branch,
+and the membership proof justifies the call under `dfsCall_wellFounded`.
+The termination proof is erased from the compiled algorithm. -/
 def karpMillerDFS (net : WeightedNet P T) (src : Branch P) :
     KarpMillerTree P T :=
-  .node src.marking <| (successors net src).attach.map fun candidate =>
-    (candidate.1.1, karpMillerDFS net candidate.1.2)
-termination_by (dfsCall_wellFounded (net := net) (T := T)).wrap src
+  .node src.marking <| (successors net src).attach.map fun child =>
+    (child.val.1, karpMillerDFS net child.val.2)
+termination_by (dfsCall_wellFounded net).wrap src
 decreasing_by
-  exact ⟨candidate.1.1, candidate.2⟩
+  exact ⟨child.val.1, child.property⟩
 
 /-- The source marking occurs at the root of the tree constructed from its
 branch. -/
@@ -150,7 +152,7 @@ private theorem exists_coveringMTr_of_karpMillerDFS_hasNode
         exists_coveringMTr_of_karpMillerDFS_hasNode net next hsubtree
       exact ⟨t :: labels, node,
         hexec.stepL (mem_successors_iff_coveringLTS_tr.mp hnext), hmarking⟩
-termination_by (dfsCall_wellFounded (net := net)).wrap src
+termination_by (dfsCall_wellFounded net).wrap src
 decreasing_by exact ⟨t, hnext⟩
 
 /-- Every marking in the Karp–Miller tree labels a reachable covering-LTS node. -/
