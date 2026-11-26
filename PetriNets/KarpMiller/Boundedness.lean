@@ -11,19 +11,34 @@ public import PetriNets.KarpMiller.Tree
 public import PetriNets.CoveringGraph.Boundedness
 
 /-!
-# Deciding place boundedness
+# Place boundedness and simultaneous unboundedness
 
-Provides an executable decision for place boundedness by collecting the
-Karp–Miller tree markings and checking for ω at the given place.
+Provides a tree characterisation of simultaneous unboundedness and an
+executable decision for boundedness at a single place.
 -/
 
 public section
 
 namespace PetriNet
 
+open KarpMiller
+
+variable {P T : Type*} [FinEnum P] [FinEnum T]
+
+/-- A set of places is simultaneously unbounded exactly when one Karp–Miller
+tree marking has ω at every place in the set. -/
+theorem WeightedNet.simultaneouslyUnboundedFrom_iff_exists_tree_marking
+    (net : WeightedNet P T) (m₀ : Marking P) (places : Set P) :
+    net.SimultaneouslyUnboundedFrom m₀ places ↔
+      ∃ label, (karpMillerDFS net (Branch.initial m₀)).HasNode label ∧
+        ∀ p ∈ places, label p = ⊤ := by
+  rw [CoveringGraph.simultaneouslyUnboundedFrom_iff_exists_omega (net := net) m₀ places]
+  simp only [karpMillerDFS_hasNode_iff_exists_coveringLTS_canReach]
+  aesop
+
 /-- Decide boundedness at `p` by checking the list of Karp–Miller node markings
 for ω at that place. -/
-def WeightedNet.decidablePlaceBoundedFrom {P T : Type*} [FinEnum P] [FinEnum T]
+def WeightedNet.decidablePlaceBoundedFrom
     (net : WeightedNet P T) (m₀ : Marking P) (p : P) :
     Decidable (net.PlaceBoundedFrom m₀ p) :=
   let tree := KarpMiller.karpMillerDFS net (KarpMiller.Branch.initial m₀)
@@ -31,9 +46,8 @@ def WeightedNet.decidablePlaceBoundedFrom {P T : Type*} [FinEnum P] [FinEnum T]
     classical
     have hplace : net.PlaceUnboundedFrom m₀ p ↔
         ∃ m, tree.HasNode m ∧ m p = ⊤ := by
-      rw [CoveringGraph.placeUnboundedFrom_iff_exists_omega (net := net) m₀ p]
-      simp only [tree, KarpMiller.karpMillerDFS_hasNode_iff_exists_coveringLTS_canReach]
-      aesop
+      simpa [tree, WeightedNet.simultaneouslyUnboundedFrom_singleton] using
+        net.simultaneouslyUnboundedFrom_iff_exists_tree_marking m₀ ({p} : Set P)
     simp only [List.any_eq_true, decide_eq_true_eq, KarpMiller.KarpMillerTree.mem_collectNodes_iff]
     rw [← hplace, net.placeUnboundedFrom_iff_not_placeBoundedFrom, not_not])
 

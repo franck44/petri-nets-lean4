@@ -9,12 +9,14 @@ module
 public import PetriNets.CoveringGraph.Completeness
 public import PetriNets.CoveringGraph.Soundness
 public import PetriNets.MarkingGraph.Boundedness
-import PetriNets.KarpMiller.Finiteness
+import PetriNets.CoveringGraph.Finiteness
+import PetriNets.LTS.Konig
 
 /-!
 # Unbounded places in the covering LTS
 
-Provides a characterisation of place unboundedness by reachable ω-markings.
+Provides characterisations of individual and simultaneous place unboundedness
+by reachable ω-markings.
 -/
 
 @[expose] public section
@@ -24,64 +26,54 @@ namespace PetriNet.CoveringGraph
 variable {P T : Type*} [FinEnum P]
 variable {net : WeightedNet P T}
 
-/-- If a place is unbounded, some reachable covering node has ω there.
-Otherwise the finitely many Karp–Miller tree labels give a common bound
-at that place. Completeness and the correspondence between the tree and
-the covering LTS transfer the bound to every reachable concrete marking. -/
-theorem exists_omega_of_placeUnboundedFrom [Finite T]
-    {m₀ : Marking P} {p : P} (hunbounded : net.PlaceUnboundedFrom m₀ p) :
-    ∃ node, (coveringLTS net).CanReach (Node.initial m₀) node ∧
-      node.marking p = ⊤ := by
-  classical
-  by_contra hnone
-  let _ : Fintype T := Fintype.ofFinite T
-  let _ : FinEnum T := FinEnum.ofEquiv _ (Fintype.equivFin T)
-  let tree := KarpMiller.karpMillerDFS net (KarpMiller.Branch.initial m₀)
-  let TreeMarking := {m : OmegaMarking P // tree.HasNode m}
-  let _ : Finite TreeMarking := KarpMiller.KarpMillerTree.finite tree
-  obtain ⟨B, hB⟩ := Finite.bddAbove_range
-    (fun m : TreeMarking => (m.val p).toNat)
-  obtain ⟨m, hm, hlt⟩ := hunbounded B
-  obtain ⟨node, hnode, hcover⟩ := coveringLTS_covers_of_reachable net hm
-  have hlabel : tree.HasNode node.marking :=
-    (KarpMiller.karpMillerDFS_hasNode_iff_exists_coveringLTS_canReach
-      net m₀ node.marking).mpr ⟨node, hnode, rfl⟩
-  have hp : node.marking p ≠ ⊤ := fun h => hnone ⟨node, hnode, h⟩
-  apply (lt_irrefl B)
-  calc
-    B < m p := hlt
-    _ ≤ (node.marking p).toNat := by
-      apply ENat.natCast_le_natCast.mp
-      rw [ENat.natCast_toNat hp]
-      exact hcover p
-    _ ≤ B := hB ⟨⟨node.marking, hlabel⟩, rfl⟩
+private theorem finite_reachable_nodes [Finite T] (m₀ : Marking P) :
+    Finite {node : Node P // (coveringLTS net).CanReach (Node.initial m₀) node} := by
+  by_contra hinfinite
+  obtain ⟨_, _, hexec, _⟩ :=
+    Cslib.LTS.konig_weak (coveringLTS net) (Node.initial m₀) hinfinite
+  exact no_OmegaExecution hexec
 
-/-- An ω at a reachable covering node makes that place unbounded.
-For any bound `B`, soundness gives a reachable marking covering the
-concretisation with `B + 1` tokens at each ω-place, including `p`. -/
-theorem placeUnboundedFrom_of_exists_omega
-    {m₀ : Marking P} {p : P}
-    (homega : ∃ node, (coveringLTS net).CanReach (Node.initial m₀) node ∧
-      node.marking p = ⊤) :
-    net.PlaceUnboundedFrom m₀ p := by
-  /- get a bound to cover and a witness node from the ω-covering. -/
-  intro B
-  obtain ⟨node, hnode, hp⟩ := homega
-  /- get a reachable concretisation covering the ω-marking of the witness node with B + 1 tokens at p. -/
-  obtain ⟨witness, hreachable, hcover⟩ :=
-    (omegaCoverableFrom_of_coveringLTS_canReach hnode).coverable_concretise
-      (fun _ => B + 1)
-  have hpCover : B + 1 ≤ witness p := by
-    simpa [hp] using hcover p
-  exact ⟨witness, hreachable, (Nat.lt_succ_self B).trans_le hpCover⟩
+/-- A set of places is simultaneously unbounded exactly when one reachable
+covering-LTS node has ω at every place in the set. -/
+theorem simultaneouslyUnboundedFrom_iff_exists_omega [Finite T]
+    (m₀ : Marking P) (places : Set P) :
+    net.SimultaneouslyUnboundedFrom m₀ places ↔
+      ∃ node, (coveringLTS net).CanReach (Node.initial m₀) node ∧
+        ∀ p ∈ places, node.marking p = ⊤ := by
+  constructor
+  · intro hunbounded
+    classical
+    let ReachableNode :=
+      {node : Node P // (coveringLTS net).CanReach (Node.initial m₀) node}
+    let _ : Finite ReachableNode := finite_reachable_nodes (net := net) m₀
+    -- Bound every finite coordinate of every reachable covering node.
+    obtain ⟨B, hB⟩ := Finite.bddAbove_range
+      (fun np : ReachableNode × P => (np.1.val.marking np.2).toNat)
+    obtain ⟨m, hreach, hlarge⟩ := hunbounded B
+    obtain ⟨node, hnode, hcover⟩ := coveringLTS_covers_of_reachable net hreach
+    refine ⟨node, hnode, fun p hp => ?_⟩
+    by_contra hfinite
+    have hle : m p ≤ (node.marking p).toNat := by
+      apply ENat.natCast_le_natCast.mp
+      rw [ENat.natCast_toNat hfinite]
+      exact hcover p
+    exact (Nat.not_le_of_lt (hlarge p hp))
+      (hle.trans (hB ⟨(⟨node, hnode⟩, p), rfl⟩))
+  · rintro ⟨node, hnode, homega⟩ B
+    obtain ⟨m, hreach, hcover⟩ :=
+      (omegaCoverableFrom_of_coveringLTS_canReach hnode).coverable_concretise
+        (fun _ => B + 1)
+    refine ⟨m, hreach, fun p hp => (Nat.lt_succ_self B).trans_le ?_⟩
+    simpa [homega p hp] using hcover p
 
 /-- A place is unbounded exactly when some reachable covering node has ω
-at that place. -/
+at that place. This is simultaneous unboundedness for a singleton. -/
 theorem placeUnboundedFrom_iff_exists_omega [Finite T]
     (m₀ : Marking P) (p : P) :
     net.PlaceUnboundedFrom m₀ p ↔
       ∃ node, (coveringLTS net).CanReach (Node.initial m₀) node ∧
-        node.marking p = ⊤ :=
-  ⟨exists_omega_of_placeUnboundedFrom, placeUnboundedFrom_of_exists_omega⟩
+        node.marking p = ⊤ := by
+  simpa [WeightedNet.simultaneouslyUnboundedFrom_singleton] using
+    simultaneouslyUnboundedFrom_iff_exists_omega (net := net) m₀ ({p} : Set P)
 
 end PetriNet.CoveringGraph
