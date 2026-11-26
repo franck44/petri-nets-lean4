@@ -26,7 +26,7 @@ namespace KarpMiller
 variable {P T : Type*}
 
 /-- **Soundness of the Karp–Miller tree.** Every ω-marking stored in the tree
-generated from `m₀` is omega coverable from `m₀`.
+generated from `m₀` is ω-coverable from `m₀`.
 
 The marking equivalence supplies a reachable covering-LTS node carrying
 the stored marking, and covering-LTS soundness gives its coverability. -/
