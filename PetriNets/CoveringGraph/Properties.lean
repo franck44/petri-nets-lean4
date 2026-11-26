@@ -106,15 +106,7 @@ theorem ancestors_mono_of_omegaExecution
     (nodes i).ancestors ⊆ (nodes j).ancestors := by
   exact ancestors_mono_of_mTr (hexec.extract_mTr hij)
 
-/-- The source marking of a `coveringLTS` edge is the final ancestor of its
-target. -/
-theorem marking_eq_last_ancestor_of_tr {src tgt : Node P} {t : T}
-    (htr : (coveringLTS net).Tr src t tgt) :
-    tgt.ancestors.getLast? = some src.marking := by
-  rw [ancestors_eq_history_of_tr htr]
-  simp [Node.history]
-
-/-- In particular, the source marking of a `coveringLTS` edge belongs to the
+/-- The source marking of a `coveringLTS` edge belongs to the
 ancestor list of its target. -/
 theorem marking_mem_ancestors_of_tr {src tgt : Node P} {t : T}
     (htr : (coveringLTS net).Tr src t tgt) :
