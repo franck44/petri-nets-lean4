@@ -11,22 +11,24 @@ public import PetriNets.Coverability
 /-!
 # Covering-graph nodes
 
-Provides the history-carrying nodes of the (algorithm-independent) covering
-graph.
+Provides nodes for the algorithm-independent covering graph of a weighted
+P/T net.
 
-A node records an ω-marking and a sequence of ω-markings (ancestors) from the initial
-marking of the net that can be visited to reach it.
+A node stores its current ω-marking and a list of ancestor markings. For a
+reachable node, that list records the markings along its path from the root
+to its parent. The node's history consists of its ancestors followed by its
+current marking.
 
-The ancestors are used to prune the search space by identifying repeated occurrences of ω-markings along a branch.
+The covering graph uses this history to decide which places to accelerate.
+It stops expanding a node when its current marking already occurs among
+its ancestors.
 -/
 
 @[expose] public section
 
 namespace PetriNet.CoveringGraph
 
-/-- A node is an ω-marking together with a sequence of ancestor ω-markings.
-The ancestor list should record a witness sequence of ω-markings from the root to reach
-the current marking. -/
+/-- A covering node stores its current ω-marking and its ancestor list. -/
 structure Node (P : Type*) where
   /-- The ω-marking labelling the node. -/
   marking : OmegaMarking P
@@ -75,17 +77,6 @@ theorem append_ancestors (node : Node P) (m : OmegaMarking P) :
 occur in its ancestors. -/
 def IsFirstOccurrence (node : Node P) : Prop :=
   node.marking ∉ node.ancestors
-
-/-- If the ancestors contain no duplicate and the current marking is a first
-occurrence, then the complete history contains no duplicate. -/
-theorem history_nodup {node : Node P}
-    (hancestors : node.ancestors.Nodup) (hfirst : node.IsFirstOccurrence) :
-    node.history.Nodup := by
-  change node.marking ∉ node.ancestors at hfirst
-  simp [history, List.nodup_append, hancestors]
-  intro m hm heq
-  apply hfirst
-  exact heq ▸ hm
 
 end Node
 
