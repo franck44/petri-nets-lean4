@@ -13,8 +13,8 @@ public import PetriNets.CoveringGraph.Boundedness
 /-!
 # Place boundedness and simultaneous unboundedness
 
-Provides a tree characterisation of simultaneous unboundedness and an
-executable decision for boundedness at a single place.
+Provides executable decisions for place boundedness and simultaneous
+unboundedness using the markings in the Karp–Miller tree.
 -/
 
 public section
@@ -35,6 +35,19 @@ theorem WeightedNet.simultaneouslyUnboundedFrom_iff_exists_tree_marking
   rw [CoveringGraph.simultaneouslyUnboundedFrom_iff_exists_omega (net := net) m₀ places]
   simp only [karpMillerDFS_hasNode_iff_exists_coveringLTS_canReach]
   aesop
+
+/-- Decide whether the places in `places` can all accumulate arbitrarily
+many tokens together. Search for one tree marking with ω at every given place. -/
+def WeightedNet.decidableSimultaneouslyUnboundedFrom
+    (net : WeightedNet P T) (m₀ : Marking P) (places : Finset P) :
+    Decidable (net.SimultaneouslyUnboundedFrom m₀ (places : Set P)) :=
+  let tree := karpMillerDFS net (Branch.initial m₀)
+  decidable_of_iff
+    (tree.collectNodes.any (fun m => decide (∀ p ∈ places, m p = ⊤)) = true) (by
+      simp only [List.any_eq_true, decide_eq_true_eq,
+        KarpMillerTree.mem_collectNodes_iff]
+      exact (net.simultaneouslyUnboundedFrom_iff_exists_tree_marking
+        m₀ (places : Set P)).symm)
 
 /-- Decide boundedness at `p` by checking the list of Karp–Miller node markings
 for ω at that place. -/
