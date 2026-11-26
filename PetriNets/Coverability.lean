@@ -8,7 +8,7 @@ module
 
 public import PetriNets.Reachability
 public import Cslib.Foundations.Semantics.LTS.Basic
-import PetriNets.Monotonicity
+import PetriNets.Repetition
 
 /-!
 # Coverability

@@ -16,6 +16,7 @@ public import PetriNets.MarkingGraph
 public import PetriNets.MarkingGraph.Boundedness
 public import PetriNets.MarkingGraph.Properties
 public import PetriNets.Monotonicity
+public import PetriNets.Repetition
 public import PetriNets.PlaceInvariant
 public import PetriNets.PlaceInvariant.Algebra
 public import PetriNets.PlaceInvariant.Boundedness
