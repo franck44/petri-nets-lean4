@@ -219,8 +219,32 @@ private theorem omegaMTr_to_rawSuccessor
     ⟨htr.2.1, fun _ => rfl⟩
   exact Cslib.LTS.MTr.stepR net.omegaMarkingLTS hreplay hfire
 
-/-- Accelerating the newly introduced ω-places gives the covering target.
-Places already equal to ω in the raw successor retain that value. -/
+/-- A step `src ─t→ tgt` in the covering LTS first fires `t` from
+`src.marking` to obtain the raw firing result. It then uses the source
+history to select which places of that result to set to ω. The accelerated
+result is `tgt.marking`.
+
+Equivalently, start with the raw firing result and set each place in
+`newOmegaPlaces src tgt` to ω. Places that were already ω in the source
+are still ω after firing, and places that remain finite in the target
+keep their raw firing values.
+
+```text
+
+                   accelerate at A
+src.marking ─────────────────────────▶ accelerate A src.marking
+     │                                            │
+     │ ordinary ω-firing t                        │ ordinary ω-firing t
+     ▼                                            ▼
+rawSuccessor ─────────────────────────────────▶ tgt.marking
+                   accelerate at A
+
+A = newOmegaPlaces src tgt
+```
+
+For this fixed set `A`, setting its places to ω commutes with the firing:
+places in `A` stay at ω and all other places follow the same firing rule.
+The equality proved here identifies the lower route with `tgt.marking`. -/
 private theorem accelerate_newOmegaPlaces_eq_target
     {src tgt : Node P} {t : T} (htr : (coveringLTS net).Tr src t tgt) :
     OmegaMarking.accelerateFinset (newOmegaPlaces src tgt)
@@ -243,7 +267,23 @@ private theorem accelerate_newOmegaPlaces_eq_target
       rw [htr.2.2]
       simp [successor, OmegaMarking.accelerateFinset, ha]
 
-/-- Soundness of a covering edge that introduces new ω-places. -/
+/-- Preserve coverability across a covering edge that introduces new
+ω-places.
+
+First fire the final transition without acceleration. The raw successor
+is coverable because the source is coverable and ordinary ω-firing
+preserves coverability.
+
+For each newly accelerated place `p`, the covering history supplies a
+suffix from an earlier node whose marking is at most the raw successor
+and strictly smaller at `p`. Replay that suffix and the final firing as
+an ordinary ω-execution by setting the old ω-places to ω throughout.
+The place `p` is finite in the raw successor, so its strict growth is
+preserved by the replay.
+
+These replays supply the witnesses for
+`omegaCoverableFrom_accelerateFinset_of_growsAt`. Accelerating exactly
+the new ω-places of the raw successor gives the target marking. -/
 private theorem kCoverableFrom_of_coveringLTS_tr_of_newOmega
     {m₀ : Marking P} {pre : List T}
     {src tgt : Node P} {t : T}
