@@ -12,7 +12,7 @@ public import PetriNets.LTS.Basic
 /-!
 # Marking graphs as labelled transition systems
 
-Provides the labelled transition semantics of a weighted P/T net, both over
+Provides the labelled transition systems semantics of a weighted P/T net, both over
 all markings and over the markings reachable from a chosen initial marking.
 
 The semantics has markings as states, transitions of the weighted P/T net as
