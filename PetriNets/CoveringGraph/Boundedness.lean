@@ -76,4 +76,30 @@ theorem placeUnboundedFrom_iff_exists_omega [Finite T]
   simpa [WeightedNet.simultaneouslyUnboundedFrom_singleton] using
     simultaneouslyUnboundedFrom_iff_exists_omega (net := net) m₀ ({p} : Set P)
 
+/-- A net is bounded from `m₀` exactly when no reachable covering node
+has ω at any place. -/
+theorem boundedFrom_iff_no_omega [Finite T]
+    (m₀ : Marking P) :
+    net.BoundedFrom m₀ ↔
+      ¬ ∃ node, (coveringLTS net).CanReach (Node.initial m₀) node ∧
+        ∃ p, node.marking p = ⊤ := by
+  classical
+  rw [net.boundedFrom_iff_forall_placeBoundedFrom m₀]
+  have hplace (p : P) : net.PlaceBoundedFrom m₀ p ↔
+      ¬ ∃ node, (coveringLTS net).CanReach (Node.initial m₀) node ∧
+        node.marking p = ⊤ := by
+    rw [← placeUnboundedFrom_iff_exists_omega (net := net) m₀ p,
+      net.placeUnboundedFrom_iff_not_placeBoundedFrom, not_not]
+  simp_rw [hplace]
+  aesop
+
+/-- The reachable markings are finite exactly when no reachable covering
+node has ω at any place. -/
+theorem finite_reachable_iff_no_omega [Finite T]
+    (m₀ : Marking P) :
+    Finite {m : Marking P // net.Reachable m₀ m} ↔
+      ¬ ∃ node, (coveringLTS net).CanReach (Node.initial m₀) node ∧
+        ∃ p, node.marking p = ⊤ :=
+  (net.finite_reachable_iff_boundedFrom m₀).trans (boundedFrom_iff_no_omega m₀)
+
 end PetriNet.CoveringGraph

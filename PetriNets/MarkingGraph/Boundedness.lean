@@ -121,4 +121,24 @@ theorem WeightedNet.boundedFrom_iff_finite_markingGraph
   ⟨WeightedNet.finite_markingGraph_of_boundedFrom,
     WeightedNet.boundedFrom_of_finite_markingGraph⟩
 
+/-- For finitely many places, individual place bounds give a common bound. -/
+theorem WeightedNet.boundedFrom_iff_forall_placeBoundedFrom
+    {P T : Type*} [Finite P] (net : WeightedNet P T) (m₀ : Marking P) :
+    net.BoundedFrom m₀ ↔ ∀ p, net.PlaceBoundedFrom m₀ p := by
+  constructor
+  · rintro ⟨B, hB⟩ p
+    exact ⟨B, fun m hm => hB m hm p⟩
+  · intro h
+    choose bound hbound using h
+    obtain ⟨B, hB⟩ := Finite.bddAbove_range bound
+    exact ⟨B, fun m hm p => (hbound p m hm).trans (hB ⟨p, rfl⟩)⟩
+
+/-- For a finite place type, finitely many markings are reachable from `m₀`
+exactly when the net is bounded from `m₀`. -/
+theorem WeightedNet.finite_reachable_iff_boundedFrom
+    {P T : Type*} [Fintype P] (net : WeightedNet P T) (m₀ : Marking P) :
+    Finite {m : Marking P // net.Reachable m₀ m} ↔ net.BoundedFrom m₀ := by
+  simpa only [net.markingLTS_canReach_iff] using
+    (net.boundedFrom_iff_finite_markingGraph m₀).symm
+
 end PetriNet

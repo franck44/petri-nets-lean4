@@ -38,6 +38,9 @@ executable decision procedures (Lean `Decidable`) from an initial marking:
   arbitrarily many tokens together exactly when a single Karp–Miller tree
   marking has ω at every place in the set.
   [`WeightedNet.decidableSimultaneouslyUnboundedFrom`](PetriNets/KarpMiller/Boundedness.lean)
+- **Finiteness of reachable markings.** Finitely many markings are reachable
+  exactly when no Karp–Miller tree marking contains ω.
+  [`WeightedNet.decidableFiniteReachable`](PetriNets/KarpMiller/Boundedness.lean)
 
 ### Other formalised results
 

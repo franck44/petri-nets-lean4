@@ -13,8 +13,9 @@ public import PetriNets.CoveringGraph.Boundedness
 /-!
 # Place boundedness and simultaneous unboundedness
 
-Provides executable decisions for place boundedness and simultaneous
-unboundedness using the markings in the Karp–Miller tree.
+Provides executable decisions for place boundedness, simultaneous
+unboundedness, and finiteness of the reachable markings using the
+Karp–Miller tree.
 -/
 
 public section
@@ -54,14 +55,23 @@ for ω at that place. -/
 def WeightedNet.decidablePlaceBoundedFrom
     (net : WeightedNet P T) (m₀ : Marking P) (p : P) :
     Decidable (net.PlaceBoundedFrom m₀ p) :=
-  let tree := KarpMiller.karpMillerDFS net (KarpMiller.Branch.initial m₀)
-  decidable_of_iff (¬ tree.collectNodes.any (fun m => decide (m p = ⊤)) = true) (by
+  letI := net.decidableSimultaneouslyUnboundedFrom m₀ ({p} : Finset P)
+  decidable_of_iff (¬ net.SimultaneouslyUnboundedFrom m₀ (({p} : Finset P) : Set P)) (by
     classical
-    have hplace : net.PlaceUnboundedFrom m₀ p ↔
-        ∃ m, tree.HasNode m ∧ m p = ⊤ := by
-      simpa [tree, WeightedNet.simultaneouslyUnboundedFrom_singleton] using
-        net.simultaneouslyUnboundedFrom_iff_exists_tree_marking m₀ ({p} : Set P)
-    simp only [List.any_eq_true, decide_eq_true_eq, KarpMiller.KarpMillerTree.mem_collectNodes_iff]
-    rw [← hplace, net.placeUnboundedFrom_iff_not_placeBoundedFrom, not_not])
+    simp only [Finset.coe_singleton, WeightedNet.simultaneouslyUnboundedFrom_singleton,
+      net.placeUnboundedFrom_iff_not_placeBoundedFrom, not_not])
+
+/-- Decide whether finitely many markings are reachable from `m₀` by
+searching the Karp–Miller tree for a marking that contains ω. -/
+def WeightedNet.decidableFiniteReachable
+    (net : WeightedNet P T) (m₀ : Marking P) :
+    Decidable (Finite {m : Marking P // net.Reachable m₀ m}) :=
+  let tree := karpMillerDFS net (Branch.initial m₀)
+  decidable_of_iff
+    (¬ tree.collectNodes.any (fun m => decide (∃ p, m p = ⊤)) = true) (by
+      simp only [List.any_eq_true, decide_eq_true_eq, KarpMillerTree.mem_collectNodes_iff]
+      rw [CoveringGraph.finite_reachable_iff_no_omega (net := net) m₀]
+      simp only [tree, karpMillerDFS_hasNode_iff_exists_coveringLTS_canReach]
+      aesop)
 
 end PetriNet
