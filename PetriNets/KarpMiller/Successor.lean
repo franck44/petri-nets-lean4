@@ -11,18 +11,16 @@ public import PetriNets.KarpMiller.Branch
 /-!
 # Karp–Miller successors
 
-The Karp–Miller algorithm expands a branch by choosing a transition enabled
-at its current marking. Firing the transition produces a successor
-marking. This marking is accelerated with respect to the history of the
-branch, and the accelerated marking is appended to form the successor branch.
-A branch that is not a first occurrence is not expanded.
+Provides executable successor computations for Karp–Miller branches.
 
-This idea is represented by the following definitions:
+* `succMarking` applies the firing arithmetic for one transition.
+* `succBranch` accelerates the resulting marking using the branch history
+  and appends it to the branch.
+* `succMarkings` enumerates the enabled transitions and their unaccelerated
+  successor markings.
 
-* `succMarking` computes the successor marking;
-* `succBranch` accelerates that marking and appends it to the branch;
-* `succMarkings` computes the successors for all enabled transitions; and
-* `succBranch` accelerates one of these markings and extends a branch.
+The branch expansion rule uses these computations to extend first-occurrence
+branches.
 -/
 
 @[expose] public section
