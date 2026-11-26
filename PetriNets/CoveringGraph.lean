@@ -9,6 +9,7 @@ module
 public import PetriNets.CoveringGraph.Finiteness
 public import PetriNets.CoveringGraph.Completeness
 public import PetriNets.CoveringGraph.Soundness
+public import PetriNets.CoveringGraph.Boundedness
 
 /-!
 # Covering graphs

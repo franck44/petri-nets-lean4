@@ -10,6 +10,7 @@ public import PetriNets.Coverability
 public import PetriNets.CoveringGraph
 public import PetriNets.Incidence
 public import PetriNets.KarpMiller
+public import PetriNets.KarpMiller.Boundedness
 public import PetriNets.KarpMiller.Completeness
 public import PetriNets.KarpMiller.Soundness
 public import PetriNets.MarkingGraph
