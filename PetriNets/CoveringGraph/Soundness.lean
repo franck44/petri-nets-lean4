@@ -149,39 +149,55 @@ private theorem growth_segments_of_newOmegaPlaces
       exact ⟨ancestor, segment, hsegment, hgrows⟩
   · exact ⟨src, [], Cslib.LTS.MTr.refl, hgrows⟩
 
-/-- A covering suffix replays as an ordinary ω-execution when every
-ω-place of its endpoint is set to ω throughout the replay. -/
+/-- Replay a covering edge as an ordinary ω-firing after setting the places
+in `A` to ω at both ends. The set `A` contains every ω-place of the target. -/
+private theorem omegaTr_of_coveringTr
+    {src tgt : Node P} {t : T} {A : Set P}
+    (htr : (coveringLTS net).Tr src t tgt)
+    (hA : ∀ p, tgt.marking p = ⊤ → p ∈ A) :
+    net.omegaMarkingLTS.Tr (OmegaMarking.accelerate A src.marking) t
+      (OmegaMarking.accelerate A tgt.marking) := by
+  classical
+  constructor
+  · intro p
+    by_cases hp : p ∈ A
+    · simp [OmegaMarking.accelerate, hp]
+    · simpa [OmegaMarking.accelerate, hp] using htr.2.1 p
+  · intro p
+    by_cases hp : p ∈ A
+    · simp [OmegaMarking.accelerate, hp]
+    · have hfinite := fun heq => hp (hA p heq)
+      have hacc : p ∉ Node.acceleratedPlaces
+          (rawSuccessor net src.marking t) src := by
+        intro ha
+        apply hfinite
+        rw [htr.2.2]
+        exact successor_eq_top_of_mem_acceleratedPlaces _ _ ha
+      rw [htr.2.2]
+      simp [successor, OmegaMarking.accelerateFinset, OmegaMarking.accelerate,
+        hp, hacc, rawSuccessor]
+
+/-- Replay a covering-LTS execution as an ordinary ω-execution with the
+same transition labels. Choose a set `A` containing every ω-place of the
+target marking, and set all places in `A` to ω throughout the replay.
+
+At a place in `A`, the ω value meets every transition's input demand and
+stays ω after firing. Outside `A`, the place is finite at the target and
+therefore stayed finite throughout the covering execution, because ω-places
+persist. No covering step accelerated that place, so its values already
+follow the ordinary firing rule. -/
 private theorem omegaMTr_of_coveringMTr
     {src tgt : Node P} {ts : List T} {A : Set P}
     (hexec : (coveringLTS net).MTr src ts tgt)
     (hA : ∀ p, tgt.marking p = ⊤ → p ∈ A) :
     net.omegaMarkingLTS.MTr (OmegaMarking.accelerate A src.marking) ts
       (OmegaMarking.accelerate A tgt.marking) := by
-  classical
   induction hexec with
   | refl => exact Cslib.LTS.MTr.refl
   | @stepL src t mid ts tgt htr htail ih =>
       have hmid p (hp : mid.marking p = ⊤) := hA p (OmegaMarking.mem_omegaPlaces.mp
         (omegaPlaces_mono_of_mTr htail (OmegaMarking.mem_omegaPlaces.mpr hp)))
-      apply Cslib.LTS.MTr.stepL _ (ih hA)
-      constructor
-      · intro p
-        by_cases hp : p ∈ A
-        · simp [OmegaMarking.accelerate, hp]
-        · simpa [OmegaMarking.accelerate, hp] using htr.2.1 p
-      · intro p
-        by_cases hp : p ∈ A
-        · simp [OmegaMarking.accelerate, hp]
-        · have hfinite := fun heq => hp (hmid p heq)
-          have hacc : p ∉ Node.acceleratedPlaces
-              (rawSuccessor net src.marking t) src := by
-            intro ha
-            apply hfinite
-            rw [htr.2.2]
-            exact successor_eq_top_of_mem_acceleratedPlaces _ _ ha
-          rw [htr.2.2]
-          simp [successor, OmegaMarking.accelerateFinset, OmegaMarking.accelerate,
-            hp, hacc, rawSuccessor]
+      exact Cslib.LTS.MTr.stepL (omegaTr_of_coveringTr htr hmid) (ih hA)
 
 /-- Replay a covering suffix followed by the final raw firing. The replay
 starts with the source's existing ω-places set to ω. -/
