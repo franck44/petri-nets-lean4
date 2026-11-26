@@ -12,12 +12,17 @@ public import PetriNets.OmegaMarking.Sequence
 /-!
 # Finiteness of covering-LTS branches
 
-Provides the progress argument showing that `coveringLTS` has no infinite
-execution. The main intermediate result states that strict growth between
-two nodes on an execution strictly increases their set of `ω`-places.
-Since there are only finitely many places, Dickson's lemma eventually finds
-two positions carrying the same marking; the later node is then not a first
-occurrence and is terminal.
+Provides a proof that the covering LTS has no infinite execution.
+
+In a hypothetical infinite execution, the set of `ω`-places can only grow.
+Since the net has finitely many places, this set eventually stabilises.
+Dickson's lemma then gives an earlier marking that is pointwise at most
+a later marking in the stable suffix.
+
+If the inequality were strict, the acceleration rule would force a new
+`ω`-place. The two markings are therefore equal. The later node repeats
+an ancestor marking and is terminal, contradicting the next step of the
+infinite execution.
 
 ## References
 
@@ -69,18 +74,6 @@ private theorem not_lt_of_omegaPlaces_eq_mTr
     rw [htr.2.2] at homega homegaPred hgrows
     exact not_growsAt_successor_of_mem_history_of_omegaPlaces_eq
       (marking_mem_history_of_mTr hprefix) homega homegaPred hgrows
-
-/-- Strict growth between the markings of two nodes related by a
-`coveringLTS` execution strictly increases the set of `ω`-places. -/
-theorem omegaPlaces_ssubset_of_lt_mTr
-    {src tgt : Node P} {labels : List T}
-    (hexec : (coveringLTS net).MTr src labels tgt)
-    (hlt : src.marking < tgt.marking) :
-    OmegaMarking.omegaPlaces src.marking ⊂
-      OmegaMarking.omegaPlaces tgt.marking := by
-  rw [Finset.ssubset_iff_subset_ne]
-  exact ⟨omegaPlaces_mono_of_mTr hexec,
-    fun homega => not_lt_of_omegaPlaces_eq_mTr hexec homega hlt⟩
 
 /-! ## Absence of infinite executions -/
 
