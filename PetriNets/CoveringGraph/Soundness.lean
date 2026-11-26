@@ -30,59 +30,7 @@ namespace PetriNet.CoveringGraph
 variable {P T : Type*} [FinEnum P]
 variable {net : WeightedNet P T}
 
-/-- The initial marking is `K`-coverable from itself for every `K`. -/
-private theorem kCoverableFrom_initial (net : WeightedNet P T)
-    (m₀ : Marking P) :
-    ∀ K, net.KCoverableFrom m₀ m₀ K := by
-  apply net.omegaCoverableFrom_iff_forall_kCoverableFrom.mp
-  exact net.omegaCoverableFrom_initial m₀
-
 /-! ## Preservation along covering-LTS executions -/
-
-/-- `K`-coverability is preserved by a covering-LTS edge which
-introduces no new `ω`-place.
-
-Because no place is accelerated to `ω`, the target marking is exactly the
-ordinary `ω`-firing result:
-
-```text
-src.marking ──t──▶ tgt.marking = rawSuccessor net src.marking t
-```
-
-To prove target `K`-coverability, first concretise the target with `K` tokens
-at every `ω`-place. Propagate this finite target backwards through `t` using
-`weakestPreMarking`. Since the abstract source fires to the abstract target,
-this finite predecessor lies below `src.marking`:
-
-```text
-             src.marking ──t──▶ tgt.marking
-                  ▲                  ▲
-                  │ ≤                │ ≤
-weakestPreMarking t target ──t──▶ a marking covering target
-```
-
-The induction hypothesis says that the source is `K`-coverable for every
-`K`, hence every finite marking below `src.marking` is coverable. It therefore
-covers the weakest predecessor. -/
-private theorem kCoverableFrom_of_coveringLTS_tr_of_no_newOmega
-    {m₀ : Marking P} {src tgt : Node P} {t : T}
-    (hsrc : ∀ K, net.KCoverableFrom m₀ src.marking K)
-    (htr : (coveringLTS net).Tr src t tgt)
-    (homega : OmegaMarking.omegaPlaces src.marking =
-      OmegaMarking.omegaPlaces tgt.marking) :
-    ∀ K, net.KCoverableFrom m₀ tgt.marking K := by
-  have htgt := marking_eq_rawSuccessor_of_tr_of_omegaPlaces_eq htr homega
-  intro K
-  let target := tgt.marking.concretise fun _ => K
-  let pre := net.weakestPreMarking t target
-  have homegaFires : net.OmegaFires src.marking t tgt.marking := by
-    rw [htgt]
-    exact ⟨htr.2.1, fun _ => rfl⟩
-  have hpre : pre ≤ src.marking :=
-    net.weakestPreMarking_le_of_omegaFires homegaFires
-      (tgt.marking.concretise_toOmega_le fun _ => K)
-  apply net.coverableFrom_of_weakestPreMarking
-  exact (net.omegaCoverableFrom_iff_forall_kCoverableFrom.mpr hsrc) pre hpre
 
 /-- The places which become `ω` across one covering-LTS edge. -/
 private noncomputable def newOmegaPlaces
@@ -267,8 +215,8 @@ private theorem accelerate_newOmegaPlaces_eq_target
       rw [htr.2.2]
       simp [successor, OmegaMarking.accelerateFinset, ha]
 
-/-- Preserve coverability across a covering edge that introduces new
-ω-places.
+/-- Preserve ω-coverability across a covering edge.
+The prefix reaching the source supplies the history needed for acceleration.
 
 First fire the final transition without acceleration. The raw successor
 is coverable because the source is coverable and ordinary ω-firing
@@ -283,20 +231,19 @@ preserved by the replay.
 
 These replays supply the witnesses for
 `omegaCoverableFrom_accelerateFinset_of_growsAt`. Accelerating exactly
-the new ω-places of the raw successor gives the target marking. -/
-private theorem kCoverableFrom_of_coveringLTS_tr_of_newOmega
+the new ω-places of the raw successor gives the target marking. When no
+new ω-places appear, the acceleration set is empty. -/
+private theorem omegaCoverableFrom_of_coveringLTS_tr
     {m₀ : Marking P} {pre : List T}
     {src tgt : Node P} {t : T}
     (hprefix :
       (coveringLTS net).MTr (Node.initial m₀) pre src)
-    (hsrc : ∀ K, net.KCoverableFrom m₀ src.marking K)
+    (hsrc : net.OmegaCoverableFrom m₀ src.marking)
     (htr : (coveringLTS net).Tr src t tgt) :
-    ∀ K, net.KCoverableFrom m₀ tgt.marking K := by
+    net.OmegaCoverableFrom m₀ tgt.marking := by
   let raw := rawSuccessor net src.marking t
   have hfire : net.OmegaFires src.marking t raw := ⟨htr.2.1, fun _ => rfl⟩
-  have hraw := net.omegaCoverableFrom_of_omegaFires
-    (net.omegaCoverableFrom_iff_forall_kCoverableFrom.mpr hsrc) hfire
-  apply net.omegaCoverableFrom_iff_forall_kCoverableFrom.mp
+  have hraw := net.omegaCoverableFrom_of_omegaFires hsrc hfire
   rw [← accelerate_newOmegaPlaces_eq_target htr]
   apply net.omegaCoverableFrom_accelerateFinset_of_growsAt _ hraw
   intro p hp
@@ -311,53 +258,24 @@ private theorem kCoverableFrom_of_coveringLTS_tr_of_newOmega
     · simpa [OmegaMarking.accelerate, hq] using hgrowth.1 q
   · simpa [OmegaMarking.accelerate, hpFinite] using hgrowth.2
 
-/-- `K`-coverability for every `K` is preserved by one covering-LTS transition reached from the
-initial node.
-
-```text
-Node.initial m₀ ──prefix──▶ src ──t──▶ tgt
-                                  │          │
-                    every K coverable ⇒ every K coverable
-```
-
-The prefix is required because acceleration at the final edge is justified
-by markings occurring earlier on that path. The proof distinguishes whether
-the edge introduces a new `ω`-place. If it does not, the target is the raw
-`ω`-firing result and soundness follows directly from preservation of
-`ω`-coverability by an `ω`-firing. -/
-private theorem kCoverableFrom_of_coveringLTS_tr
-    {m₀ : Marking P} {pre : List T}
-    {src tgt : Node P} {t : T}
-    (hprefix :
-      (coveringLTS net).MTr (Node.initial m₀) pre src)
-    (hsrc : ∀ K, net.KCoverableFrom m₀ src.marking K)
-    (htr : (coveringLTS net).Tr src t tgt) :
-    ∀ K, net.KCoverableFrom m₀ tgt.marking K := by
-  by_cases homega : OmegaMarking.omegaPlaces src.marking =
-      OmegaMarking.omegaPlaces tgt.marking
-  · exact kCoverableFrom_of_coveringLTS_tr_of_no_newOmega
-      hsrc htr homega
-  · exact kCoverableFrom_of_coveringLTS_tr_of_newOmega
-      hprefix hsrc htr
-
 /-- Extend soundness from a reachable source node along a finite covering-LTS
 execution.
 
 The proof applies `omegaCoverableFrom_of_coveringLTS_tr` to the first edge,
 extends the known prefix by that edge, and continues inductively along the
 remaining execution. -/
-private theorem kCoverableFrom_of_mTr_from
+private theorem omegaCoverableFrom_of_mTr_from
     {m₀ : Marking P} {pre labels : List T}
     {src tgt : Node P}
     (hprefix :
       (coveringLTS net).MTr (Node.initial m₀) pre src)
-    (hsrc : ∀ K, net.KCoverableFrom m₀ src.marking K)
+    (hsrc : net.OmegaCoverableFrom m₀ src.marking)
     (hexec : (coveringLTS net).MTr src labels tgt) :
-    ∀ K, net.KCoverableFrom m₀ tgt.marking K := by
+    net.OmegaCoverableFrom m₀ tgt.marking := by
   induction hexec generalizing pre with
   | refl => exact hsrc
   | @stepL src t mid labels tgt htr htail ih =>
-      have hmid := kCoverableFrom_of_coveringLTS_tr
+      have hmid := omegaCoverableFrom_of_coveringLTS_tr
         hprefix hsrc htr
       exact ih (Cslib.LTS.MTr.stepR (coveringLTS net) hprefix htr)
         hmid
@@ -385,9 +303,7 @@ theorem omegaCoverableFrom_of_coveringLTS_canReach
     (hreach : (coveringLTS net).CanReach (Node.initial m₀) node) :
     net.OmegaCoverableFrom m₀ node.marking := by
   obtain ⟨labels, hexec⟩ := hreach
-  apply net.omegaCoverableFrom_iff_forall_kCoverableFrom.mpr
-  exact kCoverableFrom_of_mTr_from
-    Cslib.LTS.MTr.refl
-    (kCoverableFrom_initial net m₀) hexec
+  exact omegaCoverableFrom_of_mTr_from
+    Cslib.LTS.MTr.refl (net.omegaCoverableFrom_initial m₀) hexec
 
 end PetriNet.CoveringGraph
