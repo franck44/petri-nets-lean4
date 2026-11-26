@@ -37,14 +37,18 @@ section FinitePlaces
 
 variable [FinEnum P] [FinEnum T]
 
-/-- One recursive call follows an edge in the executable successor list.
-The child comes first in the well-founded relation. -/
+/-- `DfsCall net next current` means that `next` occurs in
+`successors net current` under some transition label. The child comes
+first because it is the smaller argument in the recursive-call relation. -/
 def DfsCall (net : WeightedNet P T)
     (next current : Branch P) : Prop :=
   ∃ t, (t, next) ∈ successors net current
 
-/-- An infinite chain of recursive calls would give an infinite covering-LTS
-execution. -/
+/-- The recursive-call relation of the Karp–Miller DFS is well-founded.
+
+An infinite chain of calls would supply one transition label per call.
+The successor correspondence turns these labelled calls into an infinite
+covering-LTS execution, which `CoveringGraph.no_OmegaExecution` rules out. -/
 theorem dfsCall_wellFounded : WellFounded (DfsCall net) := by
   rw [wellFounded_iff_isEmpty_descending_chain]
   constructor
