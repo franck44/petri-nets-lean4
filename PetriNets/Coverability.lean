@@ -34,6 +34,8 @@ Its coverability means that every finite marking below it is coverable.
 
 namespace PetriNet
 
+variable {P T : Type*} {net : WeightedNet P T}
+
 /-! ## ω-markings and concretisations -/
 
 /-- An ω-marking assigns either a natural-number token count or `ω` to each
@@ -50,7 +52,7 @@ abbrev OmegaMarking (P : Type*) := P → ℕ∞
 namespace OmegaMarking
 
 /-- Two distinct comparable ω-markings differ strictly at some place. -/
-theorem exists_place_lt_of_le_of_ne {P : Type*} {m m' : OmegaMarking P}
+theorem exists_place_lt_of_le_of_ne {m m' : OmegaMarking P}
     (hle : m ≤ m') (hne : m ≠ m') :
     ∃ p, m p < m' p := by
   by_contra h
@@ -64,11 +66,11 @@ end OmegaMarking
 /-- Lift a concrete marking into an ω-markings. Every finite token count
 is mapped to the corresponding value in `ℕ∞`; no place is mapped to
 `ω`. -/
-def Marking.toOmega {P : Type*} (m : Marking P) : OmegaMarking P :=
+def Marking.toOmega (m : Marking P) : OmegaMarking P :=
   fun p => m p
 
 @[simp]
-theorem Marking.toOmega_apply {P : Type*} (m : Marking P) (p : P) :
+theorem Marking.toOmega_apply (m : Marking P) (p : P) :
     m.toOmega p = m p :=
   rfl
 
@@ -78,7 +80,7 @@ inserts `Marking.toOmega` whenever an `OmegaMarking` is expected in a
 comparison. As a result, we can write, for example, `m ≤ mω`, with `m` a
 concrete marking and `mω` an ω-marking, and Lean interprets it as
 `m.toOmega ≤ mω`. -/
-instance {P : Type*} : Coe (Marking P) (OmegaMarking P) where
+instance : Coe (Marking P) (OmegaMarking P) where
   coe := Marking.toOmega
 
 /-- Concretise an ω-marking by replacing every `ω` component with a prescribed
@@ -88,12 +90,12 @@ reserve, while retaining the exact value of every finite component.
 concretise (3, ω, 5, ω) (r₀, r₁, r₂, r₃) = (3, r₁, 5, r₃)
 ```
 -/
-def OmegaMarking.concretise {P : Type*}
+def OmegaMarking.concretise
     (m : OmegaMarking P) (reserve : Marking P) : Marking P :=
   fun p => if m p = ⊤ then reserve p else (m p).toNat
 
 /-- A concretisation is below its ω-marking. -/
-theorem OmegaMarking.concretise_toOmega_le {P : Type*}
+theorem OmegaMarking.concretise_toOmega_le
     (m : OmegaMarking P) (reserve : Marking P) :
     m.concretise reserve ≤ m := by
   intro p
@@ -105,14 +107,14 @@ theorem OmegaMarking.concretise_toOmega_le {P : Type*}
 
 /-- At an `ω` component, `concretise` uses the supplied reserve. -/
 @[simp]
-theorem OmegaMarking.concretise_apply_of_eq_top {P : Type*}
+theorem OmegaMarking.concretise_apply_of_eq_top
     {m : OmegaMarking P} {reserve : Marking P} {p : P}
     (hp : m p = ⊤) :
     m.concretise reserve p = reserve p := by
   simp [OmegaMarking.concretise, hp]
 
 /-- At a finite component, `concretise` retains its exact natural value. -/
-theorem OmegaMarking.concretise_apply_of_ne_top {P : Type*}
+theorem OmegaMarking.concretise_apply_of_ne_top
     {m : OmegaMarking P} {reserve : Marking P} {p : P}
     (hp : m p ≠ ⊤) :
     (m.concretise reserve p : ℕ∞) = m p := by
@@ -125,14 +127,14 @@ theorem OmegaMarking.concretise_apply_of_ne_top {P : Type*}
 least its finite pre-incidence weight. A place labelled `ω` satisfies every
 finite pre-incidence requirement, so it never prevents a transition from
 being enabled. -/
-def WeightedNet.OmegaEnabled {P T : Type*} (net : WeightedNet P T)
+def WeightedNet.OmegaEnabled (net : WeightedNet P T)
     (m : OmegaMarking P) (t : T) : Prop :=
   ∀ p, (net.pre p t : ℕ∞) ≤ m p
 
 /-- Increasing an ω-marking preserves transition enabledness.
 If `t` is enabled at `m` and `m ≤ m'`, then `t` is also enabled at `m'`. -/
-theorem WeightedNet.OmegaEnabled.mono {P T : Type*}
-    {net : WeightedNet P T} {m m' : OmegaMarking P} {t : T}
+theorem WeightedNet.OmegaEnabled.mono
+    {m m' : OmegaMarking P} {t : T}
     (h : net.OmegaEnabled m t) (hleq : m ≤ m') :
     net.OmegaEnabled m' t := by
   intro p
@@ -142,33 +144,22 @@ theorem WeightedNet.OmegaEnabled.mono {P T : Type*}
 
 As for `firingResult`, this function is defined whether or not `t` is
 enabled; `OmegaFires` additionally requires enabledness. -/
-def WeightedNet.omegaFiringResult {P T : Type*} (net : WeightedNet P T)
+def WeightedNet.omegaFiringResult (net : WeightedNet P T)
     (m : OmegaMarking P) (t : T) : OmegaMarking P :=
   fun p => m p - net.pre p t + net.post p t
-
-/-- Apply a transition sequence successively to an ω-marking.
-
-This is the deterministic ω-marking analogue of `firingSequenceResult`. It
-computes a marking for every list; an `omegaMarkingLTS.MTr` proof separately
-establishes that every transition was enabled. -/
-def WeightedNet.omegaFiringSequenceResult {P T : Type*}
-    (net : WeightedNet P T) : OmegaMarking P → List T → OmegaMarking P
-  | m, [] => m
-  | m, t :: ts =>
-      net.omegaFiringSequenceResult (net.omegaFiringResult m t) ts
 
 /-- `net.OmegaFires m t m'` means that `t` is enabled at the ω-marking `m`
 and firing it produces `m'`. Subtraction and addition are those of `ℕ∞`, so a
 component equal to `ω` remains equal to `ω`. -/
-def WeightedNet.OmegaFires {P T : Type*} (net : WeightedNet P T)
+def WeightedNet.OmegaFires (net : WeightedNet P T)
     (m : OmegaMarking P) (t : T) (m' : OmegaMarking P) : Prop :=
   net.OmegaEnabled m t ∧
     ∀ p,
       m' p = m p - net.pre p t + net.post p t
 
 /-- Adding the same ω-marking to the source and target preserves a firing. -/
-theorem WeightedNet.OmegaFires.add {P T : Type*}
-    {net : WeightedNet P T} {src tgt : OmegaMarking P} {t : T}
+theorem WeightedNet.OmegaFires.add
+    {src tgt : OmegaMarking P} {t : T}
     (hfires : net.OmegaFires src t tgt) (d : OmegaMarking P) :
     net.OmegaFires (src + d) t (tgt + d) := by
   constructor
@@ -183,44 +174,9 @@ theorem WeightedNet.OmegaFires.add {P T : Type*}
         (ENat.natCast_ne_top (net.pre p t))).tsub_add_eq_add_tsub
           (hfires.1 p))
 
-/-- The weakest ω-marking from which firing `t` can cover `target`.
-
-It is the ω-marking analogue of `weakestPreMarking`: at every place it
-contains the finite pre-incidence weight, together with the part of the target
-demand not supplied by the post-incidence weight. -/
-def WeightedNet.weakestPreOmegaMarking {P T : Type*}
-    (net : WeightedNet P T) (t : T) (target : OmegaMarking P) :
-    OmegaMarking P := fun p =>
-  net.pre p t + (target p - net.post p t)
-
-/-- Propagate an ω-marking target backwards through a transition sequence.
-The transitions are processed from right to left, as for
-`weakestPreMarkingSequence`. -/
-def WeightedNet.weakestPreOmegaMarkingSequence {P T : Type*}
-    (net : WeightedNet P T) : List T → OmegaMarking P → OmegaMarking P
-  | [], target => target
-  | t :: ts, target =>
-      net.weakestPreOmegaMarking t
-        (net.weakestPreOmegaMarkingSequence ts target)
-
-/-- Weakest ω-predecessors distribute over concatenation: first propagate
-the target through the suffix, then through the prefix. -/
-theorem WeightedNet.weakestPreOmegaMarkingSequence_append {P T : Type*}
-    (net : WeightedNet P T) (ts₁ ts₂ : List T)
-    (target : OmegaMarking P) :
-    net.weakestPreOmegaMarkingSequence (ts₁ ++ ts₂) target =
-      net.weakestPreOmegaMarkingSequence ts₁
-        (net.weakestPreOmegaMarkingSequence ts₂ target) := by
-  induction ts₁ with
-  | nil => rfl
-  | cons t ts ih =>
-      simp only [List.cons_append,
-        WeightedNet.weakestPreOmegaMarkingSequence]
-      rw [ih]
-
 /-- Firing preserves every component already equal to `ω`. -/
-theorem WeightedNet.OmegaFires.preserves_top {P T : Type*}
-    {net : WeightedNet P T} {src tgt : OmegaMarking P} {t : T}
+theorem WeightedNet.OmegaFires.preserves_top
+    {src tgt : OmegaMarking P} {t : T}
     (hfires : net.OmegaFires src t tgt) {p : P} (hp : src p = ⊤) :
     tgt p = ⊤ := by
   rw [hfires.2 p, hp]
@@ -230,8 +186,8 @@ theorem WeightedNet.OmegaFires.preserves_top {P T : Type*}
 Then `t` also fires from `src₂` to some `tgt₂`, and `tgt₁ ≤ tgt₂`. Thus,
 starting with at least as many tokens at every place preserves the pointwise
 order after firing the same transition. -/
-theorem WeightedNet.OmegaFires.mono {P T : Type*}
-    {net : WeightedNet P T} {src₁ src₂ tgt₁ : OmegaMarking P} {t : T}
+theorem WeightedNet.OmegaFires.mono
+    {src₁ src₂ tgt₁ : OmegaMarking P} {t : T}
     (h₁ : net.OmegaFires src₁ t tgt₁)
     (hleq : src₁ ≤ src₂) :
     ∃ tgt₂, net.OmegaFires src₂ t tgt₂ ∧ tgt₁ ≤ tgt₂ := by
@@ -246,7 +202,7 @@ theorem WeightedNet.OmegaFires.mono {P T : Type*}
 
 /-- A transition is enabled at an ω-marking exactly when it can fire to some
 ω-marking. -/
-theorem WeightedNet.omegaEnabled_iff_exists_omegaFires {P T : Type*}
+theorem WeightedNet.omegaEnabled_iff_exists_omegaFires
     (net : WeightedNet P T) (m : OmegaMarking P) (t : T) :
     net.OmegaEnabled m t ↔ ∃ m', net.OmegaFires m t m' := by
   constructor
@@ -257,16 +213,151 @@ theorem WeightedNet.omegaEnabled_iff_exists_omegaFires {P T : Type*}
     exact hfires.1
 
 /-- Firing a transition from an ω-marking has a unique result. -/
-theorem WeightedNet.omegaFires_is_deterministic {P T : Type*}
-    {net : WeightedNet P T} {m m₁ m₂ : OmegaMarking P} {t : T}
+theorem WeightedNet.omegaFires_is_deterministic
+    {m m₁ m₂ : OmegaMarking P} {t : T}
     (h₁ : net.OmegaFires m t m₁) (h₂ : net.OmegaFires m t m₂) : m₁ = m₂ := by
   funext p
   exact (h₁.2 p).trans (h₂.2 p).symm
 
+/-! ## ω-marking transition system -/
+
+/-- The ω-marking semantics of `net` as a labelled transition
+system. Its states are all ω-markings, its labels are the transitions of the
+weighted P/T net, and its transition relation is ω-firing. -/
+def WeightedNet.omegaMarkingLTS (net : WeightedNet P T) :
+    Cslib.LTS (OmegaMarking P) T where
+  Tr := net.OmegaFires
+
+/-- An edge of the ω-marking LTS is exactly an ω-firing. -/
+@[simp]
+theorem WeightedNet.omegaMarkingLTS_tr_iff
+    (net : WeightedNet P T) (src : OmegaMarking P) (t : T)
+    (tgt : OmegaMarking P) :
+    net.omegaMarkingLTS.Tr src t tgt ↔ net.OmegaFires src t tgt :=
+  Iff.rfl
+
+/-- A transition is enabled at an ω-marking exactly when the ω-marking LTS
+has an outgoing edge carrying that transition. -/
+theorem WeightedNet.omegaMarkingLTS_enabled_iff_exists_tr
+    (net : WeightedNet P T) (m : OmegaMarking P) (t : T) :
+    net.OmegaEnabled m t ↔ ∃ m', net.omegaMarkingLTS.Tr m t m' :=
+  net.omegaEnabled_iff_exists_omegaFires m t
+
+/-- Apply a transition sequence successively to an ω-marking.
+
+This is the deterministic ω-marking analogue of `firingSequenceResult`. It
+computes a marking for every list; an `omegaMarkingLTS.MTr` proof separately
+establishes that every transition was enabled. -/
+def WeightedNet.omegaFiringSequenceResult
+    (net : WeightedNet P T) : OmegaMarking P → List T → OmegaMarking P
+  | m, [] => m
+  | m, t :: ts =>
+      net.omegaFiringSequenceResult (net.omegaFiringResult m t) ts
+
+/-- The target of an executable ω-firing sequence is its computed
+`omegaFiringSequenceResult`. -/
+theorem WeightedNet.omegaMTr_eq_omegaFiringSequenceResult
+    {src tgt : OmegaMarking P} {labels : List T}
+    (hexec : net.omegaMarkingLTS.MTr src labels tgt) :
+    tgt = net.omegaFiringSequenceResult src labels := by
+  induction hexec with
+  | refl => rfl
+  | @stepL src t mid labels tgt hfirst _ ih =>
+      have hmid : mid = net.omegaFiringResult src t := by
+        funext p
+        exact hfirst.2 p
+      rw [WeightedNet.omegaFiringSequenceResult, ← hmid]
+      exact ih
+
+/-- An executable ω-firing sequence can be replayed from any larger source.
+Its deterministic result covers the original target. -/
+theorem WeightedNet.omegaMTr_mono
+    {src tgt largerSrc : OmegaMarking P} {labels : List T}
+    (hexec : net.omegaMarkingLTS.MTr src labels tgt)
+    (hle : src ≤ largerSrc) :
+    net.omegaMarkingLTS.MTr largerSrc labels
+        (net.omegaFiringSequenceResult largerSrc labels) ∧
+      tgt ≤ net.omegaFiringSequenceResult largerSrc labels := by
+  induction hexec generalizing largerSrc with
+  | refl => exact ⟨Cslib.LTS.MTr.refl, hle⟩
+  | @stepL src t mid labels tgt hfirst _ ih =>
+      obtain ⟨largerMid, hfirst', hmidLe⟩ := hfirst.mono hle
+      obtain ⟨htail', htgtLe⟩ := ih hmidLe
+      have hmid : largerMid = net.omegaFiringResult largerSrc t := by
+        funext p
+        exact hfirst'.2 p
+      rw [WeightedNet.omegaFiringSequenceResult, ← hmid]
+      exact ⟨Cslib.LTS.MTr.stepL hfirst' htail', htgtLe⟩
+
+/-- Adding the same ω-marking to both endpoints preserves an executable
+ω-firing sequence. -/
+theorem WeightedNet.omegaMTr_add
+    {src tgt : OmegaMarking P} {labels : List T}
+    (hexec : net.omegaMarkingLTS.MTr src labels tgt)
+    (d : OmegaMarking P) :
+    net.omegaMarkingLTS.MTr (src + d) labels (tgt + d) := by
+  induction hexec with
+  | refl => exact Cslib.LTS.MTr.refl
+  | stepL hfirst _ ih =>
+      exact Cslib.LTS.MTr.stepL (hfirst.add d) ih
+
+/-- A non-decreasing ω-firing sequence stays non-decreasing when replayed
+from a larger source. The same extra tokens are added to both endpoints. -/
+theorem WeightedNet.omegaMTr_replay_nondecreasing
+    {src tgt largerSrc : OmegaMarking P} {labels : List T}
+    (hexec : net.omegaMarkingLTS.MTr src labels tgt)
+    (hgrowth : src ≤ tgt) (hle : src ≤ largerSrc) :
+    ∃ largerTgt, net.omegaMarkingLTS.MTr largerSrc labels largerTgt ∧
+      largerSrc ≤ largerTgt := by
+  let d := largerSrc - src
+  have hsrc : src + d = largerSrc := by
+    funext p
+    exact add_tsub_cancel_of_le (hle p)
+  refine ⟨tgt + d, hsrc ▸ net.omegaMTr_add hexec d, ?_⟩
+  rw [← hsrc]
+  exact add_le_add_left hgrowth d
+
+/-! ## Weakest ω-predecessors -/
+
+/-- The weakest ω-marking from which firing `t` can cover `target`.
+
+It is the ω-marking analogue of `weakestPreMarking`: at every place it
+contains the finite pre-incidence weight, together with the part of the target
+demand not supplied by the post-incidence weight. -/
+def WeightedNet.weakestPreOmegaMarking
+    (net : WeightedNet P T) (t : T) (target : OmegaMarking P) :
+    OmegaMarking P := fun p =>
+  net.pre p t + (target p - net.post p t)
+
+/-- Propagate an ω-marking target backwards through a transition sequence.
+The transitions are processed from right to left, as for
+`weakestPreMarkingSequence`. -/
+def WeightedNet.weakestPreOmegaMarkingSequence
+    (net : WeightedNet P T) : List T → OmegaMarking P → OmegaMarking P
+  | [], target => target
+  | t :: ts, target =>
+      net.weakestPreOmegaMarking t
+        (net.weakestPreOmegaMarkingSequence ts target)
+
+/-- Weakest ω-predecessors distribute over concatenation: first propagate
+the target through the suffix, then through the prefix. -/
+theorem WeightedNet.weakestPreOmegaMarkingSequence_append
+    (net : WeightedNet P T) (ts₁ ts₂ : List T)
+    (target : OmegaMarking P) :
+    net.weakestPreOmegaMarkingSequence (ts₁ ++ ts₂) target =
+      net.weakestPreOmegaMarkingSequence ts₁
+        (net.weakestPreOmegaMarkingSequence ts₂ target) := by
+  induction ts₁ with
+  | nil => rfl
+  | cons t ts ih =>
+      simp only [List.cons_append,
+        WeightedNet.weakestPreOmegaMarkingSequence]
+      rw [ih]
+
 /-- Any ω-marking above `weakestPreOmegaMarking t target` enables `t`.
 Firing `t` from it produces an ω-marking covering `target`. -/
 theorem WeightedNet.exists_omegaFires_cover_of_weakestPreOmegaMarking_le
-    {P T : Type*} (net : WeightedNet P T) (t : T)
+    (net : WeightedNet P T) (t : T)
     (target : OmegaMarking P) {src : OmegaMarking P}
     (hsrc : net.weakestPreOmegaMarking t target ≤ src) :
     ∃ tgt, net.OmegaFires src t tgt ∧ target ≤ tgt := by
@@ -293,7 +384,7 @@ theorem WeightedNet.exists_omegaFires_cover_of_weakestPreOmegaMarking_le
 
 /-- The ω-valued and concrete weakest predecessor constructions agree on
 concrete target markings. -/
-theorem WeightedNet.weakestPreOmegaMarking_coe {P T : Type*}
+theorem WeightedNet.weakestPreOmegaMarking_coe
     (net : WeightedNet P T) (t : T) (target : Marking P) :
     net.weakestPreOmegaMarking t target = net.weakestPreMarking t target := by
   funext p
@@ -301,7 +392,7 @@ theorem WeightedNet.weakestPreOmegaMarking_coe {P T : Type*}
 
 /-- The ω-valued and concrete weakest predecessor sequence constructions
 agree on concrete target markings. -/
-theorem WeightedNet.weakestPreOmegaMarkingSequence_coe {P T : Type*}
+theorem WeightedNet.weakestPreOmegaMarkingSequence_coe
     (net : WeightedNet P T) (ts : List T) (target : Marking P) :
     net.weakestPreOmegaMarkingSequence ts target =
       net.weakestPreMarkingSequence ts target := by
@@ -317,7 +408,6 @@ theorem WeightedNet.weakestPreOmegaMarkingSequence_coe {P T : Type*}
 If `t` fires from `src` to `tgt` and `target ≤ tgt`, then the weakest
 ω-marking sufficient to cover `target` lies below `src`. -/
 theorem WeightedNet.weakestPreOmegaMarking_le_of_omegaFires
-    {P T : Type*} {net : WeightedNet P T}
     {src tgt target : OmegaMarking P} {t : T}
     (hfires : net.OmegaFires src t tgt) (htarget : target ≤ tgt) :
     net.weakestPreOmegaMarking t target ≤ src := by
@@ -337,90 +427,6 @@ theorem WeightedNet.weakestPreOmegaMarking_le_of_omegaFires
       add_le_add le_rfl hremaining
     _ = src p := add_tsub_cancel_of_le (hfires.1 p)
 
-/-! ## ω-marking transition system -/
-
-/-- The ω-marking semantics of `net` as a labelled transition
-system. Its states are all ω-markings, its labels are the transitions of the
-weighted P/T net, and its transition relation is ω-firing. -/
-def WeightedNet.omegaMarkingLTS {P T : Type*} (net : WeightedNet P T) :
-    Cslib.LTS (OmegaMarking P) T where
-  Tr := net.OmegaFires
-
-/-- An edge of the ω-marking LTS is exactly an ω-firing. -/
-@[simp]
-theorem WeightedNet.omegaMarkingLTS_tr_iff {P T : Type*}
-    (net : WeightedNet P T) (src : OmegaMarking P) (t : T)
-    (tgt : OmegaMarking P) :
-    net.omegaMarkingLTS.Tr src t tgt ↔ net.OmegaFires src t tgt :=
-  Iff.rfl
-
-/-- The target of an executable ω-firing sequence is its computed
-`omegaFiringSequenceResult`. -/
-theorem WeightedNet.omegaMTr_eq_omegaFiringSequenceResult
-    {P T : Type*} {net : WeightedNet P T}
-    {src tgt : OmegaMarking P} {labels : List T}
-    (hexec : net.omegaMarkingLTS.MTr src labels tgt) :
-    tgt = net.omegaFiringSequenceResult src labels := by
-  induction hexec with
-  | refl => rfl
-  | @stepL src t mid labels tgt hfirst _ ih =>
-      have hmid : mid = net.omegaFiringResult src t := by
-        funext p
-        exact hfirst.2 p
-      rw [WeightedNet.omegaFiringSequenceResult, ← hmid]
-      exact ih
-
-/-- An executable ω-firing sequence can be replayed from any larger source.
-Its deterministic result covers the original target. -/
-theorem WeightedNet.omegaMTr_mono
-    {P T : Type*} {net : WeightedNet P T}
-    {src tgt largerSrc : OmegaMarking P} {labels : List T}
-    (hexec : net.omegaMarkingLTS.MTr src labels tgt)
-    (hle : src ≤ largerSrc) :
-    net.omegaMarkingLTS.MTr largerSrc labels
-        (net.omegaFiringSequenceResult largerSrc labels) ∧
-      tgt ≤ net.omegaFiringSequenceResult largerSrc labels := by
-  induction hexec generalizing largerSrc with
-  | refl => exact ⟨Cslib.LTS.MTr.refl, hle⟩
-  | @stepL src t mid labels tgt hfirst _ ih =>
-      obtain ⟨largerMid, hfirst', hmidLe⟩ := hfirst.mono hle
-      obtain ⟨htail', htgtLe⟩ := ih hmidLe
-      have hmid : largerMid = net.omegaFiringResult largerSrc t := by
-        funext p
-        exact hfirst'.2 p
-      rw [WeightedNet.omegaFiringSequenceResult, ← hmid]
-      exact ⟨Cslib.LTS.MTr.stepL hfirst' htail', htgtLe⟩
-
-/-- Adding the same ω-marking to both endpoints preserves an executable
-ω-firing sequence. -/
-theorem WeightedNet.omegaMTr_add
-    {P T : Type*} {net : WeightedNet P T}
-    {src tgt : OmegaMarking P} {labels : List T}
-    (hexec : net.omegaMarkingLTS.MTr src labels tgt)
-    (d : OmegaMarking P) :
-    net.omegaMarkingLTS.MTr (src + d) labels (tgt + d) := by
-  induction hexec with
-  | refl => exact Cslib.LTS.MTr.refl
-  | stepL hfirst _ ih =>
-      exact Cslib.LTS.MTr.stepL (hfirst.add d) ih
-
-/-- A non-decreasing ω-firing sequence stays non-decreasing when replayed
-from a larger source. The same extra tokens are added to both endpoints. -/
-theorem WeightedNet.omegaMTr_replay_nondecreasing
-    {P T : Type*} {net : WeightedNet P T}
-    {src tgt largerSrc : OmegaMarking P} {labels : List T}
-    (hexec : net.omegaMarkingLTS.MTr src labels tgt)
-    (hgrowth : src ≤ tgt) (hle : src ≤ largerSrc) :
-    ∃ largerTgt, net.omegaMarkingLTS.MTr largerSrc labels largerTgt ∧
-      largerSrc ≤ largerTgt := by
-  let d := largerSrc - src
-  have hsrc : src + d = largerSrc := by
-    funext p
-    exact add_tsub_cancel_of_le (hle p)
-  refine ⟨tgt + d, hsrc ▸ net.omegaMTr_add hexec d, ?_⟩
-  rw [← hsrc]
-  exact add_le_add_left hgrowth d
-
 /-- Any ω-marking above the weakest predecessor of a transition sequence can
 execute that sequence, and the resulting ω-marking covers `target`.
 
@@ -433,7 +439,7 @@ src ────────────ts────────────�
 ```
 -/
 theorem WeightedNet.exists_omegaMTr_cover_of_weakestPreOmegaMarkingSequence_le
-    {P T : Type*} (net : WeightedNet P T) (ts : List T)
+    (net : WeightedNet P T) (ts : List T)
     (target : OmegaMarking P) {src : OmegaMarking P}
     (hsrc : net.weakestPreOmegaMarkingSequence ts target ≤ src) :
     ∃ tgt, net.omegaMarkingLTS.MTr src ts tgt ∧ target ≤ tgt := by
@@ -447,25 +453,18 @@ theorem WeightedNet.exists_omegaMTr_cover_of_weakestPreOmegaMarkingSequence_le
       obtain ⟨tgt, htail, htarget⟩ := ih htailDemand
       exact ⟨tgt, Cslib.LTS.MTr.stepL hfirst htail, htarget⟩
 
-/-- A transition is enabled at an ω-marking exactly when the ω-marking LTS
-has an outgoing edge carrying that transition. -/
-theorem WeightedNet.omegaMarkingLTS_enabled_iff_exists_tr {P T : Type*}
-    (net : WeightedNet P T) (m : OmegaMarking P) (t : T) :
-    net.OmegaEnabled m t ↔ ∃ m', net.omegaMarkingLTS.Tr m t m' :=
-  net.omegaEnabled_iff_exists_omegaFires m t
-
 /-! ## Relation with concrete firing semantics -/
 
 /-- Lifting a concrete marking into an ω-marking preserves and reflects
 enabledness. -/
-theorem WeightedNet.enabled_iff_omegaEnabled_toOmega {P T : Type*}
+theorem WeightedNet.enabled_iff_omegaEnabled_toOmega
     (net : WeightedNet P T) (m : Marking P) (t : T) :
     net.Enabled m t ↔ net.OmegaEnabled m t := by
   simp [WeightedNet.Enabled, WeightedNet.OmegaEnabled, Marking.toOmega]
 
 /-- Lifting concrete source and target markings into the ω-markings
 preserves and reflects firing. -/
-theorem WeightedNet.fires_iff_omegaFires_toOmega {P T : Type*}
+theorem WeightedNet.fires_iff_omegaFires_toOmega
     (net : WeightedNet P T) (m m' : Marking P) (t : T) :
     net.Fires m t m' ↔ net.OmegaFires m t m' := by
   constructor
@@ -509,7 +508,6 @@ predecessor demand is concrete. At a finite place, it follows from the
 This theorem is the backward step used to turn a concrete demand below an
 ω-successor into a concrete demand below its source. -/
 theorem WeightedNet.weakestPreMarking_le_of_omegaFires
-    {P T : Type*} {net : WeightedNet P T}
     {omegaSrc omegaTgt : OmegaMarking P} {t : T} {target : Marking P}
     (hfires : net.OmegaFires omegaSrc t omegaTgt)
     (htarget : target ≤ omegaTgt) :
@@ -520,7 +518,6 @@ theorem WeightedNet.weakestPreMarking_le_of_omegaFires
 /-- Propagating a concrete demand backwards along an ω-execution gives
 a concrete predecessor below the abstract source. -/
 private theorem WeightedNet.weakestPreMarkingSequence_le_of_omegaMTr
-    {P T : Type*} {net : WeightedNet P T}
     {src tgt : OmegaMarking P} {ts : List T} {demand : Marking P}
     (hexec : net.omegaMarkingLTS.MTr src ts tgt) (hdemand : demand ≤ tgt) :
     net.weakestPreMarkingSequence ts demand ≤ src := by
@@ -529,9 +526,41 @@ private theorem WeightedNet.weakestPreMarkingSequence_le_of_omegaMTr
   | stepL hfirst _ ih =>
       exact net.weakestPreMarking_le_of_omegaFires hfirst (ih hdemand)
 
+/-- Realise a concrete demand below an ω-firing target by an ordinary firing.
+
+Given `omegaSrc ─t→ omegaTgt` and a concrete `demand` represented below
+`omegaTgt`, the theorem constructs a concrete source below `omegaSrc`. Firing
+`t` from that source produces its deterministic firing result, which covers
+`demand`:
+
+```text
+           omegaSrc ─────────t─────────▶ omegaTgt
+               ▲                           ▲
+            toOmega ≤                   toOmega ≤
+               │                           │
+          finiteSrc ──t──▶ firingResult   demand
+```
+-/
+theorem WeightedNet.exists_finite_firing_cover_of_omegaFires
+    {omegaSrc omegaTgt : OmegaMarking P} {t : T} {demand : Marking P}
+    (hfires : net.OmegaFires omegaSrc t omegaTgt)
+    (hdemand : demand ≤ omegaTgt) :
+    ∃ finiteSrc : Marking P,
+      finiteSrc ≤ omegaSrc ∧
+      net.Fires finiteSrc t (net.firingResult finiteSrc t) ∧
+      demand ≤ net.firingResult finiteSrc t := by
+  let finiteSrc := net.weakestPreMarking t demand
+  have hsrcBelow : finiteSrc ≤ omegaSrc :=
+    net.weakestPreMarking_le_of_omegaFires hfires hdemand
+  obtain ⟨hfiniteFires, hdemandBelow⟩ :=
+    net.fires_firingResult_cover_of_weakestPreMarking_le t demand le_rfl
+  exact ⟨finiteSrc, hsrcBelow, hfiniteFires, hdemandBelow⟩
+
+/-! ## Concrete replay of ω-firing sequences -/
+
 /-- Every concrete marking `c` below an ω-marking `m` is covered by a concretisation
 using one uniform bound for all ω-places. -/
-private theorem OmegaMarking.exists_uniform_concretise_ge {P : Type*} [Fintype P]
+private theorem OmegaMarking.exists_uniform_concretise_ge [Fintype P]
     {m : OmegaMarking P} {c : Marking P} (hle : c ≤ m) :
     ∃ L : ℕ, c ≤ m.concretise (fun _ => L) := by
   /- We choose a uniform bound `L` as the largest value in `c`. -/
@@ -551,7 +580,7 @@ private theorem OmegaMarking.exists_uniform_concretise_ge {P : Type*} [Fintype P
 /-- Replay an ω-execution concretely using enough tokens at the
 source's ω-places to cover the target demand. -/
 private theorem WeightedNet.exists_concrete_replay
-    {P T : Type*} [Fintype P] {net : WeightedNet P T}
+    [Fintype P]
     {src tgt : OmegaMarking P} {ts : List T}
     (hexec : net.omegaMarkingLTS.MTr src ts tgt)
     (K : ℕ) :
@@ -570,7 +599,6 @@ private theorem WeightedNet.exists_concrete_replay
 
 /-- An ordinary ω-execution preserves finiteness at each finite place. -/
 private theorem WeightedNet.omegaMTr_preserves_finite
-    {P T : Type*} {net : WeightedNet P T}
     {src tgt : OmegaMarking P} {ts : List T} {p : P}
     (hexec : net.omegaMarkingLTS.MTr src ts tgt)
     (hsrc : src p ≠ ⊤) : tgt p ≠ ⊤ := by
@@ -584,7 +612,7 @@ private theorem WeightedNet.omegaMTr_preserves_finite
 /-- A concrete replay covering the target demand gains at least one token
 at a place that strictly grows in the ω-execution. -/
 private theorem WeightedNet.exists_concrete_replay_growsAt
-    {P T : Type*} [Fintype P] {net : WeightedNet P T}
+    [Fintype P]
     {src tgt : OmegaMarking P} {ts : List T} {p : P}
     (hexec : net.omegaMarkingLTS.MTr src ts tgt)
     (hgrowth : src p < tgt p) (K : ℕ) :
@@ -606,7 +634,7 @@ private theorem WeightedNet.exists_concrete_replay_growsAt
 /-- A repetition budget fits below an ω-marking when the concrete source
 already fits below it and the replay loses no tokens at its finite places. -/
 private theorem OmegaMarking.repeat_budget_le
-    {P : Type*} {m : OmegaMarking P} {base reached : Marking P}
+    {m : OmegaMarking P} {base reached : Marking P}
     (hbase : base ≤ m)
     (hfinite : ∀ q, m q ≠ ⊤ → base q ≤ reached q) (n : ℕ) :
     base + n • (base - reached) ≤ m := by
@@ -622,7 +650,7 @@ below the abstract source, and the repetition gains at least `n` tokens
 at the strictly growing place. A nonempty repetition also covers the
 target concretisation with budget `K`. -/
 theorem WeightedNet.exists_concrete_replay_repeated_growsAt
-    {P T : Type*} [Fintype P] {net : WeightedNet P T}
+    [Fintype P]
     {src tgt : OmegaMarking P} {ts : List T} {p : P}
     (hexec : net.omegaMarkingLTS.MTr src ts tgt)
     (hle : src ≤ tgt) (hgrowth : src p < tgt p) (n K : ℕ) :
@@ -651,43 +679,12 @@ theorem WeightedNet.exists_concrete_replay_repeated_growsAt
       · intro _
         exact hcover.trans (by simp)
 
-/-- Realise a concrete demand below an ω-firing target by an ordinary firing.
-
-Given `omegaSrc ─t→ omegaTgt` and a concrete `demand` represented below
-`omegaTgt`, the theorem constructs a concrete source below `omegaSrc`. Firing
-`t` from that source produces its deterministic firing result, which covers
-`demand`:
-
-```text
-           omegaSrc ─────────t─────────▶ omegaTgt
-               ▲                           ▲
-            toOmega ≤                   toOmega ≤
-               │                           │
-          finiteSrc ──t──▶ firingResult   demand
-```
--/
-theorem WeightedNet.exists_finite_firing_cover_of_omegaFires
-    {P T : Type*} {net : WeightedNet P T}
-    {omegaSrc omegaTgt : OmegaMarking P} {t : T} {demand : Marking P}
-    (hfires : net.OmegaFires omegaSrc t omegaTgt)
-    (hdemand : demand ≤ omegaTgt) :
-    ∃ finiteSrc : Marking P,
-      finiteSrc ≤ omegaSrc ∧
-      net.Fires finiteSrc t (net.firingResult finiteSrc t) ∧
-      demand ≤ net.firingResult finiteSrc t := by
-  let finiteSrc := net.weakestPreMarking t demand
-  have hsrcBelow : finiteSrc ≤ omegaSrc :=
-    net.weakestPreMarking_le_of_omegaFires hfires hdemand
-  obtain ⟨hfiniteFires, hdemandBelow⟩ :=
-    net.fires_firingResult_cover_of_weakestPreMarking_le t demand le_rfl
-  exact ⟨finiteSrc, hsrcBelow, hfiniteFires, hdemandBelow⟩
-
 /-! ## Coverability -/
 
 /-- A marking `m` is coverable from `m₀` when there is a marking `m'`
 reachable from `m₀` such that `m ≤ m'`. The order on markings is pointwise:
 `m ≤ m'` means that `m p ≤ m' p` for every place `p`. -/
-def WeightedNet.CoverableFrom {P T : Type*} (net : WeightedNet P T)
+def WeightedNet.CoverableFrom (net : WeightedNet P T)
     (m₀ m : Marking P) : Prop :=
   ∃ m', net.Reachable m₀ m' ∧ m ≤ m'
 
@@ -695,7 +692,6 @@ def WeightedNet.CoverableFrom {P T : Type*} (net : WeightedNet P T)
 `target` is coverable. A reachable marking covering the predecessor enables
 `t`, and its firing result covers `target`. -/
 theorem WeightedNet.coverableFrom_of_weakestPreMarking
-    {P T : Type*} {net : WeightedNet P T}
     {m₀ target : Marking P} {t : T}
     (hpre : net.CoverableFrom m₀ (net.weakestPreMarking t target)) :
     net.CoverableFrom m₀ target := by
@@ -724,7 +720,6 @@ sequence and reaches a marking covering `target` (monotonicity of the firing seq
 The reachable marking covering the weakest predecessor can execute `labels`;
 the resulting marking then covers `target`. -/
 theorem WeightedNet.coverableFrom_of_weakestPreMarkingSequence
-    {P T : Type*} {net : WeightedNet P T}
     {m₀ target : Marking P} {labels : List T}
     (hpre : net.CoverableFrom m₀
       (net.weakestPreMarkingSequence labels target)) :
@@ -746,7 +741,7 @@ contained in the downward closure of the reachable markings from `m₀`:
 ∀ m, m ≤ mω → ∃ m', Reachable m₀ m' ∧ m ≤ m'.
 ```
 -/
-def WeightedNet.OmegaCoverableFrom {P T : Type*} (net : WeightedNet P T)
+def WeightedNet.OmegaCoverableFrom (net : WeightedNet P T)
     (m₀ : Marking P) (mω : OmegaMarking P) : Prop :=
   ∀ m : Marking P, m ≤ mω → net.CoverableFrom m₀ m
 
@@ -782,7 +777,6 @@ reserves at the ω-places. The reachable witness may depend on the chosen
 reserve; the theorem does not claim that one concrete marking realises all
 possible reserves simultaneously. -/
 theorem WeightedNet.OmegaCoverableFrom.coverable_concretise
-    {P T : Type*} {net : WeightedNet P T}
     {m₀ : Marking P} {mω : OmegaMarking P}
     (h : net.OmegaCoverableFrom m₀ mω) (reserve : Marking P) :
     net.CoverableFrom m₀ (mω.concretise reserve) := by
@@ -791,7 +785,7 @@ theorem WeightedNet.OmegaCoverableFrom.coverable_concretise
 /-- An ω-marking `mω` is `K`-coverable from `m₀` when its concretisation with
 `K` tokens at every `ω`-place is coverable from `m₀`. Its finite components
 retain their exact values. -/
-def WeightedNet.KCoverableFrom {P T : Type*} (net : WeightedNet P T)
+def WeightedNet.KCoverableFrom (net : WeightedNet P T)
     (m₀ : Marking P) (mω : OmegaMarking P) (K : ℕ) : Prop :=
   net.CoverableFrom m₀ (mω.concretise fun _ => K)
 
@@ -801,7 +795,7 @@ for every `K`.
 Thus it suffices to show that, for every `K`, one reachable marking covers the
 finite components of `mω` and has at least `K` tokens at every `ω`-place. -/
 theorem WeightedNet.omegaCoverableFrom_iff_forall_kCoverableFrom
-    {P T : Type*} [Fintype P] {net : WeightedNet P T}
+    [Fintype P]
     {m₀ : Marking P} {mω : OmegaMarking P} :
     net.OmegaCoverableFrom m₀ mω ↔
       ∀ K, net.KCoverableFrom m₀ mω K := by
@@ -828,7 +822,7 @@ theorem WeightedNet.omegaCoverableFrom_iff_forall_kCoverableFrom
 itself. Every concrete marking below `m₀` is covered by the reachable
 marking `m₀`. -/
 theorem WeightedNet.omegaCoverableFrom_initial
-    {P T : Type*} (net : WeightedNet P T) (m₀ : Marking P) :
+    (net : WeightedNet P T) (m₀ : Marking P) :
     net.OmegaCoverableFrom m₀ m₀ := by
   intro m hle
   refine ⟨m₀, WeightedNet.Reachable.refl net m₀, ?_⟩
@@ -850,7 +844,6 @@ demand ≤ concreteTgt
 Source soundness supplies `reachableSrc`; firing monotonicity supplies
 `reachableTgt`, which covers `demand`. -/
 private theorem coverableFrom_of_concrete_firing_cover
-    {P T : Type*} {net : WeightedNet P T}
     {m₀ concreteSrc concreteTgt demand : Marking P}
     {src : OmegaMarking P} {t : T}
     (hsound : net.OmegaCoverableFrom m₀ src)
@@ -882,7 +875,6 @@ marking covering the original target demand.
 ```
 -/
 theorem WeightedNet.omegaCoverableFrom_of_omegaFires
-    {P T : Type*} {net : WeightedNet P T}
     {m₀ : Marking P} {omegaSrc omegaTgt : OmegaMarking P} {t : T}
     (hsound : net.OmegaCoverableFrom m₀ omegaSrc)
     (hfires : net.OmegaFires omegaSrc t omegaTgt) :
