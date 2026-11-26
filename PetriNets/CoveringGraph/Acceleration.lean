@@ -28,7 +28,7 @@ namespace PetriNet
 
 namespace OmegaMarking
 
-/-! ## ω-places and concrete markings -/
+/-! ## ω-places -/
 
 /-- The finite set of places at which a given ω-marking has value `ω`.
 
@@ -61,27 +61,6 @@ theorem mem_omegaPlaces {P : Type*} [Fintype P]
   classical
   simp [omegaPlaces]
 
-/-- Convert an ω-marking containing no `ω` to a concrete marking.
-
-The proof argument makes this conversion deliberately unavailable for a
-genuinely infinite ω-marking: `ENat.toNat` alone assigns a natural value to
-`ω`, which would not be a faithful conversion. -/
-def toNat {P : Type*} [Fintype P] (m : OmegaMarking P)
-    (_ : omegaPlaces m = ∅) : Marking P :=
-  fun p => (m p).toNat
-
-/-- Converting an ω-marking without any `ω` component to natural numbers and
-embedding it again recovers the original marking. -/
-theorem toOmega_toNat_eq_self {P : Type*} [Fintype P]
-    {m : OmegaMarking P} (hfinite : omegaPlaces m = ∅) :
-    (m.toNat hfinite).toOmega = m := by
-  funext p
-  apply ENat.natCast_toNat
-  intro hp
-  have : p ∈ omegaPlaces m := mem_omegaPlaces.mpr hp
-  rw [hfinite] at this
-  simp at this
-
 /-! ## Acceleration -/
 
 /-- `accelerate A m` is the ω-marking obtained from `m` by replacing the
@@ -97,13 +76,6 @@ noncomputable def accelerate {P : Type*} (A : Set P)
 def accelerateFinset {P : Type*} [DecidableEq P] (A : Finset P)
     (m : OmegaMarking P) : OmegaMarking P :=
   fun p => if p ∈ A then ⊤ else m p
-
-/-- Finite-set acceleration agrees with set-based acceleration. -/
-theorem accelerateFinset_eq_accelerate {P : Type*} [DecidableEq P]
-    (A : Finset P) (m : OmegaMarking P) :
-    accelerateFinset A m = accelerate (A : Set P) m := by
-  funext p
-  by_cases hp : p ∈ A <;> simp [accelerateFinset, accelerate, hp]
 
 /-- A place selected for acceleration has value `ω`. -/
 @[simp]
@@ -121,19 +93,19 @@ theorem accelerate_apply_of_not_mem {P : Type*} {A : Set P}
   classical
   simp [accelerate, hp]
 
-/-- Acceleration never decreases an ω-marking. -/
-theorem le_accelerate {P : Type*} (A : Set P) (m : OmegaMarking P) :
-    m ≤ accelerate A m := by
-  intro p
-  by_cases hp : p ∈ A
-  · rw [accelerate_apply_of_mem hp]
-    exact le_top
-  · rw [accelerate_apply_of_not_mem hp]
-
 end OmegaMarking
 
-/-- If a growing ω-execution ends at a coverable marking, accelerating its
-strictly growing place preserves ω-coverability. -/
+/-! ## Coverability under acceleration -/
+
+/-- Suppose `tgt` is ω-coverable from `m₀` and an ω-firing sequence
+`ts` takes `src` to `tgt` with `src ≤ tgt` and `src p < tgt p`.
+Then replacing `tgt p` by ω preserves ω-coverability from `m₀`.
+
+For any finite token demand at `p`, take enough repetitions of a concrete
+replay of `ts` to meet it. The required starting marking lies below `tgt`,
+so some reachable marking covers it. Monotonicity lets the repetitions
+fire from that reachable marking, meeting the demand at `p` while still
+covering the chosen concretisation of `tgt` at the other places. -/
 theorem WeightedNet.omegaCoverableFrom_accelerate_of_growsAt
     {P T : Type*} [Fintype P] {net : WeightedNet P T}
     {m₀ : Marking P} {src tgt : OmegaMarking P} {ts : List T} {p : P}
@@ -156,8 +128,15 @@ theorem WeightedNet.omegaCoverableFrom_accelerate_of_growsAt
   · simpa [OmegaMarking.concretise, OmegaMarking.accelerate, hq] using
       (hcover (Nat.succ_pos K) q).trans (hend q)
 
-/-- Accelerate a finite set one place at a time, using a growth witness
-ending at the original target for each selected place. -/
+/-- Suppose `tgt` is ω-coverable from `m₀`. For each `p ∈ A`, suppose
+there is an ω-firing sequence ending at `tgt` from a source at most `tgt`
+and strictly smaller at `p`. Then setting all places in the finite set
+`A` to ω preserves ω-coverability from `m₀`.
+
+Accelerate one place at a time. For the next place `p`, set the already
+accelerated places to ω at both ends of its witness execution. This gives
+an execution ending at the current target and leaves strict growth at
+`p` intact. The single-place theorem then accelerates `p`. -/
 theorem WeightedNet.omegaCoverableFrom_accelerateFinset_of_growsAt
     {P T : Type*} [Fintype P] [DecidableEq P] {net : WeightedNet P T}
     {m₀ : Marking P} {tgt : OmegaMarking P} (A : Finset P)
