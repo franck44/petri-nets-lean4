@@ -120,6 +120,12 @@ The definitions, terminology, and standard results are guided principally by:
 Individual Lean modules give more precise references where a definition or
 result is introduced.
 
+## AI assistance
+
+I use OpenAI Codex (GPT-6.2 Sol/light) to help with formalisation and Lean syntax, and to generate small code snippets. I reviewed and edited the code, added descriptive documentation, and contributed original proofs, including the soundness proof.
+
+I take responsibility for the definitions, theorem statements, proofs, examples and documentation in this repository.
+
 ## License
 
 Copyright © 2026 Franck Cassez.
